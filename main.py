@@ -54,7 +54,31 @@ class MainApp(tk.Tk):
             print('Text')
 
     def checklist(self):
-        print('Checklist')
+        self.checklist_win = tk.Toplevel()
+
+        checklist_steps = ['Turn on ignitron heat lamp for 10 minutes',
+            'Ensure that power supply is off',
+            'Ensure that the charging switch is open',
+            'Check system is grounded',
+            'Turn on power supply',
+            'Exit room and ensure nobody else is present',
+            'Turn on HV Testing Light',
+            'Close charging switch',
+            'Increase voltage on power supply',
+            'Open charging switch',
+            'Trigger ignitron',
+            'Save scope and video data',
+            'Enter room, turn off power supply, and "idiot stick" all HV lines',
+            'Turn off HV testing light'
+            ]
+
+        self.checlist_Checkbuttons = {}
+        for i, step in enumerate(checklist_steps):
+            self.checlist_Checkbuttons[f'c{i}'] = tk.Checkbutton(self.checklist_win, text=f'Step {i}: ' + step)
+            self.checlist_Checkbuttons[f'c{i}'].grid(row=i, column=0, sticky='w')
+
+        self.checklist_win.wait_window()
+
 
     def charge(self):
         print('Charge')
