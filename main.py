@@ -12,6 +12,9 @@ class MainApp(tk.Tk):
         self.title('HV Capacitor Testing')
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
+        # Constant Button Options
+        button_opts = {'font':('Times', 24)}
+
         # Column for buttons on the left
         self.grid_columnconfigure(0, w=1)
         self.buttons = ttk.Frame(self)
@@ -20,19 +23,22 @@ class MainApp(tk.Tk):
 
         # Begin checklist button
         self.checklist_button = tk.Button(self.buttons, text='Begin Charging\nChecklist',
-                                    font=('Times', 24), command=self.checklist)
+                                    command=self.checklist, **button_opts)
         self.checklist_button.grid(row=2, column=0, sticky='ew')
 
         # Begin charging button
-        self.charge_button = tk.Button(self.buttons, text='Begin Charging', font=('Times', 24), command=self.charge)
+        self.charge_button = tk.Button(self.buttons, text='Begin Charging',
+                                    command=self.charge, **button_opts)
         self.charge_button.grid(row=3, column=0, sticky='ew')
 
         # Discharge button
-        self.discharge_button = tk.Button(self.buttons, text='Discharge', font=('Times', 24), command=self.discharge)
+        self.discharge_button = tk.Button(self.buttons, text='Discharge',
+                                    command=self.discharge, **button_opts)
         self.discharge_button.grid(row=4, column=0, sticky='ew')
 
         # Emergency Off button
-        self.emergency_off_button = tk.Button(self.buttons, text='Emergency Off', font=('Times', 24), command=self.emergency_off)
+        self.emergency_off_button = tk.Button(self.buttons, text='Emergency Off',
+                                    command=self.emergency_off, **button_opts)
         self.emergency_off_button.grid(row=5, column=0, sticky='ew')
 
         # Configure Graphs
@@ -72,10 +78,10 @@ class MainApp(tk.Tk):
             'Turn off HV testing light'
             ]
 
-        self.checlist_Checkbuttons = {}
+        self.checklist_Checkbuttons = {}
         for i, step in enumerate(checklist_steps):
-            self.checlist_Checkbuttons[f'c{i}'] = tk.Checkbutton(self.checklist_win, text=f'Step {i}: ' + step)
-            self.checlist_Checkbuttons[f'c{i}'].grid(row=i, column=0, sticky='w')
+            self.checklist_Checkbuttons[f'c{i}'] = tk.Checkbutton(self.checklist_win, text=f'Step {i}: ' + step)
+            self.checklist_Checkbuttons[f'c{i}'].grid(row=i, column=0, sticky='w')
 
         self.checklist_win.wait_window()
 
@@ -112,25 +118,6 @@ class Can_Plot(ttk.Frame):
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
-
-class Data_Display(ttk.Frame):
-
-    def __init__(self, master, lab_name):
-
-        super().__init__(master)
-        self.master = master
-        s = ttk.Style()
-        s.configure('.', font=('Times', 24))
-        self.lab_tit = ttk.Label(self, text=lab_name) #Set Label Title
-        self.lab_tit.pack(expand=1, fill=tk.BOTH)
-        self.var = tk.StringVar()
-        #self.var.set('test')
-        self.lab_data = ttk.Label(self, textvariable=self.var)
-        self.lab_data.pack(expand=1, fill=tk.BOTH)
-
-    def update(self, x):
-
-        self.var.set(str(x))
 
 if __name__ == "__main__":
     app = MainApp()
