@@ -14,7 +14,7 @@ class MainApp(tk.Tk):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Constant Button Options
-        button_opts = {'font':('Times', 24)}
+        widget_opts = {'font':('Times', 24)}
 
         # Column for buttons on the left
         self.grid_columnconfigure(0, w=1)
@@ -24,23 +24,27 @@ class MainApp(tk.Tk):
 
         # Begin checklist button
         self.checklist_button = tk.Button(self.buttons, text='Begin Charging\nChecklist',
-                                    command=self.checklist, bg=green, fg=yellow, **button_opts)
+                                    command=self.checklist, bg=green, fg=yellow, **widget_opts)
         self.checklist_button.grid(row=2, column=0, sticky='ew')
 
         # Begin charging button
         self.charge_button = tk.Button(self.buttons, text='Begin Charging',
-                                    command=self.charge, bg=orange, fg=white, **button_opts)
+                                    command=self.charge, bg=orange, fg=white, **widget_opts)
         self.charge_button.grid(row=3, column=0, sticky='ew')
 
         # Discharge button
         self.discharge_button = tk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bg=red, fg=white, **button_opts)
+                                    command=self.discharge, bg=red, fg=white, **widget_opts)
         self.discharge_button.grid(row=4, column=0, sticky='ew')
 
         # Emergency Off button
         self.emergency_off_button = tk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off, bg=red, fg=white, **button_opts)
+                                    command=self.emergency_off, bg=red, fg=white, **widget_opts)
         self.emergency_off_button.grid(row=5, column=0, sticky='ew')
+
+        # Display current voltage
+        self.voltage_label = tk.Label(self.buttons, text=f'Voltage: {self.get_voltage()} kV', **widget_opts)
+        self.voltage_label.grid(row=6, column=0)
 
         # Configure Graphs
         self.grid_rowconfigure(0, w=1)
@@ -103,6 +107,9 @@ class MainApp(tk.Tk):
         plt.close('all')
         self.quit()
         self.destroy()
+
+    def get_voltage(self):
+        return 'N/A'
 
 class Can_Plot(ttk.Frame):
 
