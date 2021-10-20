@@ -43,7 +43,8 @@ class MainApp(tk.Tk):
         self.emergency_off_button.grid(row=5, column=0, sticky='ew')
 
         # Display current voltage
-        self.voltage_label = tk.Label(self.buttons, text=f'Voltage: {self.get_voltage()} kV', **widget_opts)
+        voltage_text = f'{self.get_voltage()} kV' if type(self.get_voltage())==float else 'N/A'
+        self.voltage_label = tk.Label(self.buttons, text='Voltage: '+voltage_text, **widget_opts)
         self.voltage_label.grid(row=6, column=0)
 
         # Configure Graphs
