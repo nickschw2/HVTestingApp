@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
-from aux import *
+from constants import *
 
 class MainApp(tk.Tk):
 
@@ -24,17 +24,17 @@ class MainApp(tk.Tk):
 
         # Begin checklist button
         self.checklist_button = tk.Button(self.buttons, text='Begin Charging\nChecklist',
-                                    command=self.checklist, bg=green, fg=yellow, **widget_opts)
+                                    command=self.checklist, bg=green, fg=white, **widget_opts)
         self.checklist_button.grid(row=2, column=0, sticky='ew')
 
         # Begin charging button
         self.charge_button = tk.Button(self.buttons, text='Begin Charging',
-                                    command=self.charge, bg=orange, fg=white, **widget_opts)
+                                    command=self.charge, bg=yellow, fg=white, **widget_opts)
         self.charge_button.grid(row=3, column=0, sticky='ew')
 
         # Discharge button
         self.discharge_button = tk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bg=red, fg=white, **widget_opts)
+                                    command=self.discharge, bg=orange, fg=white, **widget_opts)
         self.discharge_button.grid(row=4, column=0, sticky='ew')
 
         # Emergency Off button
