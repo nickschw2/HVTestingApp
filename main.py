@@ -1,9 +1,11 @@
 import tkinter as tk
+import numpy as np
 from tkinter import ttk
 import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
+import time
 from constants import *
 
 class MainApp(tk.Tk):
@@ -12,9 +14,6 @@ class MainApp(tk.Tk):
         super().__init__()
         self.title('HV Capacitor Testing')
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
-
-        # Constant Button Options
-        widget_opts = {'font':('Times', 24)}
 
         # Column for buttons on the left
         self.grid_columnconfigure(0, w=1)
@@ -47,23 +46,25 @@ class MainApp(tk.Tk):
         self.voltage_label = tk.Label(self.buttons, text='Voltage: '+voltage_text, **widget_opts)
         self.voltage_label.grid(row=6, column=0)
 
+        # Refresh button
+        self.collectDataButton = tk.Button(self.buttons, text='Begin Collection',
+                                    command=self.resetPlot, bg=red, fg=white, **widget_opts)
+        self.collectDataButton.grid(row=6, column=0, sticky='ew')
+
         # Configure Graphs
         self.grid_rowconfigure(0, w=1)
-        self.grid_rowconfigure(1, w=1)
         self.grid_columnconfigure(1, w=1)
 
         # Plot of results
-        self.charge_plot = Can_Plot(self)
-        self.charge_plot.grid(row=0, column=1, sticky='news')
+        self.timeTrace = Can_Plot(self)
+        self.timeTrace.grid(row=0, column=1, sticky='news')
 
-        self.discharge_plot = Can_Plot(self)
-        self.discharge_plot.grid(row=1, column=1, sticky='news')
-
-        # On startup, ask for username
         try:
-            self.check_username()
-        except:
-            print('Text')
+            # On startup, ask for username
+            self.loggedIn = False
+            self.validateLogin()
+        except Exception as e:
+            print(e)
 
     def checklist(self):
         self.checklist_win = tk.Toplevel()
@@ -91,7 +92,6 @@ class MainApp(tk.Tk):
 
         self.checklist_win.wait_window()
 
-
     def charge(self):
         print('Charge')
 
@@ -101,8 +101,43 @@ class MainApp(tk.Tk):
     def emergency_off(self):
         print('Emergency Off')
 
-    def check_username(self):
-        print('Check Username')
+    def validateLogin(self):
+        # If someone is not logged in then the buttons remain deactivated
+        def checkLogin():
+            self.username = self.usernameEntry.get()
+            self.password = self.passwordEntry.get()
+            self.loggedIn = self.username in acceptableUsernames and self.password in acceptablePasswords
+
+            if self.loggedIn:
+                self.loginWindow.destroy()
+            else:
+                incorrectLoginName = 'Incorrect Login'
+                incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
+                incorrectLoginWindow = MessageWindow(self, incorrectLoginName, incorrectLoginText)
+
+                incorrectLoginWindow.wait_window()
+
+                self.usernameEntry.delete(0, 'end')
+                self.passwordEntry.delete(0, 'end')
+
+        self.loginWindow = tk.Toplevel(padx=pad_val, pady=pad_val)
+        self.loginWindow.title('Login Window')
+
+        login_text = 'Please enter UMD username.'
+        password_text = 'Please enter password.'
+        button_text = 'Login'
+
+        self.username_label = tk.Label(self.loginWindow, text=login_text, **widget_opts)
+        self.usernameEntry = tk.Entry(self.loginWindow, **widget_opts)
+        self.password_label = tk.Label(self.loginWindow, text=password_text, **widget_opts)
+        self.passwordEntry = tk.Entry(self.loginWindow, show='*', **widget_opts)
+        self.login_button = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **widget_opts)
+
+        self.username_label.pack()
+        self.usernameEntry.pack()
+        self.password_label.pack()
+        self.passwordEntry.pack()
+        self.login_button.pack()
 
     def on_closing(self):
         plt.close('all')
@@ -111,6 +146,29 @@ class MainApp(tk.Tk):
 
     def get_voltage(self):
         return 'N/A'
+
+    def generate_data(self):
+        timePoint = time.time() - self.beginDataCollectionTime
+        period = 10 #seconds
+        voltagePoint = np.sin(timePoint * 2 * np.pi / period)
+        return timePoint, voltagePoint
+
+    def updatePlot(self):
+        timePoint, voltagePoint = self.generate_data()
+        self.timeArray = np.append(self.timeArray, timePoint)
+        self.voltageArray = np.append(self.voltageArray, voltagePoint)
+        self.timeTrace.ax.plot(self.timeArray, self.voltageArray, color=voltageColor)
+        self.timeTrace.update()
+
+        self.after(100, self.updatePlot)
+
+    def resetPlot(self):
+        # Set time and voltage to empty array
+        self.timeArray = np.array([])
+        self.voltageArray = np.array([])
+
+        self.beginDataCollectionTime = time.time()
+        self.updatePlot()
 
 class Can_Plot(ttk.Frame):
 
@@ -123,11 +181,32 @@ class Can_Plot(ttk.Frame):
         self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
 
     def update(self):
-        #update grap
+        #update graph
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
 
+class MessageWindow(tk.Toplevel):
+    def __init__(self, master, name, text):
+        super().__init__(master)
+        self.name = name
+        self.text = text
+        self.title(self.name)
+
+        self.maxWidth = 2000
+        self.maxHeight = 2000
+        self.maxsize(self.maxWidth, self.maxHeight)
+
+        OKButtonText = 'Okay'
+
+        self.message = tk.Message(self, text=self.text, **widget_opts)
+        self.OKButon = tk.Button(self, text=OKButtonText, command=self.destroy, **widget_opts)
+
+        self.message.pack()
+        self.OKButon.pack()
+
+
 if __name__ == "__main__":
     app = MainApp()
+    app.loginWindow.lift(aboveThis=app)
     app.mainloop()
