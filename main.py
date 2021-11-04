@@ -57,6 +57,13 @@ class MainApp(tk.Tk):
 
         # Plot of results
         self.timeTrace = Can_Plot(self)
+        self.voltageAxis = self.timeTrace.ax
+        self.currentAxis = self.timeTrace.ax.twinx()
+
+        self.timeTrace.ax.set_xlabel('Time (s)')
+        self.voltageAxis.set_ylabel('Voltage (kV)')
+        self.currentAxis.set_ylabel('Current (A)')
+
         self.timeTrace.grid(row=0, column=1, sticky='news')
 
         try:
