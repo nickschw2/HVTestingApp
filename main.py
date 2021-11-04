@@ -22,29 +22,36 @@ class MainApp(tk.Tk):
         self.buttons.grid_columnconfigure(0, w=1)
 
         # Begin checklist button
-        self.checklist_button = tk.Button(self.buttons, text='Begin Charging\nChecklist',
+        self.checklistButton = tk.Button(self.buttons, text='Begin Charging\nChecklist',
                                     command=self.checklist, bg=green, fg=white, **widget_opts)
-        self.checklist_button.grid(row=2, column=0, sticky='ew')
+        self.checklistButton.grid(row=2, column=0, sticky='ew')
 
         # Begin charging button
-        self.charge_button = tk.Button(self.buttons, text='Begin Charging',
+        self.chargeButton = tk.Button(self.buttons, text='Begin Charging',
                                     command=self.charge, bg=yellow, fg=white, **widget_opts)
-        self.charge_button.grid(row=3, column=0, sticky='ew')
+        self.chargeButton.grid(row=3, column=0, sticky='ew')
 
         # Discharge button
-        self.discharge_button = tk.Button(self.buttons, text='Discharge',
+        self.dischargeButton = tk.Button(self.buttons, text='Discharge',
                                     command=self.discharge, bg=orange, fg=white, **widget_opts)
-        self.discharge_button.grid(row=4, column=0, sticky='ew')
+        self.dischargeButton.grid(row=4, column=0, sticky='ew')
 
         # Emergency Off button
-        self.emergency_off_button = tk.Button(self.buttons, text='Emergency Off',
+        self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
                                     command=self.emergency_off, bg=red, fg=white, **widget_opts)
-        self.emergency_off_button.grid(row=5, column=0, sticky='ew')
+        self.emergency_offButton.grid(row=5, column=0, sticky='ew')
 
-        # Display current voltage
-        voltage_text = f'{self.get_voltage()} kV' if type(self.get_voltage())==float else 'N/A'
-        self.voltage_label = tk.Label(self.buttons, text='Voltage: '+voltage_text, **widget_opts)
-        self.voltage_label.grid(row=6, column=0)
+        # Display voltage and current
+        self.timePoint = 0.0
+
+        voltageText = f'{self.getVoltage(self.timePoint)} kV' if type(self.getVoltage(self.timePoint))==float else 'N/A'
+        currentText = f'{self.getCurrent(self.timePoint)} A' if type(self.getCurrent(self.timePoint))==float else 'N/A'
+
+        self.voltageLabel = tk.Label(self.buttons, text='Voltage: '+ voltageText, **widget_opts)
+        self.currentLabel = tk.Label(self.buttons, text='Current: '+ currentText, **widget_opts)
+
+        self.voltageLabel.grid(row=7, column=0)
+        self.voltageLabel.grid(row=8, column=0)
 
         # Refresh button
         self.collectDataButton = tk.Button(self.buttons, text='Begin Collection',
@@ -134,37 +141,46 @@ class MainApp(tk.Tk):
         password_text = 'Please enter password.'
         button_text = 'Login'
 
-        self.username_label = tk.Label(self.loginWindow, text=login_text, **widget_opts)
+        self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **widget_opts)
         self.usernameEntry = tk.Entry(self.loginWindow, **widget_opts)
-        self.password_label = tk.Label(self.loginWindow, text=password_text, **widget_opts)
+        self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **widget_opts)
         self.passwordEntry = tk.Entry(self.loginWindow, show='*', **widget_opts)
-        self.login_button = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **widget_opts)
+        self.loginButton = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **widget_opts)
 
-        self.username_label.pack()
+        self.usernameLabel.pack()
         self.usernameEntry.pack()
-        self.password_label.pack()
+        self.passwordLabel.pack()
         self.passwordEntry.pack()
-        self.login_button.pack()
+        self.loginButton.pack()
 
     def on_closing(self):
         plt.close('all')
         self.quit()
         self.destroy()
 
-    def get_voltage(self):
-        return 'N/A'
-
-    def generate_data(self):
-        timePoint = time.time() - self.beginDataCollectionTime
+    def getVoltage(self, timePoint):
+        if self.timePoint == 0.0:
+            return float('nan')
         period = 10 #seconds
-        voltagePoint = np.sin(timePoint * 2 * np.pi / period)
-        return timePoint, voltagePoint
+        return np.sin(timePoint * 2 * np.pi / period)
+
+    def getCurrent(self, timePoint):
+        if self.timePoint == 0.0:
+            return float('nan')
+        period = 10 #seconds
+        return np.cos(timePoint * 2 * np.pi / period)
 
     def updatePlot(self):
-        timePoint, voltagePoint = self.generate_data()
-        self.timeArray = np.append(self.timeArray, timePoint)
+        self.timePoint = time.time() - self.beginDataCollectionTime
+        voltagePoint = self.getVoltage(self.timePoint)
+        currentPoint = self.getCurrent(self.timePoint)
+
+        self.timeArray = np.append(self.timeArray, self.timePoint)
         self.voltageArray = np.append(self.voltageArray, voltagePoint)
-        self.timeTrace.ax.plot(self.timeArray, self.voltageArray, color=voltageColor)
+        self.currentArray = np.append(self.currentArray, currentPoint)
+
+        self.voltageAxis.plot(self.timeArray, self.voltageArray, color=voltageColor)
+        self.currentAxis.plot(self.timeArray, self.currentArray, color=currentColor)
         self.timeTrace.update()
 
         self.after(100, self.updatePlot)
@@ -173,6 +189,7 @@ class MainApp(tk.Tk):
         # Set time and voltage to empty array
         self.timeArray = np.array([])
         self.voltageArray = np.array([])
+        self.currentArray = np.array([])
 
         self.beginDataCollectionTime = time.time()
         self.updatePlot()
