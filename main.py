@@ -84,11 +84,29 @@ class MainApp(tk.Tk):
         except Exception as e:
             print(e)
 
+    def disableButtons(self):
+        for w in self.buttons.winfo_children():
+            if isinstance(w, tk.Button):
+                w.configure(state='disabled')
+
+    def enableButtons(self):
+        for w in self.buttons.winfo_children():
+            if isinstance(w, tk.Button):
+                w.configure(state='normal')
+
+    def checklistComplete(self):
+        complete = False
+        complete = all([cb.get() for keys, cb in self.checklist_Checkbuttons.items()])
+
+        if complete:
+            self.enableButtons()
+
     def checklist(self):
+        self.disableButtons()
+        self.checklistButton.configure(state='normal')
         self.checklist_win = tk.Toplevel()
 
-        checklist_steps = ['Turn on ignitron heat lamp for 10 minutes',
-            'Ensure that power supply is off',
+        checklist_steps = ['Ensure that power supply is off',
             'Ensure that the charging switch is open',
             'Check system is grounded',
             'Turn on power supply',
@@ -105,8 +123,12 @@ class MainApp(tk.Tk):
 
         self.checklist_Checkbuttons = {}
         for i, step in enumerate(checklist_steps):
-            self.checklist_Checkbuttons[f'c{i}'] = tk.Checkbutton(self.checklist_win, text=f'Step {i}: ' + step)
-            self.checklist_Checkbuttons[f'c{i}'].grid(row=i, column=0, sticky='w')
+            self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
+            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete)
+            button.grid(row=i, column=0, sticky='w')
+
+        self.OKButton = tk.Button(self.checklist_win, text='Okay', command=self.checklist_win.destroy, **button_opts)
+        self.OKButton.grid(row=i + 1, column=0)
 
         self.checklist_win.wait_window()
 
@@ -118,16 +140,6 @@ class MainApp(tk.Tk):
 
     def emergency_off(self):
         print('Emergency Off')
-
-    def disableButtons(self):
-        for w in self.buttons.winfo_children():
-            if isinstance(w, tk.Button):
-                w.configure(state='disabled')
-
-    def enableButtons(self):
-        for w in self.buttons.winfo_children():
-            if isinstance(w, tk.Button):
-                w.configure(state='normal')
 
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated
@@ -252,10 +264,10 @@ class MessageWindow(tk.Toplevel):
         OKButtonText = 'Okay'
 
         self.message = tk.Message(self, text=self.text, **text_opts)
-        self.OKButon = tk.Button(self, text=OKButtonText, command=self.destroy, **button_opts)
+        self.OKButton = tk.Button(self, text=OKButtonText, command=self.destroy, **button_opts)
 
         self.message.pack()
-        self.OKButon.pack()
+        self.OKButton.pack()
 
     def update(self):
         self.message
