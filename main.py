@@ -23,39 +23,39 @@ class MainApp(tk.Tk):
 
         # Begin checklist button
         self.checklistButton = tk.Button(self.buttons, text='Begin Charging\nChecklist',
-                                    command=self.checklist, bg=green, fg=white, **widget_opts)
+                                    command=self.checklist, bg=green, fg=white, **button_opts)
         self.checklistButton.grid(row=2, column=0, sticky='ew')
 
         # Begin charging button
         self.chargeButton = tk.Button(self.buttons, text='Begin Charging',
-                                    command=self.charge, bg=yellow, fg=white, **widget_opts)
+                                    command=self.charge, bg=yellow, fg=white, **button_opts)
         self.chargeButton.grid(row=3, column=0, sticky='ew')
 
         # Discharge button
         self.dischargeButton = tk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bg=orange, fg=white, **widget_opts)
+                                    command=self.discharge, bg=orange, fg=white, **button_opts)
         self.dischargeButton.grid(row=4, column=0, sticky='ew')
 
         # Emergency Off button
         self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off, bg=red, fg=white, **widget_opts)
+                                    command=self.emergency_off, bg=red, fg=white, **button_opts)
         self.emergency_offButton.grid(row=5, column=0, sticky='ew')
 
         # Display voltage and current
         self.timePoint = 0.0
 
-        voltageText = f'{self.getVoltage(self.timePoint)} kV' if type(self.getVoltage(self.timePoint))==float else 'N/A'
-        currentText = f'{self.getCurrent(self.timePoint)} A' if type(self.getCurrent(self.timePoint))==float else 'N/A'
+        voltageText = f'{self.getVoltage(self.timePoint)} kV' if type(self.getVoltage(self.timePoint)) == float else 'N/A'
+        currentText = f'{self.getCurrent(self.timePoint)} A' if type(self.getCurrent(self.timePoint)) == float else 'N/A'
 
-        self.voltageLabel = tk.Label(self.buttons, text='Voltage: '+ voltageText, **widget_opts)
-        self.currentLabel = tk.Label(self.buttons, text='Current: '+ currentText, **widget_opts)
+        self.voltageLabel = tk.Label(self.buttons, text='Voltage: '+ voltageText, **text_opts)
+        self.currentLabel = tk.Label(self.buttons, text='Current: '+ currentText, **text_opts)
 
         self.voltageLabel.grid(row=7, column=0)
         self.voltageLabel.grid(row=8, column=0)
 
         # Refresh button
         self.collectDataButton = tk.Button(self.buttons, text='Begin Collection',
-                                    command=self.resetPlot, bg=red, fg=white, **widget_opts)
+                                    command=self.resetPlot, bg=red, fg=white, **button_opts)
         self.collectDataButton.grid(row=6, column=0, sticky='ew')
 
         # Configure Graphs
@@ -67,14 +67,18 @@ class MainApp(tk.Tk):
         self.voltageAxis = self.timeTrace.ax
         self.currentAxis = self.timeTrace.ax.twinx()
 
+        self.voltageAxis.tick_params(axis='y', labelcolor=voltageColor)
+        self.currentAxis.tick_params(axis='y', labelcolor=currentColor)
+
         self.timeTrace.ax.set_xlabel('Time (s)')
-        self.voltageAxis.set_ylabel('Voltage (kV)')
-        self.currentAxis.set_ylabel('Current (A)')
+        self.voltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
+        self.currentAxis.set_ylabel('Current (A)', color=currentColor)
 
         self.timeTrace.grid(row=0, column=1, sticky='news')
 
         try:
-            # On startup, ask for username
+            # On startup, disable buttons until login is correct
+            self.disableButtons()
             self.loggedIn = False
             self.validateLogin()
         except Exception as e:
@@ -115,6 +119,16 @@ class MainApp(tk.Tk):
     def emergency_off(self):
         print('Emergency Off')
 
+    def disableButtons(self):
+        for w in self.buttons.winfo_children():
+            if isinstance(w, tk.Button):
+                w.configure(state='disabled')
+
+    def enableButtons(self):
+        for w in self.buttons.winfo_children():
+            if isinstance(w, tk.Button):
+                w.configure(state='normal')
+
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated
         def checkLogin():
@@ -124,6 +138,7 @@ class MainApp(tk.Tk):
 
             if self.loggedIn:
                 self.loginWindow.destroy()
+                self.checklistButton.configure(state='normal')
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
@@ -141,11 +156,11 @@ class MainApp(tk.Tk):
         password_text = 'Please enter password.'
         button_text = 'Login'
 
-        self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **widget_opts)
-        self.usernameEntry = tk.Entry(self.loginWindow, **widget_opts)
-        self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **widget_opts)
-        self.passwordEntry = tk.Entry(self.loginWindow, show='*', **widget_opts)
-        self.loginButton = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **widget_opts)
+        self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **text_opts)
+        self.usernameEntry = tk.Entry(self.loginWindow, **text_opts)
+        self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **text_opts)
+        self.passwordEntry = tk.Entry(self.loginWindow, show='*', **text_opts)
+        self.loginButton = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **button_opts)
 
         self.usernameLabel.pack()
         self.usernameEntry.pack()
@@ -158,11 +173,21 @@ class MainApp(tk.Tk):
         self.quit()
         self.destroy()
 
+    def startDischargeTimer(self, timeDesiredVoltage):
+        elapsedHoldChargeTime = time.time() - timeDesiredVoltage
+        if  elapsedHoldChargeTime < holdChargeTime * 1000:
+            dischargeTimerName = 'Discharge Timer'
+            dischargeTimerText = f'{holdChargeTime - elapsedHoldChargeTime}'
+            # countdown clock https://www.pythontutorial.net/tkinter/tkinter-after/
+        else:
+            self.dischargeCapacitor()
+
+
     def getVoltage(self, timePoint):
         if self.timePoint == 0.0:
             return float('nan')
-        period = 10 #seconds
-        return np.sin(timePoint * 2 * np.pi / period)
+        RCTime = powerSupplyResistance * capacitorCapacitance
+        return powerSupplyVoltage * ( 1 -  np.exp( -timePoint / RCTime ) )
 
     def getCurrent(self, timePoint):
         if self.timePoint == 0.0:
@@ -179,9 +204,12 @@ class MainApp(tk.Tk):
         self.voltageArray = np.append(self.voltageArray, voltagePoint)
         self.currentArray = np.append(self.currentArray, currentPoint)
 
-        self.voltageAxis.plot(self.timeArray, self.voltageArray, color=voltageColor)
+        self.voltageAxis.plot(self.timeArray, self.voltageArray / 1000, color=voltageColor)
         self.currentAxis.plot(self.timeArray, self.currentArray, color=currentColor)
         self.timeTrace.update()
+
+        if voltagePoint >= dummyMaxVoltage:
+            self.startDischargeTimer(time.time())
 
         self.after(100, self.updatePlot)
 
@@ -223,11 +251,14 @@ class MessageWindow(tk.Toplevel):
 
         OKButtonText = 'Okay'
 
-        self.message = tk.Message(self, text=self.text, **widget_opts)
-        self.OKButon = tk.Button(self, text=OKButtonText, command=self.destroy, **widget_opts)
+        self.message = tk.Message(self, text=self.text, **text_opts)
+        self.OKButon = tk.Button(self, text=OKButtonText, command=self.destroy, **button_opts)
 
         self.message.pack()
         self.OKButon.pack()
+
+    def update(self):
+        self.message
 
 
 if __name__ == "__main__":
