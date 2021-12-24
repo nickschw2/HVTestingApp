@@ -25,5 +25,6 @@ currentColor = 'red'
 powerSupplyVoltage = 20e3 # V
 powerSupplyResistance = 1E4 # Ohm
 capacitorCapacitance = 200e-6 # Farads
+RCTime = powerSupplyResistance * capacitorCapacitance
 
 dummyMaxVoltage = 15e3 # V

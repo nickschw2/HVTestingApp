@@ -6,6 +6,7 @@ matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 import time
+import nidaqmx
 from constants import *
 
 class MainApp(tk.Tk):
@@ -41,46 +42,60 @@ class MainApp(tk.Tk):
                                     command=self.emergency_off, bg=red, fg=white, **button_opts)
         self.emergency_offButton.grid(row=5, column=0, sticky='ew')
 
+        # Reset plots button
+        self.resetPlotsButton = tk.Button(self.buttons, text='Reset Plots',
+                                    command=self.resetPlot, bg=red, fg=white, **button_opts)
+        self.resetPlotsButton.grid(row=6, column=0, sticky='ew')
+
         # Display voltage and current
         self.timePoint = 0.0
 
-        voltageText = f'{self.getVoltage(self.timePoint)} kV' if type(self.getVoltage(self.timePoint)) == float else 'N/A'
-        currentText = f'{self.getCurrent(self.timePoint)} A' if type(self.getCurrent(self.timePoint)) == float else 'N/A'
+        # Voltage and current are read from both the power supply and the load
+        self.voltageLoadPin = 'ai0'
+        self.voltagePSPin = 'ai1'
+        self.currentLoadPin = 'ai2'
+        self.currentPSPin = 'ai3'
 
-        self.voltageLabel = tk.Label(self.buttons, text='Voltage: '+ voltageText, **text_opts)
-        self.currentLabel = tk.Label(self.buttons, text='Current: '+ currentText, **text_opts)
+        voltageLoadText = f'{self.readSensor(self.voltageLoadPin)} kV'
+        voltagePSText = f'{self.readSensor(self.voltagePSPin)} kV'
+        currentLoadText = f'{self.readSensor(self.currentLoadPin)} A'
+        currentPSText = f'{self.readSensor(self.currentPSPin)} A'
 
-        self.voltageLabel.grid(row=7, column=0)
-        self.voltageLabel.grid(row=8, column=0)
+        self.voltageLoadLabel = tk.Label(self.buttons, text='Voltage: '+ voltageLoadText, **text_opts)
+        self.voltagePSLabel = tk.Label(self.buttons, text='Voltage: '+ voltagePSText, **text_opts)
+        self.currentLoadLabel = tk.Label(self.buttons, text='Current: '+ currentLoadText, **text_opts)
+        self.currentPSLabel = tk.Label(self.buttons, text='Current: '+ currentPSText, **text_opts)
 
-        # Refresh button
-        self.collectDataButton = tk.Button(self.buttons, text='Begin Collection',
-                                    command=self.resetPlot, bg=red, fg=white, **button_opts)
-        self.collectDataButton.grid(row=6, column=0, sticky='ew')
+        self.voltageLoadLabel.grid(row=7, column=0, sticky='w')
+        self.voltagePSLabel.grid(row=8, column=0, sticky='w')
+        self.currentLoadLabel.grid(row=9, column=0, sticky='w')
+        self.currentPSLabel.grid(row=10, column=0, sticky='w')
 
         # Configure Graphs
         self.grid_rowconfigure(0, w=1)
         self.grid_columnconfigure(1, w=1)
 
         # Plot of results
-        self.timeTrace = Can_Plot(self)
-        self.voltageAxis = self.timeTrace.ax
-        self.currentAxis = self.timeTrace.ax.twinx()
+        self.chargeTrace = Can_Plot(self)
+        self.voltageAxis = self.chargeTrace.ax
+        self.currentAxis = self.chargeTrace.ax.twinx()
 
         self.voltageAxis.tick_params(axis='y', labelcolor=voltageColor)
         self.currentAxis.tick_params(axis='y', labelcolor=currentColor)
 
-        self.timeTrace.ax.set_xlabel('Time (s)')
+        self.chargeTrace.ax.set_xlabel('Time (s)')
         self.voltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.currentAxis.set_ylabel('Current (A)', color=currentColor)
 
-        self.timeTrace.grid(row=0, column=1, sticky='news')
+        self.chargeTrace.grid(row=0, column=1, sticky='news')
 
         try:
             # On startup, disable buttons until login is correct
             self.disableButtons()
             self.loggedIn = False
             self.validateLogin()
+
+            self.safetyLights()
         except Exception as e:
             print(e)
 
@@ -106,20 +121,19 @@ class MainApp(tk.Tk):
         self.checklistButton.configure(state='normal')
         self.checklist_win = tk.Toplevel()
 
-        checklist_steps = ['Ensure that power supply is off',
-            'Ensure that the charging switch is open',
-            'Check system is grounded',
-            'Turn on power supply',
-            'Exit room and ensure nobody else is present',
-            'Turn on HV Testing Light',
-            'Close charging switch',
-            'Increase voltage on power supply',
-            'Open charging switch',
-            'Trigger ignitron',
-            'Save scope and video data',
-            'Enter room, turn off power supply, and "idiot stick" all HV lines',
-            'Turn off HV testing light'
-            ]
+        checklist_steps = ['Ensure that power supply is off']
+            # 'Ensure that the charging switch is open',
+            # 'Check system is grounded',
+            # 'Turn on power supply',
+            # 'Exit room and ensure nobody else is present',
+            # 'Turn on HV Testing Light',
+            # 'Close charging switch',
+            # 'Increase voltage on power supply',
+            # 'Open charging switch',
+            # 'Trigger ignitron',
+            # 'Save scope and video data',
+            # 'Enter room, turn off power supply, and "idiot stick" all HV lines',
+            # 'Turn off HV testing light']
 
         self.checklist_Checkbuttons = {}
         for i, step in enumerate(checklist_steps):
@@ -134,9 +148,14 @@ class MainApp(tk.Tk):
 
     def charge(self):
         print('Charge')
+        self.resetPlot()
+        self.updateChargePlot()
 
     def discharge(self):
         print('Discharge')
+
+    def safetyLights(self):
+        print('Turn on safety lights')
 
     def emergency_off(self):
         print('Emergency Off')
@@ -194,45 +213,67 @@ class MainApp(tk.Tk):
         else:
             self.dischargeCapacitor()
 
+    def readSensor(self, pin):
+        sensorName = 'Dev1'
+        try:
+            with nidaqmx.Task() as task:
+                task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
+                value = task.read()
 
-    def getVoltage(self, timePoint):
-        if self.timePoint == 0.0:
-            return float('nan')
-        RCTime = powerSupplyResistance * capacitorCapacitance
-        return powerSupplyVoltage * ( 1 -  np.exp( -timePoint / RCTime ) )
+        except nidaqmx._lib.DaqNotFoundError:
+            # value = 'N/A'
+            try:
+                if pin == 'ai0':
+                    value = np.random.rand()
+                elif pin == 'ai1':
+                    value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
+                elif pin == 'ai2':
+                    value = np.random.rand()
+                elif pin == 'ai3':
+                    period = 10 # seconds
+                    value = np.cos(self.timePoint * 2 * np.pi / period)
+                else:
+                    value = 'N/A'
+            except AttributeError:
+                value = 'N/A'
 
-    def getCurrent(self, timePoint):
-        if self.timePoint == 0.0:
-            return float('nan')
-        period = 10 #seconds
-        return np.cos(timePoint * 2 * np.pi / period)
 
-    def updatePlot(self):
+        return value
+
+    def updateChargePlot(self):
         self.timePoint = time.time() - self.beginDataCollectionTime
-        voltagePoint = self.getVoltage(self.timePoint)
-        currentPoint = self.getCurrent(self.timePoint)
+        voltageLoadPoint = self.readSensor(self.voltageLoadPin)
+        voltagePSPoint = self.readSensor(self.voltagePSPin)
+        currentLoadPoint = self.readSensor(self.currentLoadPin)
+        currentPSPoint = self.readSensor(self.currentPSPin)
 
         self.timeArray = np.append(self.timeArray, self.timePoint)
-        self.voltageArray = np.append(self.voltageArray, voltagePoint)
-        self.currentArray = np.append(self.currentArray, currentPoint)
+        self.voltageLoadArray = np.append(self.voltageLoadArray, voltageLoadPoint)
+        self.voltagePSArray = np.append(self.voltagePSArray, voltagePSPoint)
+        self.currentLoadArray = np.append(self.currentLoadArray, currentLoadPoint)
+        self.currentPSArray = np.append(self.currentPSArray, currentPSPoint)
 
-        self.voltageAxis.plot(self.timeArray, self.voltageArray / 1000, color=voltageColor)
-        self.currentAxis.plot(self.timeArray, self.currentArray, color=currentColor)
-        self.timeTrace.update()
+        self.voltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor)
+        self.voltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, linestyle='--')
+        self.currentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor)
+        self.currentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, linestyle='--')
+        self.chargeTrace.update()
 
-        if voltagePoint >= dummyMaxVoltage:
-            self.startDischargeTimer(time.time())
+        # if voltagePoint >= dummyMaxVoltage:
+        #     self.startDischargeTimer(time.time())
 
-        self.after(100, self.updatePlot)
+        frequency = 10 #Hz
+        self.after(int(1000 / frequency), self.updateChargePlot)
 
     def resetPlot(self):
         # Set time and voltage to empty array
         self.timeArray = np.array([])
-        self.voltageArray = np.array([])
-        self.currentArray = np.array([])
+        self.voltageLoadArray = np.array([])
+        self.voltagePSArray = np.array([])
+        self.currentLoadArray = np.array([])
+        self.currentPSArray = np.array([])
 
         self.beginDataCollectionTime = time.time()
-        self.updatePlot()
 
 class Can_Plot(ttk.Frame):
 
