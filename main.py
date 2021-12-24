@@ -56,15 +56,17 @@ class MainApp(tk.Tk):
         self.currentLoadPin = 'ai2'
         self.currentPSPin = 'ai3'
 
-        voltageLoadText = f'{self.readSensor(self.voltageLoadPin)} kV'
-        voltagePSText = f'{self.readSensor(self.voltagePSPin)} kV'
-        currentLoadText = f'{self.readSensor(self.currentLoadPin)} A'
-        currentPSText = f'{self.readSensor(self.currentPSPin)} A'
+        self.voltageLoadText = tk.StringVar()
+        self.voltagePSText = tk.StringVar()
+        self.currentLoadText = tk.StringVar()
+        self.currentPSText = tk.StringVar()
 
-        self.voltageLoadLabel = tk.Label(self.buttons, text='Voltage: '+ voltageLoadText, **text_opts)
-        self.voltagePSLabel = tk.Label(self.buttons, text='Voltage: '+ voltagePSText, **text_opts)
-        self.currentLoadLabel = tk.Label(self.buttons, text='Current: '+ currentLoadText, **text_opts)
-        self.currentPSLabel = tk.Label(self.buttons, text='Current: '+ currentPSText, **text_opts)
+        self.voltageLoadLabel = tk.Label(self.buttons, textvariable=self.voltageLoadText, **text_opts)
+        self.voltagePSLabel = tk.Label(self.buttons, textvariable=self.voltagePSText, **text_opts)
+        self.currentLoadLabel = tk.Label(self.buttons, textvariable=self.currentLoadText, **text_opts)
+        self.currentPSLabel = tk.Label(self.buttons, textvariable=self.currentPSText, **text_opts)
+
+        self.updateLabels()
 
         self.voltageLoadLabel.grid(row=7, column=0, sticky='w')
         self.voltagePSLabel.grid(row=8, column=0, sticky='w')
@@ -214,31 +216,50 @@ class MainApp(tk.Tk):
             self.dischargeCapacitor()
 
     def readSensor(self, pin):
-        sensorName = 'Dev1'
-        try:
-            with nidaqmx.Task() as task:
-                task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
-                value = task.read()
+        # sensorName = 'Dev1'
+        # try:
+        #     with nidaqmx.Task() as task:
+        #         task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
+        #         value = task.read()
+        #
+        # except nidaqmx._lib.DaqNotFoundError:
+        #     # value = 'N/A'
+        #     try:
+        #         if pin == 'ai0':
+        #             value = np.random.rand()
+        #         elif pin == 'ai1':
+        #             value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
+        #         elif pin == 'ai2':
+        #             value = np.random.rand()
+        #         elif pin == 'ai3':
+        #             period = 10 # seconds
+        #             value = np.cos(self.timePoint * 2 * np.pi / period)
+        #         else:
+        #             value = 'N/A'
+        #     except AttributeError:
+        #         value = 'N/A'
 
-        except nidaqmx._lib.DaqNotFoundError:
-            # value = 'N/A'
-            try:
-                if pin == 'ai0':
-                    value = np.random.rand()
-                elif pin == 'ai1':
-                    value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-                elif pin == 'ai2':
-                    value = np.random.rand()
-                elif pin == 'ai3':
-                    period = 10 # seconds
-                    value = np.cos(self.timePoint * 2 * np.pi / period)
-                else:
-                    value = 'N/A'
-            except AttributeError:
-                value = 'N/A'
-
+        if pin == 'ai0':
+            value = np.random.rand() * 1000
+        elif pin == 'ai1':
+            value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
+        elif pin == 'ai2':
+            value = np.random.rand()
+        elif pin == 'ai3':
+            period = 10 # seconds
+            value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
+        else:
+            value = 'N/A'
 
         return value
+
+    def updateLabels(self):
+        loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
+        PSSuperscript = '\u1D56\u02E2'
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(self.voltageLoadPin) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(self.voltagePSPin) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.currentLoadPin):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.currentPSPin):.2f} A')
 
     def updateChargePlot(self):
         self.timePoint = time.time() - self.beginDataCollectionTime
@@ -246,6 +267,8 @@ class MainApp(tk.Tk):
         voltagePSPoint = self.readSensor(self.voltagePSPin)
         currentLoadPoint = self.readSensor(self.currentLoadPin)
         currentPSPoint = self.readSensor(self.currentPSPin)
+
+        self.updateLabels()
 
         self.timeArray = np.append(self.timeArray, self.timePoint)
         self.voltageLoadArray = np.append(self.voltageLoadArray, voltageLoadPoint)
