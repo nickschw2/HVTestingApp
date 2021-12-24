@@ -17,10 +17,31 @@ class MainApp(tk.Tk):
         self.title('HV Capacitor Testing')
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
+        # Row for user inputs on the top
+        self.userInputs = tk.Frame(self)
+        self.userInputs.grid(row=0, columnspan=2, sticky='ns')
+
+        # Charge voltage and desired hold charge time
+        self.chargeVoltageLabel = tk.Label(self.userInputs, text='Charge (kV):', **text_opts)
+        self.holdChargeTimeLabel = tk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
+
+        userInputWidth = 6
+        self.chargeVoltageEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
+        self.holdChargeTimeEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
+
+        self.userInputOkayButton = tk.Button(self.userInputs, text='Okay', command=self.setUserInputs, **button_opts)
+
+        userInputPadding = 100
+        self.chargeVoltageLabel.pack(side='left')
+        self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
+        self.holdChargeTimeLabel.pack(side='left')
+        self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
+        self.userInputOkayButton.pack(side='left')
+
         # Column for buttons on the left
         self.grid_columnconfigure(0, w=1)
         self.buttons = ttk.Frame(self)
-        self.buttons.grid(row=0, column=0, sticky='news')
+        self.buttons.grid(row=1, column=0, sticky='news')
         self.buttons.grid_columnconfigure(0, w=1)
 
         # Begin checklist button
@@ -75,7 +96,7 @@ class MainApp(tk.Tk):
         self.currentPSLabel.grid(row=10, column=0, sticky='w')
 
         # Configure Graphs
-        self.grid_rowconfigure(0, w=1)
+        self.grid_rowconfigure(1, w=1)
         self.grid_columnconfigure(1, w=1)
 
         # Plot of results
@@ -96,7 +117,7 @@ class MainApp(tk.Tk):
         currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
         self.chargeTrace.ax.legend(handles=[voltageLine, voltageDash, currentLine, currentLine], loc='lower left')
 
-        self.chargeTrace.grid(row=0, column=1, sticky='news')
+        self.chargeTrace.grid(row=1, column=1, sticky='news')
 
         try:
             # On startup, disable buttons until login is correct
@@ -107,6 +128,13 @@ class MainApp(tk.Tk):
             self.safetyLights()
         except Exception as e:
             print(e)
+
+    def setUserInputs(self):
+        try:
+            self.chargeVoltage = float(self.chargeVoltageEntry.get())
+            self.holdChargeTime = float(self.holdChargeTimeEntry.get())
+        except ValueError:
+            print('User Input Error')
 
     def disableButtons(self):
         for w in self.buttons.winfo_children():
