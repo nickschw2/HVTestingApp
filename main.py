@@ -2,6 +2,7 @@ import tkinter as tk
 import numpy as np
 from tkinter import ttk
 import matplotlib
+import matplotlib.lines as mlines
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
@@ -88,6 +89,12 @@ class MainApp(tk.Tk):
         self.chargeTrace.ax.set_xlabel('Time (s)')
         self.voltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.currentAxis.set_ylabel('Current (A)', color=currentColor)
+
+        voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{load}$')
+        voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
+        currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
+        currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
+        self.chargeTrace.ax.legend(handles=[voltageLine, voltageDash, currentLine, currentLine], loc='lower left')
 
         self.chargeTrace.grid(row=0, column=1, sticky='news')
 
@@ -244,7 +251,7 @@ class MainApp(tk.Tk):
         elif pin == 'ai1':
             value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
         elif pin == 'ai2':
-            value = np.random.rand()
+            value = np.random.rand() / 10
         elif pin == 'ai3':
             period = 10 # seconds
             value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
@@ -276,10 +283,10 @@ class MainApp(tk.Tk):
         self.currentLoadArray = np.append(self.currentLoadArray, currentLoadPoint)
         self.currentPSArray = np.append(self.currentPSArray, currentPSPoint)
 
-        self.voltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor)
-        self.voltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, linestyle='--')
-        self.currentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor)
-        self.currentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, linestyle='--')
+        self.voltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor, label='V$_{load}$')
+        self.voltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, label='V$_{PS}$', linestyle='--')
+        self.currentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor, label='I$_{load}$')
+        self.currentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, label='I$_{PS}$', linestyle='--')
         self.chargeTrace.update()
 
         # if voltagePoint >= dummyMaxVoltage:
