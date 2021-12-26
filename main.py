@@ -2,7 +2,6 @@ import tkinter as tk
 import numpy as np
 from tkinter import ttk
 import matplotlib
-import matplotlib.lines as mlines
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
@@ -19,13 +18,14 @@ class MainApp(tk.Tk):
 
         # Row for user inputs on the top
         self.userInputs = tk.Frame(self)
-        self.userInputs.grid(row=0, columnspan=2, sticky='ns')
+        self.userInputs.grid(row=0, columnspan=3, sticky='ns')
 
         # Charge voltage and desired hold charge time
+        self.serialNumberLabel = tk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
         self.chargeVoltageLabel = tk.Label(self.userInputs, text='Charge (kV):', **text_opts)
         self.holdChargeTimeLabel = tk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
 
-        userInputWidth = 6
+        self.serialNumberEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
         self.chargeVoltageEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
         self.holdChargeTimeEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
 
@@ -34,7 +34,8 @@ class MainApp(tk.Tk):
         self.userInputSetText.set('      ')
         self.userInputSetLabel = tk.Label(self.userInputs, textvariable=self.userInputSetText, **text_opts)
 
-        userInputPadding = 100
+        self.serialNumberLabel.pack(side='left')
+        self.serialNumberEntry.pack(side='left', padx=(0, userInputPadding))
         self.chargeVoltageLabel.pack(side='left')
         self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
         self.holdChargeTimeLabel.pack(side='left')
@@ -44,34 +45,20 @@ class MainApp(tk.Tk):
 
         # Column for buttons and labels on the left
         self.grid_columnconfigure(0, w=1)
-        self.buttons = ttk.Frame(self)
-        self.buttons.grid(row=1, column=0, sticky='news')
-        self.buttons.grid_columnconfigure(0, w=1)
+        self.buttons = tk.Frame(self)
+        self.buttons.grid(row=1, column=0)
 
-        # Begin checklist button
+        # Button definitions and placement
         self.checklistButton = tk.Button(self.buttons, text='Begin Charging\nChecklist',
                                     command=self.checklist, bg=green, fg=white, **button_opts)
-        self.checklistButton.grid(row=2, column=0, sticky='ew')
-
-        # Begin charging button
         self.chargeButton = tk.Button(self.buttons, text='Begin Charging',
                                     command=self.charge, bg=yellow, fg=white, **button_opts)
-        self.chargeButton.grid(row=3, column=0, sticky='ew')
-
-        # Discharge button
         self.dischargeButton = tk.Button(self.buttons, text='Discharge',
                                     command=self.discharge, bg=orange, fg=white, **button_opts)
-        self.dischargeButton.grid(row=4, column=0, sticky='ew')
-
-        # Emergency Off button
         self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
                                     command=self.emergency_off, bg=red, fg=white, **button_opts)
-        self.emergency_offButton.grid(row=5, column=0, sticky='ew')
-
-        # Reset plots button
         self.resetPlotsButton = tk.Button(self.buttons, text='Reset Plots',
                                     command=self.resetPlot, bg=red, fg=white, **button_opts)
-        self.resetPlotsButton.grid(row=6, column=0, sticky='ew')
 
         # Voltage and current are read from both the power supply and the load
         self.voltageLoadPin = 'ai0'
@@ -99,36 +86,50 @@ class MainApp(tk.Tk):
         self.countdownStarted = False
         self.updateLabels()
 
-        self.voltageLoadLabel.grid(row=7, column=0, sticky='w')
-        self.voltagePSLabel.grid(row=8, column=0, sticky='w')
-        self.currentLoadLabel.grid(row=9, column=0, sticky='w')
-        self.currentPSLabel.grid(row=10, column=0, sticky='w')
-        self.chargeStateLabel.grid(row=11, column=0, sticky='w')
-        self.countdownLabel.grid(row=12, column=0, sticky='w')
+        self.checklistButton.pack()
+        self.chargeButton.pack()
+        self.dischargeButton.pack()
+        self.emergency_offButton.pack()
+        self.resetPlotsButton.pack()
+        self.voltageLoadLabel.pack()
+        self.voltagePSLabel.pack()
+        self.currentLoadLabel.pack()
+        self.currentPSLabel.pack()
+        self.chargeStateLabel.pack()
+        self.countdownLabel.pack()
 
         # Configure Graphs
         self.grid_rowconfigure(1, w=1)
         self.grid_columnconfigure(1, w=1)
+        self.grid_columnconfigure(2, w=1)
 
-        # Plot of results
-        self.chargeTrace = Can_Plot(self)
-        self.voltageAxis = self.chargeTrace.ax
-        self.currentAxis = self.chargeTrace.ax.twinx()
+        # Plot of charge and discharge
+        self.chargePlot = Can_Plot(self)
+        self.dischargePlot = Can_Plot(self)
 
-        self.voltageAxis.tick_params(axis='y', labelcolor=voltageColor)
-        self.currentAxis.tick_params(axis='y', labelcolor=currentColor)
+        self.chargeVoltageAxis = self.chargePlot.ax
+        self.chargeCurrentAxis = self.chargePlot.ax.twinx()
+        self.dischargeVoltageAxis = self.dischargePlot.ax
+        self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
 
-        self.chargeTrace.ax.set_xlabel('Time (s)')
-        self.voltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        self.currentAxis.set_ylabel('Current (A)', color=currentColor)
+        self.chargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
+        self.chargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
+        self.dischargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
+        self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
 
-        voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{load}$')
-        voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
-        currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
-        currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
-        self.chargeTrace.ax.legend(handles=[voltageLine, voltageDash, currentLine, currentLine], loc='lower left')
+        self.chargePlot.ax.set_xlabel('Time (s)')
+        self.dischargePlot.ax.set_xlabel('Time (s)')
 
-        self.chargeTrace.grid(row=1, column=1, sticky='news')
+        self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
+        self.chargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+        self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
+        self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+
+        self.chargePlot.ax.legend(handles=handles, loc='lower left')
+
+        self.chargePlot.grid(row=1, column=1, sticky='ew')
+        self.dischargePlot.grid(row=1, column=2, sticky='ew')
+
 
         try:
             # On startup, disable buttons until login is correct
@@ -142,22 +143,26 @@ class MainApp(tk.Tk):
 
     def setUserInputs(self):
         try:
+            self.serialNumber = str(self.serialNumberEntry.get())
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
+            if format.match(self.serialNumber) is None:
+                raise ValueError
+
             self.userInputSetText.set('Set!')
-            displaySetTextTime = 1000 # ms
             def resetSetText():
                 self.userInputSetText.set('      ')
             self.after(displaySetTextTime, resetSetText)
 
         except ValueError:
             incorrectUserInputName = 'Invalid Input'
-            incorrectUserInputText = 'Please reenter a numerical value for both the Charge Voltage and Holt Charge Time.'
+            incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Holt Charge Time.'
             incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, incorrectUserInputText)
 
             incorrectUserInputWindow.wait_window()
 
+            self.serialNumberEntry.delete(0, 'end')
             self.chargeVoltageEntry.delete(0, 'end')
             self.holdChargeTimeEntry.delete(0, 'end')
 
@@ -243,7 +248,7 @@ class MainApp(tk.Tk):
                 self.usernameEntry.delete(0, 'end')
                 self.passwordEntry.delete(0, 'end')
 
-        self.loginWindow = tk.Toplevel(padx=pad_val, pady=pad_val)
+        self.loginWindow = tk.Toplevel(padx=loginPadding, pady=loginPadding)
         self.loginWindow.title('Login Window')
 
         login_text = 'Please enter UMD username.'
@@ -330,7 +335,6 @@ class MainApp(tk.Tk):
         currentPSPoint = self.readSensor(self.currentPSPin)
 
         # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        chargeVoltageFraction = 0.9
         if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
             if not self.countdownStarted:
                 self.countdownTimeStart = time.time()
@@ -351,14 +355,13 @@ class MainApp(tk.Tk):
         self.currentLoadArray = np.append(self.currentLoadArray, currentLoadPoint)
         self.currentPSArray = np.append(self.currentPSArray, currentPSPoint)
 
-        self.voltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor, label='V$_{load}$')
-        self.voltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, label='V$_{PS}$', linestyle='--')
-        self.currentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor, label='I$_{load}$')
-        self.currentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, label='I$_{PS}$', linestyle='--')
-        self.chargeTrace.update()
+        self.chargeVoltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor, label='V$_{load}$')
+        self.chargeVoltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, label='V$_{PS}$', linestyle='--')
+        self.chargeCurrentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor, label='I$_{load}$')
+        self.chargeCurrentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, label='I$_{PS}$', linestyle='--')
+        self.chargePlot.update()
 
-        frequency = 10 #Hz
-        self.after(int(1000 / frequency), self.updateChargePlot)
+        self.after(int(1000 / refreshRate), self.updateChargePlot)
 
     def resetPlot(self):
         # Set time and voltage to empty array

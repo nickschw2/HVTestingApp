@@ -1,3 +1,6 @@
+import re
+import matplotlib.lines as mlines
+
 # Colors
 green = '#2ecc71'
 yellow = '#f1c40f'
@@ -14,17 +17,30 @@ acceptablePasswords = ['plasma']
 button_opts = {'font':('Calibri', 24), 'state':'normal'}
 text_opts = {'font':('Calibri', 24)}
 
-pad_val = 20 #pixels
+# Widget display constants
+userInputWidth = 6
+userInputPadding = 100
+loginPadding = 20 #pixels
+displaySetTextTime = 1000 # ms
+
+# Serial number format
+# 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
+format = re.compile('.{3}\d{3}')
 
 # Plotting constants
 refreshRate = 10.0 # Hz
 voltageColor = 'blue'
 currentColor = 'red'
 
+voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{load}$')
+voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
+currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
+currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
+handles = [voltageLine, voltageDash, currentLine, currentLine]
+
 # Charging constants
 powerSupplyVoltage = 20e3 # V
 powerSupplyResistance = 1E4 # Ohm
 capacitorCapacitance = 200e-6 # Farads
 RCTime = powerSupplyResistance * capacitorCapacitance
-
-dummyMaxVoltage = 15e3 # V
+chargeVoltageFraction = 0.95
