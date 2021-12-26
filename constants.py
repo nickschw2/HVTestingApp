@@ -1,5 +1,9 @@
 import re
 import matplotlib.lines as mlines
+import datetime
+
+# Date
+today = datetime.date.today()
 
 # Oscilloscope pins
 voltageLoadPin = 'ai0'
@@ -53,3 +57,23 @@ powerSupplyResistance = 1E4 # Ohm
 capacitorCapacitance = 200e-6 # Farads
 RCTime = powerSupplyResistance * capacitorCapacitance
 chargeVoltageFraction = 0.95
+
+checklist_steps = ['Ensure that power supply is off']
+    # 'Ensure that the charging switch is open',
+    # 'Check system is grounded',
+    # 'Turn on power supply',
+    # 'Enter serial number, charge voltage, and hold charge time',
+    # 'Exit room and ensure nobody else is present',
+    # 'Turn on HV Testing Light',
+    # 'Close charging switch',
+    # 'Increase voltage on power supply',
+    # 'Open charging switch',
+    # 'Trigger ignitron',
+    # 'Save scope and video data',
+    # 'Enter room, turn off power supply, and "idiot stick" all HV lines',
+    # 'Turn off HV testing light']
+
+# Saving results
+columns = ['Serial Number', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
+    'Charge Time (s)', 'Charge Voltage (V)', 'Charge Current (A)', 'Discharge Time (s)',
+    'Discharge Voltage (V)', 'Discharge Current (A)']

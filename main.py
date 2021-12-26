@@ -1,11 +1,13 @@
 import tkinter as tk
 import numpy as np
-from tkinter import ttk
+import pandas as pd
+from tkinter import ttk, filedialog
 import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 import time
+import os
 import nidaqmx
 from constants import *
 
@@ -76,6 +78,8 @@ class MainApp(tk.Tk):
         self.buttons.grid(row=2, columnspan=3, sticky='ns')
 
         # Button definitions and placement
+        self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
+                                    command=self.setSaveLocation, bg=green, fg=white, **button_opts)
         self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
                                     command=self.checklist, bg=green, fg=white, **button_opts)
         self.chargeButton = tk.Button(self.buttons, text='Charge',
@@ -87,6 +91,7 @@ class MainApp(tk.Tk):
         self.resetButton = tk.Button(self.buttons, text='Reset',
                                     command=self.reset, bg=red, fg=white, **button_opts)
 
+        self.saveLocationButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
         self.chargeButton.pack(side='left', padx=buttonPadding)
         self.dischargeButton.pack(side='left', padx=buttonPadding)
@@ -139,8 +144,30 @@ class MainApp(tk.Tk):
             self.safetyLights()
 
             self.reset()
+
         except Exception as e:
             print(e)
+
+    def setSaveLocation(self):
+        self.saveFolder = filedialog.askdirectory(initialdir=os.path.dirname(os.path.realpath(__file__)), title='Select directory for saving results.')
+
+        if self.userInputsSet:
+            self.checklistButton.configure(state='normal')
+
+    def saveResults(self):
+        date = today.strftime('%Y%m%d')
+        run = 1
+        filename = f'{today}_{self.serialNumber}_{run}.csv'
+        while filename in os.listdir(self.saveFolder):
+            run += 1
+            filename = f'{today}_{self.serialNumber}_{run}.csv'
+
+        results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
+            self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
+            self.dischargeVoltageLoad, self.dischargeCurrentLoad]
+
+        results_df = pd.DataFrame([results], columns=columns)
+        results_df.to_csv(f'{self.saveFolder}/{filename}')
 
     def setUserInputs(self):
         try:
@@ -150,6 +177,12 @@ class MainApp(tk.Tk):
 
             if format.match(self.serialNumber) is None:
                 raise ValueError
+
+            self.userInputsSet = True
+            self.checklistComplete()
+
+            if hasattr(self, 'saveFolder'):
+                self.checklistButton.configure(state='normal')
 
             self.userInputSetText.set('Set!')
             def resetSetText():
@@ -181,7 +214,7 @@ class MainApp(tk.Tk):
         complete = False
         complete = all([cb.get() for keys, cb in self.checklist_Checkbuttons.items()])
 
-        if complete:
+        if complete and self.userInputsSet and len(self.checklist_Checkbuttons) !=0:
             self.enableButtons()
 
     def checklist(self):
@@ -189,22 +222,6 @@ class MainApp(tk.Tk):
         self.checklistButton.configure(state='normal')
         self.checklist_win = tk.Toplevel()
 
-        checklist_steps = ['Ensure that power supply is off']
-            # 'Ensure that the charging switch is open',
-            # 'Check system is grounded',
-            # 'Turn on power supply',
-            # 'Enter serial number, charge voltage, and hold charge time',
-            # 'Exit room and ensure nobody else is present',
-            # 'Turn on HV Testing Light',
-            # 'Close charging switch',
-            # 'Increase voltage on power supply',
-            # 'Open charging switch',
-            # 'Trigger ignitron',
-            # 'Save scope and video data',
-            # 'Enter room, turn off power supply, and "idiot stick" all HV lines',
-            # 'Turn off HV testing light']
-
-        self.checklist_Checkbuttons = {}
         for i, step in enumerate(checklist_steps):
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
             button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete)
@@ -243,6 +260,8 @@ class MainApp(tk.Tk):
 
             self.replotDischarge()
 
+            self.saveResults()
+
         else:
             dischargeConfirmName = 'Discharge'
             dischargeConfirmText = 'Are you sure you want to discharge?'
@@ -271,7 +290,7 @@ class MainApp(tk.Tk):
 
             if self.loggedIn:
                 self.loginWindow.destroy()
-                self.checklistButton.configure(state='normal')
+                self.saveLocationButton.configure(state='normal')
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
@@ -449,6 +468,7 @@ class MainApp(tk.Tk):
         self.charged = False
         self.chargePress = False
         self.discharged = False
+        self.userInputsSet = False
         self.timePoint = 0
         self.countdownStarted = False
         self.checklist_Checkbuttons = {}
@@ -458,7 +478,8 @@ class MainApp(tk.Tk):
         self.resetDischargePlot()
 
         self.disableButtons()
-        self.checklistButton.configure(state='normal')
+        if self.loggedIn:
+            self.saveLocationButton.configure(state='normal')
 
 class Can_Plot(ttk.Frame):
 
