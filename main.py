@@ -42,7 +42,7 @@ class MainApp(tk.Tk):
         self.userInputOkayButton.pack(side='left')
         self.userInputSetLabel.pack(side='left')
 
-        # Column for buttons on the left
+        # Column for buttons and labels on the left
         self.grid_columnconfigure(0, w=1)
         self.buttons = ttk.Frame(self)
         self.buttons.grid(row=1, column=0, sticky='news')
@@ -73,9 +73,6 @@ class MainApp(tk.Tk):
                                     command=self.resetPlot, bg=red, fg=white, **button_opts)
         self.resetPlotsButton.grid(row=6, column=0, sticky='ew')
 
-        # Display voltage and current
-        self.timePoint = 0.0
-
         # Voltage and current are read from both the power supply and the load
         self.voltageLoadPin = 'ai0'
         self.voltagePSPin = 'ai1'
@@ -86,18 +83,28 @@ class MainApp(tk.Tk):
         self.voltagePSText = tk.StringVar()
         self.currentLoadText = tk.StringVar()
         self.currentPSText = tk.StringVar()
+        self.chargeStateText = tk.StringVar()
+        self.countdownText = tk.StringVar()
 
         self.voltageLoadLabel = tk.Label(self.buttons, textvariable=self.voltageLoadText, **text_opts)
         self.voltagePSLabel = tk.Label(self.buttons, textvariable=self.voltagePSText, **text_opts)
         self.currentLoadLabel = tk.Label(self.buttons, textvariable=self.currentLoadText, **text_opts)
         self.currentPSLabel = tk.Label(self.buttons, textvariable=self.currentPSText, **text_opts)
+        self.chargeStateLabel = tk.Label(self.buttons, textvariable=self.chargeStateText, **text_opts)
+        self.countdownLabel = tk.Label(self.buttons, textvariable=self.countdownText, **text_opts)
 
+        self.charged = False
+        self.discharged = False
+        self.timePoint = 0
+        self.countdownStarted = False
         self.updateLabels()
 
         self.voltageLoadLabel.grid(row=7, column=0, sticky='w')
         self.voltagePSLabel.grid(row=8, column=0, sticky='w')
         self.currentLoadLabel.grid(row=9, column=0, sticky='w')
         self.currentPSLabel.grid(row=10, column=0, sticky='w')
+        self.chargeStateLabel.grid(row=11, column=0, sticky='w')
+        self.countdownLabel.grid(row=12, column=0, sticky='w')
 
         # Configure Graphs
         self.grid_rowconfigure(1, w=1)
@@ -208,6 +215,7 @@ class MainApp(tk.Tk):
 
     def discharge(self):
         print('Discharge')
+        self.discharged = True
 
     def safetyLights(self):
         print('Turn on safety lights')
@@ -259,15 +267,6 @@ class MainApp(tk.Tk):
         self.quit()
         self.destroy()
 
-    def startDischargeTimer(self, timeDesiredVoltage):
-        elapsedHoldChargeTime = time.time() - timeDesiredVoltage
-        if  elapsedHoldChargeTime < holdChargeTime * 1000:
-            dischargeTimerName = 'Discharge Timer'
-            dischargeTimerText = f'{holdChargeTime - elapsedHoldChargeTime}'
-            # countdown clock https://www.pythontutorial.net/tkinter/tkinter-after/
-        else:
-            self.dischargeCapacitor()
-
     def readSensor(self, pin):
         # sensorName = 'Dev1'
         # try:
@@ -291,7 +290,6 @@ class MainApp(tk.Tk):
         #             value = 'N/A'
         #     except AttributeError:
         #         value = 'N/A'
-
         if pin == 'ai0':
             value = np.random.rand() * 1000
         elif pin == 'ai1':
@@ -314,12 +312,36 @@ class MainApp(tk.Tk):
         self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.currentLoadPin):.2f} A')
         self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.currentPSPin):.2f} A')
 
+        if self.discharged:
+            self.chargeStateText.set('Discharged!')
+            self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
+        elif self.charged:
+            self.chargeStateText.set('Charged')
+            self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
+        else:
+            self.chargeStateText.set('Not Charged')
+            self.countdownText.set('Countdown: N/A')
+
     def updateChargePlot(self):
         self.timePoint = time.time() - self.beginDataCollectionTime
         voltageLoadPoint = self.readSensor(self.voltageLoadPin)
         voltagePSPoint = self.readSensor(self.voltagePSPin)
         currentLoadPoint = self.readSensor(self.currentLoadPin)
         currentPSPoint = self.readSensor(self.currentPSPin)
+
+        # Voltage reaches a certain value of chargeVoltage to begin countown clock
+        chargeVoltageFraction = 0.9
+        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
+            if not self.countdownStarted:
+                self.countdownTimeStart = time.time()
+                self.charged = True
+                self.countdownStarted = True
+
+            self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
+
+            if self.countdownTime <= 0.0:
+                self.countdownTime = 0.0
+                self.discharge()
 
         self.updateLabels()
 
@@ -334,9 +356,6 @@ class MainApp(tk.Tk):
         self.currentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor, label='I$_{load}$')
         self.currentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, label='I$_{PS}$', linestyle='--')
         self.chargeTrace.update()
-
-        # if voltagePoint >= dummyMaxVoltage:
-        #     self.startDischargeTimer(time.time())
 
         frequency = 10 #Hz
         self.after(int(1000 / frequency), self.updateChargePlot)
