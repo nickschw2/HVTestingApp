@@ -43,22 +43,10 @@ class MainApp(tk.Tk):
         self.userInputOkayButton.pack(side='left')
         self.userInputSetLabel.pack(side='left')
 
-        # Column for buttons and labels on the left
+        # Column for labels on the left
         self.grid_columnconfigure(0, w=1)
-        self.buttons = tk.Frame(self)
-        self.buttons.grid(row=1, column=0)
-
-        # Button definitions and placement
-        self.checklistButton = tk.Button(self.buttons, text='Begin Charging\nChecklist',
-                                    command=self.checklist, bg=green, fg=white, **button_opts)
-        self.chargeButton = tk.Button(self.buttons, text='Begin Charging',
-                                    command=self.charge, bg=yellow, fg=white, **button_opts)
-        self.dischargeButton = tk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bg=orange, fg=white, **button_opts)
-        self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off, bg=red, fg=white, **button_opts)
-        self.resetPlotsButton = tk.Button(self.buttons, text='Reset Plots',
-                                    command=self.resetPlot, bg=red, fg=white, **button_opts)
+        self.labels = tk.Frame(self)
+        self.labels.grid(row=1, column=0)
 
         # Voltage and current are read from both the power supply and the load
         self.voltageLoadText = tk.StringVar()
@@ -68,30 +56,42 @@ class MainApp(tk.Tk):
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
 
-        self.voltageLoadLabel = tk.Label(self.buttons, textvariable=self.voltageLoadText, **text_opts)
-        self.voltagePSLabel = tk.Label(self.buttons, textvariable=self.voltagePSText, **text_opts)
-        self.currentLoadLabel = tk.Label(self.buttons, textvariable=self.currentLoadText, **text_opts)
-        self.currentPSLabel = tk.Label(self.buttons, textvariable=self.currentPSText, **text_opts)
-        self.chargeStateLabel = tk.Label(self.buttons, textvariable=self.chargeStateText, **text_opts)
-        self.countdownLabel = tk.Label(self.buttons, textvariable=self.countdownText, **text_opts)
+        self.voltageLoadLabel = tk.Label(self.labels, textvariable=self.voltageLoadText, **text_opts)
+        self.voltagePSLabel = tk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
+        self.currentLoadLabel = tk.Label(self.labels, textvariable=self.currentLoadText, **text_opts)
+        self.currentPSLabel = tk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
+        self.chargeStateLabel = tk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
+        self.countdownLabel = tk.Label(self.labels, textvariable=self.countdownText, **text_opts)
 
-        self.charged = False
-        self.discharged = False
-        self.timePoint = 0
-        self.countdownStarted = False
-        self.updateLabels()
-
-        self.checklistButton.pack()
-        self.chargeButton.pack()
-        self.dischargeButton.pack()
-        self.emergency_offButton.pack()
-        self.resetPlotsButton.pack()
         self.voltageLoadLabel.pack()
         self.voltagePSLabel.pack()
         self.currentLoadLabel.pack()
         self.currentPSLabel.pack()
         self.chargeStateLabel.pack()
         self.countdownLabel.pack()
+
+        # Row for buttons on the bottom
+        self.grid_rowconfigure(2, w=1)
+        self.buttons = tk.Frame(self)
+        self.buttons.grid(row=2, columnspan=3, sticky='ns')
+
+        # Button definitions and placement
+        self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
+                                    command=self.checklist, bg=green, fg=white, **button_opts)
+        self.chargeButton = tk.Button(self.buttons, text='Charge',
+                                    command=self.charge, bg=yellow, fg=white, **button_opts)
+        self.dischargeButton = tk.Button(self.buttons, text='Discharge',
+                                    command=self.discharge, bg=orange, fg=white, **button_opts)
+        self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
+                                    command=self.emergency_off, bg=red, fg=white, **button_opts)
+        self.resetButton = tk.Button(self.buttons, text='Reset',
+                                    command=self.reset, bg=red, fg=white, **button_opts)
+
+        self.checklistButton.pack(side='left', padx=buttonPadding)
+        self.chargeButton.pack(side='left', padx=buttonPadding)
+        self.dischargeButton.pack(side='left', padx=buttonPadding)
+        self.emergency_offButton.pack(side='left', padx=buttonPadding)
+        self.resetButton.pack(side='left', padx=buttonPadding)
 
         # Configure Graphs
         self.grid_rowconfigure(1, w=1)
@@ -137,6 +137,8 @@ class MainApp(tk.Tk):
             self.validateLogin()
 
             self.safetyLights()
+
+            self.reset()
         except Exception as e:
             print(e)
 
@@ -156,7 +158,7 @@ class MainApp(tk.Tk):
 
         except ValueError:
             incorrectUserInputName = 'Invalid Input'
-            incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Holt Charge Time.'
+            incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Hold Charge Time.'
             incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, incorrectUserInputText)
 
             incorrectUserInputWindow.wait_window()
@@ -191,6 +193,7 @@ class MainApp(tk.Tk):
             # 'Ensure that the charging switch is open',
             # 'Check system is grounded',
             # 'Turn on power supply',
+            # 'Enter serial number, charge voltage, and hold charge time',
             # 'Exit room and ensure nobody else is present',
             # 'Turn on HV Testing Light',
             # 'Close charging switch',
@@ -213,19 +216,45 @@ class MainApp(tk.Tk):
         self.checklist_win.wait_window()
 
     def charge(self):
-        print('Charge')
-        self.resetPlot()
-        self.updateChargePlot()
+        chargeConfirmName = 'Begin charging'
+        chargeConfirmText = 'Are you sure you want to begin charging?'
+        chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
+
+        cancelButton = tk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, **button_opts)
+        cancelButton.pack(side='left')
+
+        chargeConfirmWindow.wait_window()
+
+        if chargeConfirmWindow.OKPress:
+            self.beginChargeTime = time.time()
+            self.charging = True
+            self.resetChargePlot()
+            self.updateChargePlot()
+            self.chargePress = True
 
     def discharge(self):
-        print('Discharge')
-        self.discharged = True
-        pins = [voltageLoadPin, currentLoadPin]
-        self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
+        # Differentiate a discharge that comes automatically from charging the capacitor
+        # and a discharge that comes from the discharge button press
+        if self.chargePress:
+            self.discharged = True
+            self.charging = False
+            pins = [voltageLoadPin, currentLoadPin]
+            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
 
-        self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
-        self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
-        self.dischargePlot.update()
+            self.replotDischarge()
+
+        else:
+            dischargeConfirmName = 'Discharge'
+            dischargeConfirmText = 'Are you sure you want to discharge?'
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+
+            cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
+            cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
+
+            if dischargeConfirmWindow.OKPress:
+                print('Discharge')
 
     def safetyLights(self):
         print('Turn on safety lights')
@@ -338,8 +367,31 @@ class MainApp(tk.Tk):
             self.chargeStateText.set('Not Charged')
             self.countdownText.set('Countdown: N/A')
 
+    def clearAxisLines(self, axis):
+        if len(axis.lines) != 0:
+            for i in range(len(axis.lines)):
+                axis.lines[0].remove()
+
+    def replotCharge(self):
+        self.clearAxisLines(self.chargeVoltageAxis)
+        self.clearAxisLines(self.chargeCurrentAxis)
+
+        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltageLoad / 1000, color=voltageColor)
+        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
+        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
+        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
+        self.chargePlot.update()
+
+    def replotDischarge(self):
+        self.clearAxisLines(self.dischargeVoltageAxis)
+        self.clearAxisLines(self.dischargeCurrentAxis)
+
+        self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
+        self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
+        self.dischargePlot.update()
+
     def updateChargePlot(self):
-        self.timePoint = time.time() - self.beginDataCollectionTime
+        self.timePoint = time.time() - self.beginChargeTime
         voltageLoadPoint = self.readSensor(voltageLoadPin)
         voltagePSPoint = self.readSensor(voltagePSPin)
         currentLoadPoint = self.readSensor(currentLoadPin)
@@ -366,15 +418,12 @@ class MainApp(tk.Tk):
         self.chargeCurrentLoad = np.append(self.chargeCurrentLoad, currentLoadPoint)
         self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
 
-        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltageLoad / 1000, color=voltageColor)
-        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
-        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
-        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
-        self.chargePlot.update()
+        self.replotCharge()
 
-        self.after(int(1000 / refreshRate), self.updateChargePlot)
+        if self.charging == True:
+            self.after(int(1000 / refreshRate), self.updateChargePlot)
 
-    def resetPlot(self):
+    def resetChargePlot(self):
         # Set time and voltage to empty array
         self.chargeTime = np.array([])
         self.chargeVoltageLoad = np.array([])
@@ -382,7 +431,34 @@ class MainApp(tk.Tk):
         self.chargeCurrentLoad = np.array([])
         self.chargeCurrentPS = np.array([])
 
-        self.beginDataCollectionTime = time.time()
+        self.replotCharge()
+
+    def resetDischargePlot(self):
+        # Set time and voltage to empty array
+        self.dischargeTime = np.array([])
+        self.dischargeVoltageLoad = np.array([])
+        self.dischargeCurrentLoad = np.array([])
+
+        self.replotDischarge()
+
+    def reset(self):
+        self.serialNumberEntry.delete(0, 'end')
+        self.chargeVoltageEntry.delete(0, 'end')
+        self.holdChargeTimeEntry.delete(0, 'end')
+
+        self.charged = False
+        self.chargePress = False
+        self.discharged = False
+        self.timePoint = 0
+        self.countdownStarted = False
+        self.checklist_Checkbuttons = {}
+        self.updateLabels()
+
+        self.resetChargePlot()
+        self.resetDischargePlot()
+
+        self.disableButtons()
+        self.checklistButton.configure(state='normal')
 
 class Can_Plot(ttk.Frame):
 
@@ -412,16 +488,23 @@ class MessageWindow(tk.Toplevel):
         self.maxsize(self.maxWidth, self.maxHeight)
 
         OKButtonText = 'Okay'
+        self.OKPress = False
 
-        self.message = tk.Message(self, text=self.text, **text_opts)
-        self.OKButton = tk.Button(self, text=OKButtonText, command=self.destroy, **button_opts)
+        self.topFrame = tk.Frame(self)
+        self.bottomFrame = tk.Frame(self)
 
-        self.message.pack()
-        self.OKButton.pack()
+        self.topFrame.pack(side='top')
+        self.bottomFrame.pack(side='bottom')
 
-    def update(self):
-        self.message
+        def OKPress():
+            self.OKPress = True
+            self.destroy()
 
+        self.message = tk.Message(self.topFrame, width=topLevelWidth, text=self.text, **text_opts)
+        self.OKButton = tk.Button(self.bottomFrame, text=OKButtonText, command=OKPress, **button_opts)
+
+        self.message.pack(fill='both')
+        self.OKButton.pack(side='left')
 
 if __name__ == "__main__":
     app = MainApp()

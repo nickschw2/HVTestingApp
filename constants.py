@@ -25,9 +25,11 @@ text_opts = {'font':('Calibri', 24)}
 
 # Widget display constants
 userInputWidth = 6
-userInputPadding = 100
+userInputPadding = 100 #pixels
 loginPadding = 20 #pixels
+buttonPadding = 50 #pixels
 displaySetTextTime = 1000 # ms
+topLevelWidth = 300 #pixels
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
