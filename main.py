@@ -30,6 +30,9 @@ class MainApp(tk.Tk):
         self.holdChargeTimeEntry = tk.Entry(self.userInputs, width=userInputWidth, **text_opts)
 
         self.userInputOkayButton = tk.Button(self.userInputs, text='Okay', command=self.setUserInputs, **button_opts)
+        self.userInputSetText = tk.StringVar()
+        self.userInputSetText.set('      ')
+        self.userInputSetLabel = tk.Label(self.userInputs, textvariable=self.userInputSetText, **text_opts)
 
         userInputPadding = 100
         self.chargeVoltageLabel.pack(side='left')
@@ -37,6 +40,7 @@ class MainApp(tk.Tk):
         self.holdChargeTimeLabel.pack(side='left')
         self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
         self.userInputOkayButton.pack(side='left')
+        self.userInputSetLabel.pack(side='left')
 
         # Column for buttons on the left
         self.grid_columnconfigure(0, w=1)
@@ -133,8 +137,22 @@ class MainApp(tk.Tk):
         try:
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
+
+            self.userInputSetText.set('Set!')
+            displaySetTextTime = 1000 # ms
+            def resetSetText():
+                self.userInputSetText.set('      ')
+            self.after(displaySetTextTime, resetSetText)
+
         except ValueError:
-            print('User Input Error')
+            incorrectUserInputName = 'Invalid Input'
+            incorrectUserInputText = 'Please reenter a numerical value for both the Charge Voltage and Holt Charge Time.'
+            incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, incorrectUserInputText)
+
+            incorrectUserInputWindow.wait_window()
+
+            self.chargeVoltageEntry.delete(0, 'end')
+            self.holdChargeTimeEntry.delete(0, 'end')
 
     def disableButtons(self):
         for w in self.buttons.winfo_children():
