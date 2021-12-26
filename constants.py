@@ -1,6 +1,12 @@
 import re
 import matplotlib.lines as mlines
 
+# Oscilloscope pins
+voltageLoadPin = 'ai0'
+voltagePSPin = 'ai1'
+currentLoadPin = 'ai2'
+currentPSPin = 'ai3'
+
 # Colors
 green = '#2ecc71'
 yellow = '#f1c40f'
@@ -36,7 +42,8 @@ voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$
 voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
 currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
-handles = [voltageLine, voltageDash, currentLine, currentLine]
+chargeHandles = [voltageLine, voltageDash, currentLine, currentLine]
+dischargeHandles = [voltageLine, currentLine]
 
 # Charging constants
 powerSupplyVoltage = 20e3 # V

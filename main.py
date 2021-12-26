@@ -61,11 +61,6 @@ class MainApp(tk.Tk):
                                     command=self.resetPlot, bg=red, fg=white, **button_opts)
 
         # Voltage and current are read from both the power supply and the load
-        self.voltageLoadPin = 'ai0'
-        self.voltagePSPin = 'ai1'
-        self.currentLoadPin = 'ai2'
-        self.currentPSPin = 'ai3'
-
         self.voltageLoadText = tk.StringVar()
         self.voltagePSText = tk.StringVar()
         self.currentLoadText = tk.StringVar()
@@ -125,7 +120,11 @@ class MainApp(tk.Tk):
         self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
 
-        self.chargePlot.ax.legend(handles=handles, loc='lower left')
+        self.chargePlot.ax.set_title('Charge Plot')
+        self.dischargePlot.ax.set_title('Discharge Plot')
+
+        self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
+        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='lower left')
 
         self.chargePlot.grid(row=1, column=1, sticky='ew')
         self.dischargePlot.grid(row=1, column=2, sticky='ew')
@@ -221,6 +220,12 @@ class MainApp(tk.Tk):
     def discharge(self):
         print('Discharge')
         self.discharged = True
+        pins = [voltageLoadPin, currentLoadPin]
+        self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
+
+        self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
+        self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
+        self.dischargePlot.update()
 
     def safetyLights(self):
         print('Turn on safety lights')
@@ -309,13 +314,19 @@ class MainApp(tk.Tk):
 
         return value
 
+    def readOscilloscope(self, pins):
+        time = np.linspace(0, 1)
+        voltageLoad = 1 - np.exp(-time)
+        currentLoad = np.exp(-time)
+        return time, voltageLoad, currentLoad
+
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(self.voltageLoadPin) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(self.voltagePSPin) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.currentLoadPin):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.currentPSPin):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(voltageLoadPin) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(voltagePSPin) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(currentLoadPin):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(currentPSPin):.2f} A')
 
         if self.discharged:
             self.chargeStateText.set('Discharged!')
@@ -329,10 +340,10 @@ class MainApp(tk.Tk):
 
     def updateChargePlot(self):
         self.timePoint = time.time() - self.beginDataCollectionTime
-        voltageLoadPoint = self.readSensor(self.voltageLoadPin)
-        voltagePSPoint = self.readSensor(self.voltagePSPin)
-        currentLoadPoint = self.readSensor(self.currentLoadPin)
-        currentPSPoint = self.readSensor(self.currentPSPin)
+        voltageLoadPoint = self.readSensor(voltageLoadPin)
+        voltagePSPoint = self.readSensor(voltagePSPin)
+        currentLoadPoint = self.readSensor(currentLoadPin)
+        currentPSPoint = self.readSensor(currentPSPin)
 
         # Voltage reaches a certain value of chargeVoltage to begin countown clock
         if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
@@ -349,27 +360,27 @@ class MainApp(tk.Tk):
 
         self.updateLabels()
 
-        self.timeArray = np.append(self.timeArray, self.timePoint)
-        self.voltageLoadArray = np.append(self.voltageLoadArray, voltageLoadPoint)
-        self.voltagePSArray = np.append(self.voltagePSArray, voltagePSPoint)
-        self.currentLoadArray = np.append(self.currentLoadArray, currentLoadPoint)
-        self.currentPSArray = np.append(self.currentPSArray, currentPSPoint)
+        self.chargeTime = np.append(self.chargeTime, self.timePoint)
+        self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)
+        self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
+        self.chargeCurrentLoad = np.append(self.chargeCurrentLoad, currentLoadPoint)
+        self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
 
-        self.chargeVoltageAxis.plot(self.timeArray, self.voltageLoadArray / 1000, color=voltageColor, label='V$_{load}$')
-        self.chargeVoltageAxis.plot(self.timeArray, self.voltagePSArray / 1000, color=voltageColor, label='V$_{PS}$', linestyle='--')
-        self.chargeCurrentAxis.plot(self.timeArray, self.currentLoadArray, color=currentColor, label='I$_{load}$')
-        self.chargeCurrentAxis.plot(self.timeArray, self.currentPSArray, color=currentColor, label='I$_{PS}$', linestyle='--')
+        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltageLoad / 1000, color=voltageColor)
+        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
+        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
+        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
         self.chargePlot.update()
 
         self.after(int(1000 / refreshRate), self.updateChargePlot)
 
     def resetPlot(self):
         # Set time and voltage to empty array
-        self.timeArray = np.array([])
-        self.voltageLoadArray = np.array([])
-        self.voltagePSArray = np.array([])
-        self.currentLoadArray = np.array([])
-        self.currentPSArray = np.array([])
+        self.chargeTime = np.array([])
+        self.chargeVoltageLoad = np.array([])
+        self.chargeVoltagePS = np.array([])
+        self.chargeCurrentLoad = np.array([])
+        self.chargeCurrentPS = np.array([])
 
         self.beginDataCollectionTime = time.time()
 
