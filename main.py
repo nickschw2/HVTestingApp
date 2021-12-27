@@ -166,8 +166,9 @@ class MainApp(tk.Tk):
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
             self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
-        results_df = pd.DataFrame([results], columns=columns)
-        results_df.to_csv(f'{self.saveFolder}/{filename}')
+        results_df = pd.DataFrame([pd.Series(val) for val in results]).T
+        results_df.columns = columns
+        results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
 
     def setUserInputs(self):
         try:
