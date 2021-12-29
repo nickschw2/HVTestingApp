@@ -1,28 +1,38 @@
 import tkinter as tk
-import numpy as np
-import pandas as pd
 from tkinter import ttk, filedialog
+
+# Import statements for creating plots in tkinter applications
 import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
+
+import numpy as np
+import pandas as pd
 import time
 import os
 import nidaqmx
 from constants import *
+
+# Tkinter has quite a high learning curve. If attempting to edit this source code without experience, I highly
+# recommend going through some tutorials. The documentation on tkinter is also quite poor, but
+# this website has the best I can find (http://www.tcl.tk/man/tcl8.5/TkCmd/contents.htm). At times you may
+# need to manually go into the tkinter source code to investigate the behavior/capabilities of some code.
 
 class MainApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
         self.title('HV Capacitor Testing')
+
+        # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Row for user inputs on the top
         self.userInputs = tk.Frame(self)
         self.userInputs.grid(row=0, columnspan=3, sticky='ns')
 
-        # Charge voltage and desired hold charge time
+        # User input fields along with a button for setting them
         self.serialNumberLabel = tk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
         self.chargeVoltageLabel = tk.Label(self.userInputs, text='Charge (kV):', **text_opts)
         self.holdChargeTimeLabel = tk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
@@ -90,6 +100,8 @@ class MainApp(tk.Tk):
                                     command=self.emergency_off, bg=red, fg=white, **button_opts)
         self.resetButton = tk.Button(self.buttons, text='Reset',
                                     command=self.reset, bg=red, fg=white, **button_opts)
+        self.helpButton = tk.Button(self.buttons, text='Help',
+                                    command=self.help, **button_opts)
 
         self.saveLocationButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
@@ -97,6 +109,7 @@ class MainApp(tk.Tk):
         self.dischargeButton.pack(side='left', padx=buttonPadding)
         self.emergency_offButton.pack(side='left', padx=buttonPadding)
         self.resetButton.pack(side='left', padx=buttonPadding)
+        self.helpButton.pack(side='left', padx=buttonPadding)
 
         # Configure Graphs
         self.grid_rowconfigure(1, w=1)
@@ -104,9 +117,10 @@ class MainApp(tk.Tk):
         self.grid_columnconfigure(2, w=1)
 
         # Plot of charge and discharge
-        self.chargePlot = Can_Plot(self)
-        self.dischargePlot = Can_Plot(self)
+        self.chargePlot = CanvasPlot(self)
+        self.dischargePlot = CanvasPlot(self)
 
+        # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
         self.chargeCurrentAxis = self.chargePlot.ax.twinx()
         self.dischargeVoltageAxis = self.dischargePlot.ax
@@ -128,6 +142,7 @@ class MainApp(tk.Tk):
         self.chargePlot.ax.set_title('Charge Plot')
         self.dischargePlot.ax.set_title('Discharge Plot')
 
+        # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
         self.dischargePlot.ax.legend(handles=dischargeHandles, loc='lower left')
 
@@ -143,18 +158,23 @@ class MainApp(tk.Tk):
 
             self.safetyLights()
 
+            # Reset all fields on startup, including making a connection to NI DAQ
             self.reset()
 
         except Exception as e:
             print(e)
 
     def setSaveLocation(self):
+        # Creates folder dialog for user to choose save directory
         self.saveFolder = filedialog.askdirectory(initialdir=os.path.dirname(os.path.realpath(__file__)), title='Select directory for saving results.')
 
+        # If the user inputs have already been set, enable the checklist button
         if self.userInputsSet:
             self.checklistButton.configure(state='normal')
 
     def saveResults(self):
+        # Create a unique identifier for the filename in the save folder
+        # Format: date_serialNumber_runNumber.csv
         date = today.strftime('%Y%m%d')
         run = 1
         filename = f'{today}_{self.serialNumber}_{run}.csv'
@@ -162,34 +182,41 @@ class MainApp(tk.Tk):
             run += 1
             filename = f'{today}_{self.serialNumber}_{run}.csv'
 
+        # These results are listed in accordance with the 'columns' variable in constants.py
+        # If the user would like to add or remove fields please make those changes both here and to 'columns'
         results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
             self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
+        # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in results]).T
         results_df.columns = columns
         results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
 
     def setUserInputs(self):
+        # Try to set the user inputs. If there is a ValueError, display pop up message.
         try:
             self.serialNumber = str(self.serialNumberEntry.get())
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
+            # Make sure that the serial number matches the correct format
             if format.match(self.serialNumber) is None:
                 raise ValueError
 
             self.userInputsSet = True
-            self.checklistComplete()
 
+            # Check if the save folder has been selected, and if so allow user to begin checklist
             if hasattr(self, 'saveFolder'):
                 self.checklistButton.configure(state='normal')
 
+            # Briefly display text so that the user knows that the inputs have been set.
             self.userInputSetText.set('Set!')
             def resetSetText():
                 self.userInputSetText.set('      ')
             self.after(displaySetTextTime, resetSetText)
 
+        # Pop up window for incorrect user inputs
         except ValueError:
             incorrectUserInputName = 'Invalid Input'
             incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Hold Charge Time.'
@@ -197,24 +224,29 @@ class MainApp(tk.Tk):
 
             incorrectUserInputWindow.wait_window()
 
+            # Clear the user input fields
             self.serialNumberEntry.delete(0, 'end')
             self.chargeVoltageEntry.delete(0, 'end')
             self.holdChargeTimeEntry.delete(0, 'end')
 
+    # Disable all buttons in the button frame
     def disableButtons(self):
         for w in self.buttons.winfo_children():
             if isinstance(w, tk.Button):
                 w.configure(state='disabled')
 
+    # Enable normal operation of all buttons in the button frame
     def enableButtons(self):
         for w in self.buttons.winfo_children():
             if isinstance(w, tk.Button):
                 w.configure(state='normal')
 
+    # Every time an item on the checklist is ticked complete, check to see if the entire list is complete
     def checklistComplete(self):
         complete = False
         complete = all([cb.get() for keys, cb in self.checklist_Checkbuttons.items()])
 
+        # Only if the user inputs are also set will the buttons be enabled
         if complete and self.userInputsSet and len(self.checklist_Checkbuttons) !=0:
             self.enableButtons()
 
@@ -292,6 +324,7 @@ class MainApp(tk.Tk):
             if self.loggedIn:
                 self.loginWindow.destroy()
                 self.saveLocationButton.configure(state='normal')
+                self.helpButton.configure(state='normal')
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
@@ -481,8 +514,15 @@ class MainApp(tk.Tk):
         self.disableButtons()
         if self.loggedIn:
             self.saveLocationButton.configure(state='normal')
+            self.helpButton.configure(state='normal')
 
-class Can_Plot(ttk.Frame):
+    def help(self):
+        helpName = 'Help'
+        helpWindow = MessageWindow(self, helpName, helpText)
+
+        helpWindow.wait_window()
+
+class CanvasPlot(ttk.Frame):
 
     def __init__(self, master):
         super().__init__(master)
