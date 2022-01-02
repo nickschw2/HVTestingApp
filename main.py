@@ -200,7 +200,7 @@ class MainApp(tk.Tk):
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
-            # Make sure that the serial number matches the correct format
+            # Make sure that the serial number matches the correct format, if not raise error
             if format.match(self.serialNumber) is None:
                 raise ValueError
 
@@ -251,21 +251,32 @@ class MainApp(tk.Tk):
             self.enableButtons()
 
     def checklist(self):
+        # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
         self.disableButtons()
+        self.saveLocationButton.configure(state='normal')
+        self.helpButton.configure(state='normal')
         self.checklistButton.configure(state='normal')
+
+        # Top level window for checklist
         self.checklist_win = tk.Toplevel()
 
+        # Create a Checkbutton for each item on the checklist
         for i, step in enumerate(checklist_steps):
+            # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
+            # The completion of the checklist is checked every time a Checkbutton value is changed
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
             button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete)
             button.grid(row=i, column=0, sticky='w')
 
+        # Add okay button to close the window
         self.OKButton = tk.Button(self.checklist_win, text='Okay', command=self.checklist_win.destroy, **button_opts)
-        self.OKButton.grid(row=i + 1, column=0)
+        self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
+        # I believe wait_window functions to wait for the window to close before the rest of the app can execute the next function
         self.checklist_win.wait_window()
 
     def charge(self):
+        # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
         chargeConfirmText = 'Are you sure you want to begin charging?'
         chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
@@ -275,9 +286,13 @@ class MainApp(tk.Tk):
 
         chargeConfirmWindow.wait_window()
 
+        # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
+            # Begin tracking time
             self.beginChargeTime = time.time()
             self.charging = True
+
+            # Reset the charge plot and begin continuously plotting
             self.resetChargePlot()
             self.updateChargePlot()
             self.chargePress = True
@@ -286,16 +301,21 @@ class MainApp(tk.Tk):
         # Differentiate a discharge that comes automatically from charging the capacitor
         # and a discharge that comes from the discharge button press
         if self.chargePress:
+            print('Discharge')
             self.discharged = True
             self.charging = False
+
+            # Read from the load
             pins = [voltageLoadPin, currentLoadPin]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
 
+            # Plot results on the discharge graph and save them
+            # The only time results are saved is when there is a discharge that is preceded by successful charge
             self.replotDischarge()
-
             self.saveResults()
 
         else:
+            # Popup window to confirm discharge
             dischargeConfirmName = 'Discharge'
             dischargeConfirmText = 'Are you sure you want to discharge?'
             dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
@@ -308,6 +328,7 @@ class MainApp(tk.Tk):
             if dischargeConfirmWindow.OKPress:
                 print('Discharge')
 
+    # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):
         print('Turn on safety lights')
 
@@ -317,14 +338,18 @@ class MainApp(tk.Tk):
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated
         def checkLogin():
+            # Obtain login status. To change valid usernames and password please see constants.py
             self.username = self.usernameEntry.get()
             self.password = self.passwordEntry.get()
             self.loggedIn = self.username in acceptableUsernames and self.password in acceptablePasswords
 
+            # Once logged in, enable the save location and help buttons
             if self.loggedIn:
                 self.loginWindow.destroy()
                 self.saveLocationButton.configure(state='normal')
                 self.helpButton.configure(state='normal')
+
+            # If incorrect username or password, create popup notifying the user
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
@@ -332,9 +357,11 @@ class MainApp(tk.Tk):
 
                 incorrectLoginWindow.wait_window()
 
+                # Clear username and password entries
                 self.usernameEntry.delete(0, 'end')
                 self.passwordEntry.delete(0, 'end')
 
+        # Create popup window with fields for username and password
         self.loginWindow = tk.Toplevel(padx=loginPadding, pady=loginPadding)
         self.loginWindow.title('Login Window')
 
