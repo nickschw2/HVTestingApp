@@ -306,7 +306,7 @@ class MainApp(tk.Tk):
             self.charging = False
 
             # Read from the load
-            pins = [voltageLoadPin, currentLoadPin]
+            pins = [pins['voltageLoadPin'], pins['currentLoadPin']]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
 
             # Plot results on the discharge graph and save them
@@ -381,6 +381,7 @@ class MainApp(tk.Tk):
         self.passwordEntry.pack()
         self.loginButton.pack()
 
+    # Special function for closing the window and program
     def on_closing(self):
         plt.close('all')
         self.quit()
@@ -423,20 +424,23 @@ class MainApp(tk.Tk):
 
         return value
 
-    def readOscilloscope(self, pins):
+    # Read oscilloscope data based on pins
+    def readOscilloscope(self):
         time = np.linspace(0, 1)
         voltageLoad = 1 - np.exp(-time)
         currentLoad = np.exp(-time)
         return time, voltageLoad, currentLoad
 
+    # The labels for the load and power supply update in real time
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(voltageLoadPin) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(voltagePSPin) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(currentLoadPin):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(currentPSPin):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(pins['voltageLoadPin']) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(pins['voltagePSPin']) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(pins['currentLoadPin']):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(pins['currentPSPin']):.2f} A')
 
+        # Logic heirarchy for charge state and countdown text
         if self.discharged:
             self.chargeStateText.set('Discharged!')
             self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
@@ -447,15 +451,19 @@ class MainApp(tk.Tk):
             self.chargeStateText.set('Not Charged')
             self.countdownText.set('Countdown: N/A')
 
-    def clearAxisLines(self, axis):
-        if len(axis.lines) != 0:
-            for i in range(len(axis.lines)):
-                axis.lines[0].remove()
+    # Removes all lines from a figure
+    def clearFigLines(self, fig):
+        axes = fig.axes
+        for axis in axes:
+            if len(axis.lines) != 0:
+                for i in range(len(axis.lines)):
+                    axis.lines[0].remove()
 
     def replotCharge(self):
-        self.clearAxisLines(self.chargeVoltageAxis)
-        self.clearAxisLines(self.chargeCurrentAxis)
+        # Remove lines every time the figure is plotted
+        self.clearFigLines(self.chargePlot.fig)
 
+        # Add plots
         self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltageLoad / 1000, color=voltageColor)
         self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
         self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
@@ -463,34 +471,22 @@ class MainApp(tk.Tk):
         self.chargePlot.update()
 
     def replotDischarge(self):
-        self.clearAxisLines(self.dischargeVoltageAxis)
-        self.clearAxisLines(self.dischargeCurrentAxis)
+        # Remove lines every time the figure is plotted
+        self.clearFigLines(self.dischargePlot.fig)
 
+        # Add plots
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
         self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
         self.dischargePlot.update()
 
+    # Retrieves and processes the data for the charging plot in a continuous loop
     def updateChargePlot(self):
+        # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
-        voltageLoadPoint = self.readSensor(voltageLoadPin)
-        voltagePSPoint = self.readSensor(voltagePSPin)
-        currentLoadPoint = self.readSensor(currentLoadPin)
-        currentPSPoint = self.readSensor(currentPSPin)
-
-        # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
-            if not self.countdownStarted:
-                self.countdownTimeStart = time.time()
-                self.charged = True
-                self.countdownStarted = True
-
-            self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
-
-            if self.countdownTime <= 0.0:
-                self.countdownTime = 0.0
-                self.discharge()
-
-        self.updateLabels()
+        voltageLoadPoint = self.readSensor(pins['voltageLoadPin'])
+        voltagePSPoint = self.readSensor(pins['voltagePSPin'])
+        currentLoadPoint = self.readSensor(pins['currentLoadPin'])
+        currentPSPoint = self.readSensor(pins['currentPSPin'])
 
         self.chargeTime = np.append(self.chargeTime, self.timePoint)
         self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)
@@ -498,8 +494,29 @@ class MainApp(tk.Tk):
         self.chargeCurrentLoad = np.append(self.chargeCurrentLoad, currentLoadPoint)
         self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
 
+        # Plot the new data
         self.replotCharge()
 
+        # Voltage reaches a certain value of chargeVoltage to begin countown clock
+        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
+            # Start countdown only once
+            if not self.countdownStarted:
+                self.countdownTimeStart = time.time()
+                self.charged = True
+                self.countdownStarted = True
+
+            # Time left before discharge
+            self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
+
+            # Set countdown time to 0 seconds once discharged
+            if self.countdownTime <= 0.0:
+                self.countdownTime = 0.0
+                self.discharge()
+
+        # Also update the labels with time
+        self.updateLabels()
+
+        # Loop through this function again continuously while charging
         if self.charging == True:
             self.after(int(1000 / refreshRate), self.updateChargePlot)
 
@@ -522,10 +539,12 @@ class MainApp(tk.Tk):
         self.replotDischarge()
 
     def reset(self):
+        # Clear all user inputs
         self.serialNumberEntry.delete(0, 'end')
         self.chargeVoltageEntry.delete(0, 'end')
         self.holdChargeTimeEntry.delete(0, 'end')
 
+        # Reset all boolean variables, time, and checklist
         self.charged = False
         self.chargePress = False
         self.discharged = False
@@ -535,20 +554,24 @@ class MainApp(tk.Tk):
         self.checklist_Checkbuttons = {}
         self.updateLabels()
 
+        # Reset plots
         self.resetChargePlot()
         self.resetDischargePlot()
 
+        # Disable all buttons except for save and help, if logged in
         self.disableButtons()
         if self.loggedIn:
             self.saveLocationButton.configure(state='normal')
             self.helpButton.configure(state='normal')
 
+    # Popup window for help
     def help(self):
         helpName = 'Help'
         helpWindow = MessageWindow(self, helpName, helpText)
 
         helpWindow.wait_window()
 
+# Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
 
     def __init__(self, master):
@@ -556,6 +579,7 @@ class CanvasPlot(ttk.Frame):
         self.master = master
         self.fig, self.ax = plt.subplots(constrained_layout=True)
         self.line, = self.ax.plot([],[]) #Create line object on plot
+        # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
 
@@ -565,32 +589,34 @@ class CanvasPlot(ttk.Frame):
         self.ax.autoscale_view()
         self.canvas.draw()
 
+# Class for generating popup windows
 class MessageWindow(tk.Toplevel):
     def __init__(self, master, name, text):
         super().__init__(master)
-        self.name = name
-        self.text = text
-        self.title(self.name)
+        self.title(name)
 
         self.maxWidth = 2000
         self.maxHeight = 2000
         self.maxsize(self.maxWidth, self.maxHeight)
 
-        OKButtonText = 'Okay'
+        # Initialize okay button to False
         self.OKPress = False
 
+        # Create two frames, one for the text, and the other for buttons on the bottom
         self.topFrame = tk.Frame(self)
         self.bottomFrame = tk.Frame(self)
 
         self.topFrame.pack(side='top')
         self.bottomFrame.pack(side='bottom')
 
+        # Destroy window and set value of okay button to True
         def OKPress():
             self.OKPress = True
             self.destroy()
 
-        self.message = tk.Message(self.topFrame, width=topLevelWidth, text=self.text, **text_opts)
-        self.OKButton = tk.Button(self.bottomFrame, text=OKButtonText, command=OKPress, **button_opts)
+        # Create and place message and okay button
+        self.message = tk.Message(self.topFrame, width=topLevelWidth, text=text, **text_opts)
+        self.OKButton = tk.Button(self.bottomFrame, text='Okay', command=OKPress, **button_opts)
 
         self.message.pack(fill='both')
         self.OKButton.pack(side='left')

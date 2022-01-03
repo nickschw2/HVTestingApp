@@ -6,10 +6,10 @@ import datetime
 today = datetime.date.today()
 
 # Oscilloscope pins
-voltageLoadPin = 'ai0'
-voltagePSPin = 'ai1'
-currentLoadPin = 'ai2'
-currentPSPin = 'ai3'
+pins = {'voltageLoadPin': 'ai0'
+'voltagePSPin': 'ai1'
+'currentLoadPin': 'ai2'
+'currentPSPin': 'ai3'}
 
 # Colors
 green = '#2ecc71'
