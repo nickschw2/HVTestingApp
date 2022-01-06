@@ -306,8 +306,8 @@ class MainApp(tk.Tk):
             self.charging = False
 
             # Read from the load
-            pins = [pins['voltageLoadPin'], pins['currentLoadPin']]
-            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(pins)
+            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
+            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by successful charge
@@ -425,7 +425,7 @@ class MainApp(tk.Tk):
         return value
 
     # Read oscilloscope data based on pins
-    def readOscilloscope(self):
+    def readOscilloscope(self, pins):
         time = np.linspace(0, 1)
         voltageLoad = 1 - np.exp(-time)
         currentLoad = np.exp(-time)
@@ -435,10 +435,10 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(pins['voltageLoadPin']) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(pins['voltagePSPin']) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(pins['currentLoadPin']):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(pins['currentPSPin']):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(pins["voltageLoadPin"]) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(pins["voltagePSPin"]) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(pins["currentLoadPin"]):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(pins["currentPSPin"]):.2f} A')
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -563,6 +563,7 @@ class MainApp(tk.Tk):
         if self.loggedIn:
             self.saveLocationButton.configure(state='normal')
             self.helpButton.configure(state='normal')
+            self.checklistButton.configure(state='normal')
 
     # Popup window for help
     def help(self):
@@ -578,6 +579,7 @@ class CanvasPlot(ttk.Frame):
         super().__init__(master)
         self.master = master
         self.fig, self.ax = plt.subplots(constrained_layout=True)
+        self.fig.patch.set_facecolor(defaultbg)
         self.line, = self.ax.plot([],[]) #Create line object on plot
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)

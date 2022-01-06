@@ -6,10 +6,10 @@ import datetime
 today = datetime.date.today()
 
 # Oscilloscope pins
-pins = {'voltageLoadPin': 'ai0'
-'voltagePSPin': 'ai1'
-'currentLoadPin': 'ai2'
-'currentPSPin': 'ai3'}
+pins = {'voltageLoadPin': 'ai0',
+'voltagePSPin': 'ai1',
+'currentLoadPin': 'ai2',
+'currentPSPin': 'ai3',}
 
 # Colors
 green = '#2ecc71'
@@ -18,14 +18,15 @@ orange = '#e67e22'
 red = '#e74c3c'
 blue = '#3498db'
 white = '#ecf0f1'
+defaultbg = '#f0f0f0'
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero']
 acceptablePasswords = ['plasma']
 
 # Constant Button Options
-button_opts = {'font':('Calibri', 24), 'state':'normal'}
-text_opts = {'font':('Calibri', 24)}
+button_opts = {'font':('Calibri', 18), 'state':'normal'}
+text_opts = {'font':('Calibri', 18)}
 
 # Widget display constants
 userInputWidth = 6
@@ -48,7 +49,7 @@ voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$
 voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
 currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
-chargeHandles = [voltageLine, voltageDash, currentLine, currentLine]
+chargeHandles = [voltageLine, voltageDash, currentLine, currentDash]
 dischargeHandles = [voltageLine, currentLine]
 
 # Charging constants
