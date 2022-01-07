@@ -5,11 +5,15 @@ import datetime
 # Date
 today = datetime.date.today()
 
-# Oscilloscope pins
+# NI DAQ pins
+sensorName = 'PXI1Slot2'
+digitalOutName = 'port0'
 pins = {'voltageLoadPin': 'ai0',
 'voltagePSPin': 'ai1',
 'currentLoadPin': 'ai2',
-'currentPSPin': 'ai3',}
+'currentPSPin': 'ai3',
+'switchPSPin': 'line0',
+'switchLoadPin': 'line1'}
 
 # Colors
 green = '#2ecc71'

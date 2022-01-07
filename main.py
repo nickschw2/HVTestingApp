@@ -400,39 +400,23 @@ class MainApp(tk.Tk):
         self.destroy()
 
     def readSensor(self, pin):
-        # sensorName = 'Dev1'
-        # try:
-        #     with nidaqmx.Task() as task:
-        #         task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
-        #         value = task.read()
-        #
-        # except nidaqmx._lib.DaqNotFoundError:
-        #     # value = 'N/A'
-        #     try:
-        #         if pin == 'ai0':
-        #             value = np.random.rand()
-        #         elif pin == 'ai1':
-        #             value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-        #         elif pin == 'ai2':
-        #             value = np.random.rand()
-        #         elif pin == 'ai3':
-        #             period = 10 # seconds
-        #             value = np.cos(self.timePoint * 2 * np.pi / period)
-        #         else:
-        #             value = 'N/A'
-        #     except AttributeError:
-        #         value = 'N/A'
-        if pin == 'ai0':
-            value = np.random.rand() * 1000
-        elif pin == 'ai1':
-            value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-        elif pin == 'ai2':
-            value = np.random.rand() / 10
-        elif pin == 'ai3':
-            period = 10 # seconds
-            value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
-        else:
-            value = 'N/A'
+        try:
+            with nidaqmx.Task() as task:
+                task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
+                value = task.read()
+
+        except nidaqmx._lib.DaqNotFoundError:
+            if pin == 'ai0':
+                value = np.random.rand() * 1000
+            elif pin == 'ai1':
+                value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
+            elif pin == 'ai2':
+                value = np.random.rand() / 10
+            elif pin == 'ai3':
+                period = 10 # seconds
+                value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
+            else:
+                value = 'N/A'
 
         return value
 
