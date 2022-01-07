@@ -19,6 +19,7 @@ red = '#e74c3c'
 blue = '#3498db'
 white = '#ecf0f1'
 defaultbg = '#f0f0f0'
+UMDRed = '#e03a3d'
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero']
@@ -33,6 +34,7 @@ userInputWidth = 6
 userInputPadding = 100 #pixels
 loginPadding = 20 #pixels
 buttonPadding = 50 #pixels
+yPaddingFrame = 30 #pixels
 displaySetTextTime = 1000 # ms
 topLevelWidth = 300 #pixels
 
@@ -59,8 +61,8 @@ capacitorCapacitance = 200e-6 # Farads
 RCTime = powerSupplyResistance * capacitorCapacitance
 chargeVoltageFraction = 0.95
 
-checklist_steps = ['Ensure that power supply is off']
-    # 'Ensure that the charging switch is open',
+checklist_steps = ['Ensure that power supply is off',
+     'Ensure that the charging switch is open']
     # 'Check system is grounded',
     # 'Turn on power supply',
     # 'Enter serial number, charge voltage, and hold charge time',

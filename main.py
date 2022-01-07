@@ -29,8 +29,8 @@ class MainApp(tk.Tk):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Row for user inputs on the top
-        self.userInputs = tk.Frame(self)
-        self.userInputs.grid(row=0, columnspan=3, sticky='ns')
+        self.userInputs = tk.Frame(self, background=UMDRed)
+        self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=(0, yPaddingFrame))
 
         # User input fields along with a button for setting them
         self.serialNumberLabel = tk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
@@ -85,7 +85,7 @@ class MainApp(tk.Tk):
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
         self.buttons = tk.Frame(self)
-        self.buttons.grid(row=2, columnspan=3, sticky='ns')
+        self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=(yPaddingFrame, 0))
 
         # Button definitions and placement
         self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
@@ -196,12 +196,16 @@ class MainApp(tk.Tk):
     def setUserInputs(self):
         # Try to set the user inputs. If there is a ValueError, display pop up message.
         try:
-            self.serialNumber = str(self.serialNumberEntry.get())
+            # If there is an exception, catch where the exception came from
+            self.serialNumber = self.serialNumberEntry.get()
+            self.userInputError = 'chargeVoltage'
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
+            self.userInputError = 'holdChargeTime'
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
             # Make sure that the serial number matches the correct format, if not raise error
             if format.match(self.serialNumber) is None:
+                self.userInputError = 'serialNumber'
                 raise ValueError
 
             self.userInputsSet = True
@@ -217,29 +221,32 @@ class MainApp(tk.Tk):
             self.after(displaySetTextTime, resetSetText)
 
         # Pop up window for incorrect user inputs
-        except ValueError:
+        except ValueError as err:
+            # Clear the user input fields
+            if self.userInputError == 'chargeVoltage':
+                self.chargeVoltageEntry.delete(0, 'end')
+            elif self.userInputError == 'holdChargeTime':
+                self.holdChargeTimeEntry.delete(0, 'end')
+            elif self.userInputError == 'serialNumber':
+                self.serialNumberEntry.delete(0, 'end')
+
             incorrectUserInputName = 'Invalid Input'
             incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Hold Charge Time.'
             incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, incorrectUserInputText)
 
             incorrectUserInputWindow.wait_window()
 
-            # Clear the user input fields
-            self.serialNumberEntry.delete(0, 'end')
-            self.chargeVoltageEntry.delete(0, 'end')
-            self.holdChargeTimeEntry.delete(0, 'end')
-
     # Disable all buttons in the button frame
     def disableButtons(self):
         for w in self.buttons.winfo_children():
             if isinstance(w, tk.Button):
-                w.configure(state='disabled')
+                w.configure(state='disabled', relief='sunken')
 
     # Enable normal operation of all buttons in the button frame
     def enableButtons(self):
         for w in self.buttons.winfo_children():
             if isinstance(w, tk.Button):
-                w.configure(state='normal')
+                w.configure(state='normal', relief='raised')
 
     # Every time an item on the checklist is ticked complete, check to see if the entire list is complete
     def checklistComplete(self):
@@ -337,7 +344,7 @@ class MainApp(tk.Tk):
 
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated
-        def checkLogin():
+        def checkLogin(event):
             # Obtain login status. To change valid usernames and password please see constants.py
             self.username = self.usernameEntry.get()
             self.password = self.passwordEntry.get()
@@ -348,6 +355,8 @@ class MainApp(tk.Tk):
                 self.loginWindow.destroy()
                 self.saveLocationButton.configure(state='normal')
                 self.helpButton.configure(state='normal')
+                # Prompt save location after login
+                self.setSaveLocation()
 
             # If incorrect username or password, create popup notifying the user
             else:
@@ -374,6 +383,9 @@ class MainApp(tk.Tk):
         self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **text_opts)
         self.passwordEntry = tk.Entry(self.loginWindow, show='*', **text_opts)
         self.loginButton = tk.Button(self.loginWindow, text=button_text, command=checkLogin, **button_opts)
+
+        # User can press 'Return' key to login instead of loginButton
+        self.loginWindow.bind('<Return>', checkLogin)
 
         self.usernameLabel.pack()
         self.usernameEntry.pack()
