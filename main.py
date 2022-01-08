@@ -107,6 +107,8 @@ class MainApp(tk.Tk):
         self.emergency_offButton.pack(side='left', padx=buttonPadding)
         self.resetButton.pack(side='left', padx=buttonPadding)
 
+        self.saveFolderSet = False
+
         # Menubar at the top
         self.menubar = tk.Menu(self)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
@@ -283,13 +285,16 @@ class MainApp(tk.Tk):
 
         # Top level window for checklist
         self.checklist_win = tk.Toplevel()
+        # Bring pop up to the center and top
+        self.eval(f'tk::PlaceWindow {str(self.checklist_win)} center')
+        self.checklist_win.attributes('-topmost', True)
 
         # Create a Checkbutton for each item on the checklist
         for i, step in enumerate(checklist_steps):
             # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
             # The completion of the checklist is checked every time a Checkbutton value is changed
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
-            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete)
+            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete, font=('Calibri', 12), selectcolor=black)
             button.grid(row=i, column=0, sticky='w')
 
         # Add okay button to close the window
@@ -542,6 +547,10 @@ class MainApp(tk.Tk):
         self.chargeCurrentLoad = np.array([])
         self.chargeCurrentPS = np.array([])
 
+        # Also need to reset the twinx axis
+        self.chargeCurrentAxis.relim()
+        self.chargeCurrentAxis.autoscale_view()
+
         self.replotCharge()
 
     def resetDischargePlot(self):
@@ -549,6 +558,10 @@ class MainApp(tk.Tk):
         self.dischargeTime = np.array([])
         self.dischargeVoltageLoad = np.array([])
         self.dischargeCurrentLoad = np.array([])
+
+        # Also need to reset the twinx axis
+        self.dischargeCurrentAxis.relim()
+        self.dischargeCurrentAxis.autoscale_view()
 
         self.replotDischarge()
 
@@ -563,7 +576,6 @@ class MainApp(tk.Tk):
         self.chargePress = False
         self.discharged = False
         self.userInputsSet = False
-        self.saveFolderSet = False
         self.timePoint = 0
         self.countdownStarted = False
         self.checklist_Checkbuttons = {}
@@ -577,7 +589,6 @@ class MainApp(tk.Tk):
         self.disableButtons()
         if self.loggedIn:
             self.saveLocationButton.configure(state='normal', relief='raised')
-            self.checklistButton.configure(state='normal', relief='raised')
 
     # Popup window for help
     def help(self):
