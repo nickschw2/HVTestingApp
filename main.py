@@ -111,6 +111,22 @@ class MainApp(tk.Tk):
         self.resetButton.pack(side='left', padx=buttonPadding)
         self.helpButton.pack(side='left', padx=buttonPadding)
 
+        # Menubar at the top
+        self.menubar = tk.Menu(self)
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label='Open', command=self.donothing)
+        self.filemenu.add_command(label='Save', command=self.donothing)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label='Quit', command=self.on_closing)
+        self.menubar.add_cascade(label='File', menu=self.filemenu)
+
+        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu.add_command(label='Help', command=self.donothing)
+        self.helpmenu.add_command(label='About...', command=self.donothing)
+        self.menubar.add_cascade(label='Help', menu=self.helpmenu)
+
+        self.config(menu=self.menubar)
+
         # Configure Graphs
         self.grid_rowconfigure(1, w=1)
         self.grid_columnconfigure(1, w=1)
@@ -163,6 +179,9 @@ class MainApp(tk.Tk):
 
         except Exception as e:
             print(e)
+
+    def donothing(self):
+        print('nothing')
 
     def setSaveLocation(self):
         # Creates folder dialog for user to choose save directory
