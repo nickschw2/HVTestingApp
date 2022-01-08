@@ -38,7 +38,7 @@ text_opts = {'font':('Calibri', 18)}
 entry_opts = {'font':('Calibri', 18), 'bg': lightGrey}
 
 # Widget display constants
-userInputWidth = 6
+userInputWidth = 8
 userInputPadding = 50 #pixels
 loginPadding = 20 #pixels
 labelPadding = 10 #pixels
@@ -71,6 +71,7 @@ powerSupplyResistance = 1E4 # Ohm
 capacitorCapacitance = 200e-6 # Farads
 RCTime = powerSupplyResistance * capacitorCapacitance
 chargeVoltageFraction = 0.95
+maxVoltage = {'LBL': 5, 'BLU': 10, 'GRA': 50, '': 'N/A'}
 
 checklist_steps = ['Ensure that power supply is off',
      'Ensure that the charging switch is open']

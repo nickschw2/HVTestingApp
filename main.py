@@ -223,8 +223,13 @@ class MainApp(tk.Tk):
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
             # Make sure that the serial number matches the correct format, if not raise error
-            if format.match(self.serialNumber) is None:
+            self.capModel = self.serialNumber[0:3]
+            if format.match(self.serialNumber) is None or self.capModel not in maxVoltage:
                 self.userInputError = 'serialNumber'
+                raise ValueError
+
+            if self.chargeVoltage > maxVoltage[self.capModel]:
+                self.userInputError = 'chargeVoltage'
                 raise ValueError
 
             self.userInputsSet = True
@@ -242,19 +247,30 @@ class MainApp(tk.Tk):
 
         # Pop up window for incorrect user inputs
         except ValueError as err:
+            def incorrectUserInput(text):
+                incorrectUserInputName = 'Invalid Input'
+                incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, text)
+
+                incorrectUserInputWindow.wait_window()
+
             # Clear the user input fields
             if self.userInputError == 'chargeVoltage':
                 self.chargeVoltageEntry.delete(0, 'end')
+
+                incorrectUserInputText = f'Please reenter a valid number for the charge voltage. The maximum voltage for this capacitor is {maxVoltage[self.capModel]} kV.'
+                incorrectUserInput(incorrectUserInputText)
+
             elif self.userInputError == 'holdChargeTime':
                 self.holdChargeTimeEntry.delete(0, 'end')
+
+                incorrectUserInputText = 'Please reenter a valid number for the charge time.'
+                incorrectUserInput(incorrectUserInputText)
+
             elif self.userInputError == 'serialNumber':
                 self.serialNumberEntry.delete(0, 'end')
 
-            incorrectUserInputName = 'Invalid Input'
-            incorrectUserInputText = 'Please reenter a valid string for serial number and numerical value for both the Charge Voltage and Hold Charge Time.'
-            incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, incorrectUserInputText)
-
-            incorrectUserInputWindow.wait_window()
+                incorrectUserInputText = 'Please reenter a valid format for serial number.'
+                incorrectUserInput(incorrectUserInputText)
 
     # Disable all buttons in the button frame
     def disableButtons(self):
@@ -277,6 +293,8 @@ class MainApp(tk.Tk):
         if complete and self.userInputsSet and len(self.checklist_Checkbuttons) !=0:
             self.enableButtons()
 
+        self.checklist_win.destroy()
+
     def checklist(self):
         # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
         self.disableButtons()
@@ -294,11 +312,11 @@ class MainApp(tk.Tk):
             # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
             # The completion of the checklist is checked every time a Checkbutton value is changed
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
-            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, command=self.checklistComplete, font=('Calibri', 12), selectcolor=black)
+            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, font=('Calibri', 12), selectcolor=black)
             button.grid(row=i, column=0, sticky='w')
 
         # Add okay button to close the window
-        self.OKButton = tk.Button(self.checklist_win, text='Okay', command=self.checklist_win.destroy, **button_opts)
+        self.OKButton = tk.Button(self.checklist_win, text='Okay', command=self.checklistComplete, **button_opts)
         self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
         # I believe wait_window functions to wait for the window to close before the rest of the app can execute the next function
@@ -327,13 +345,27 @@ class MainApp(tk.Tk):
             self.chargePress = True
 
     def discharge(self):
-        # Differentiate a discharge that comes automatically from charging the capacitor
-        # and a discharge that comes from the discharge button press
-        if self.chargePress:
-            print('Discharge')
-            self.discharged = True
-            self.charging = False
+        # Popup window to confirm discharge
+        dischargeConfirmName = 'Discharge'
+        dischargeConfirmText = 'Are you sure you want to discharge?'
+        dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
+        cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
+        cancelButton.pack(side='left')
+
+        dischargeConfirmWindow.wait_window()
+
+        if dischargeConfirmWindow.OKPress:
+            print('Discharge')
+
+        # Disable all buttons except for save and help, if logged in
+        self.disableButtons()
+        if self.loggedIn:
+            self.saveLocationButton.configure(state='normal', relief='raised')
+            self.resetButton.configure(state='normal', relief='raised')
+
+        # Only plot discharge and save results if charging
+        if self.charging:
             # Read from the load
             oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
@@ -343,19 +375,8 @@ class MainApp(tk.Tk):
             self.replotDischarge()
             self.saveResults()
 
-        else:
-            # Popup window to confirm discharge
-            dischargeConfirmName = 'Discharge'
-            dischargeConfirmText = 'Are you sure you want to discharge?'
-            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
-
-            cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
-            cancelButton.pack(side='left')
-
-            dischargeConfirmWindow.wait_window()
-
-            if dischargeConfirmWindow.OKPress:
-                print('Discharge')
+        self.discharged = True
+        self.charging = False
 
     # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):
@@ -462,7 +483,7 @@ class MainApp(tk.Tk):
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
             self.chargeStateText.set('Discharged!')
-            self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
+            self.countdownText.set(f'Coundown: 0.0 s')
         elif self.charged:
             self.chargeStateText.set('Charged')
             self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
@@ -517,7 +538,7 @@ class MainApp(tk.Tk):
         self.replotCharge()
 
         # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000 and not self.discharged:
+        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000:
             # Start countdown only once
             if not self.countdownStarted:
                 self.countdownTimeStart = time.time()
