@@ -22,25 +22,32 @@ orange = '#e67e22'
 red = '#e74c3c'
 blue = '#3498db'
 white = '#ecf0f1'
+black = '#000000'
+grey = '#636262'
+lightGrey = '#a9a1a1'
 defaultbg = '#f0f0f0'
 UMDRed = '#e03a3d'
 
 # Usernames
-acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero']
+acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
 # Constant Button Options
 button_opts = {'font':('Calibri', 18), 'state':'normal'}
 text_opts = {'font':('Calibri', 18)}
+entry_opts = {'font':('Calibri', 18), 'bg': lightGrey}
 
 # Widget display constants
 userInputWidth = 6
-userInputPadding = 100 #pixels
+userInputPadding = 50 #pixels
 loginPadding = 20 #pixels
+labelPadding = 10 #pixels
 buttonPadding = 50 #pixels
 yPaddingFrame = 30 #pixels
+plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
 topLevelWidth = 300 #pixels
+border_opts = {'highlightbackground': red, 'highlightcolor': red, 'highlightthickness': 3}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
@@ -49,7 +56,7 @@ format = re.compile('.{3}\d{3}')
 # Plotting constants
 refreshRate = 10.0 # Hz
 voltageColor = 'blue'
-currentColor = 'red'
+currentColor = UMDRed
 
 voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{load}$')
 voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
