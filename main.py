@@ -91,7 +91,7 @@ class MainApp(tk.Tk):
         self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
                                     command=self.setSaveLocation, bg=green, **button_opts)
         self.setPinsButton = tk.Button(self.buttons, text='Set Pins',
-                                    command=self.setPins, bg=green, **button_opts)
+                                    command=self.pinSelector, bg=green, **button_opts)
         self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
                                     command=self.checklist, bg=green, **button_opts)
         self.chargeButton = tk.Button(self.buttons, text='Charge',
@@ -196,9 +196,13 @@ class MainApp(tk.Tk):
             self.checklistButton.configure(state='normal', relief='raised')
 
         # Try setting the pins automatically
-        self.setPins()
+        self.pinSelector()
 
-    def setPins(self):
+    def pinSelector(self):
+        # Initialize pins to default values
+        self.inputPins = inputPinDefaults
+        self.outputPins = outputPinDefaults
+
         # Create popup window with fields for username and password
         self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
         self.setPinWindow.title('Set Pins')
@@ -206,40 +210,48 @@ class MainApp(tk.Tk):
         self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
         self.setPinWindow.attributes('-topmost', True)
 
-        # Options available for pins and channels to read/write
-        inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
-        outputPinOptions = ['line0', 'line1']
-
-        inputChannels = ['Load Voltage', 'Power Supply Voltage', 'Load Current', 'Power Supply Current']
-        outputChannels = ['Power Supply Switch', 'Load Switch']
-
-        # Labels on the left, dropdowns on the right
+        # Labels on the left, dropdowns on the right, button on the bottom
         labelFrame = tk.Frame(self.setPinWindow)
         optionMenuFrame = tk.Frame(self.setPinWindow)
-        labelFrame.pack(side='left')
-        optionMenuFrame.pack(side='left')
+        buttonFrame = tk.Frame(self.setPinWindow)
 
-        # Initialize empty dictionary for pins
-        inputPins = {}
-        outputPins = {}
-        for i, channel in enumerate(inputChannels):
-            channelVariable = tk.StringVar()
-            channelVariable.set(inputPinDefaults[channel])
-            label = tk.Label(labelFrame, text=channel, **text_opts)
-            drop = tk.OptionMenu(optionMenuFrame, channelVariable, *inputPinOptions)
+        labelFrame.grid(row=0, column=0)
+        optionMenuFrame.grid(row=0, column=1)
+        buttonFrame.grid(row=1, columnspan=2)
 
-            label.grid(row=i, sticky='w', padx=(0, setPinsPadding))
-            drop.grid(row=i, sticky='w', padx=(setPinsPadding, 0))
+        # This function places pin labels and dropdown menus in the popup window
+        def selectPins(channelDefaults, options):
+            pins = {}
+            for i, channel in enumerate(channelDefaults):
+                channelVariable = tk.StringVar()
+                channelVariable.set(channelDefaults[channel])
+                label = tk.Label(labelFrame, text=channel, **text_opts)
+                drop = tk.OptionMenu(optionMenuFrame, channelVariable, *options)
 
-        for i, channel in enumerate(outputChannels):
-            channelVariable = tk.StringVar()
-            channelVariable.set(outputPinDefaults[channel])
-            label = tk.Label(labelFrame, text=channel, **text_opts)
-            drop = tk.OptionMenu(optionMenuFrame, channelVariable, *inputPinOptions)
+                label.pack(anchor='w', padx=(0, setPinsPadding))
+                drop.pack(anchor='w', padx=(setPinsPadding, 0))
 
-            label.grid(row=i + len(inputChannels), sticky='w', padx=(0, setPinsPadding))
-            drop.grid(row=i + len(inputChannels), sticky='w', padx=(setPinsPadding, 0))
+                pins[channel] = channelVariable
 
+            return pins
+
+        inputPins = selectPins(inputPinDefaults, inputPinOptions)
+        outputPins = selectPins(outputPinDefaults, outputPinOptions)
+
+        # Once the okay button is pressed, assign the pins
+        def assignPins():
+            for channel in inputPins:
+                self.inputPins[channel] = inputPins[channel].get()
+
+            for channel in outputPins:
+                self.outputPins[channel] = outputPins[channel].get()
+
+            print(self.inputPins)
+            print(self.outputPins)
+            self.setPinWindow.close()
+
+        okayButton = tk.Button(buttonFrame, text='Set Pins', command=assignPins, **button_opts)
+        okayButton.pack()
 
         # login_text = 'Please enter UMD username.'
         # password_text = 'Please enter password.'

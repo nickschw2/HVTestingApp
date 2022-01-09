@@ -15,9 +15,10 @@ inputPinDefaults = {'Load Voltage': 'ai0',
 'Power Supply Voltage': 'ai1',
 'Load Current': 'ai2',
 'Power Supply Current': 'ai3'}
-
 outputPinDefaults = {'Power Supply Switch': 'line0',
 'Load Switch': 'line1'}
+inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
+outputPinOptions = ['line0', 'line1']
 
 # Colors
 green = '#2ecc71'
