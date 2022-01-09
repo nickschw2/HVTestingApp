@@ -1,6 +1,7 @@
 import re
 import matplotlib.lines as mlines
 import datetime
+from tkinter import ttk
 
 # github website
 githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
@@ -37,10 +38,10 @@ UMDRed = '#e03a3d'
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
-# Constant Button Options
-button_opts = {'font':('Calibri', 18), 'state':'normal'}
-text_opts = {'font':('Calibri', 18)}
-entry_opts = {'font':('Calibri', 18), 'bg': lightGrey}
+# Styles
+button_opts = {'font':('Helvetica', 18), 'state':'normal'}
+text_opts = {'font':('Helvetica', 18)}
+entry_opts = {'font':('Helvetica', 18), 'background': lightGrey}
 
 # Widget display constants
 userInputWidth = 8
@@ -52,7 +53,8 @@ buttonPadding = 50 #pixels
 yPaddingFrame = 30 #pixels
 plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
-topLevelWidth = 300 #pixels
+topLevelWidth = 50
+topLevelWrapLength = 300
 border_opts = {'highlightbackground': red, 'highlightcolor': red, 'highlightthickness': 3}
 
 # Serial number format

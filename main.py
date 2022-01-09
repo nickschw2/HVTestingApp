@@ -21,31 +21,39 @@ from constants import *
 # need to manually go into the tkinter source code to investigate the behavior/capabilities of some code.
 
 class MainApp(tk.Tk):
-
     def __init__(self):
         super().__init__()
+        self.tk.call('source', 'Sun-Valley-ttk-theme-master/sun-valley.tcl')
+        self.tk.call('set_theme', 'dark')
+
+        # Change style
+        style = ttk.Style(self)
+        style.configure('TButton', **button_opts)
+        style.configure('TLabel', **text_opts)
+        style.configure('TEntry', **entry_opts)
+
         self.title('HV Capacitor Testing')
 
         #Change deault color palette
-        self.tk_setPalette(background=grey, foreground=white, activeBackground=lightGrey, activeForeground=white)
+        # self.tk_setPalette(background=grey, foreground=white, activeBackground=lightGrey, activeForeground=white)
 
         # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Row for user inputs on the top
-        self.userInputs = tk.Frame(self, **border_opts)
+        self.userInputs = ttk.Frame(self)
         self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=(0, yPaddingFrame))
 
         # User input fields along with a button for setting them
-        self.serialNumberLabel = tk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
-        self.chargeVoltageLabel = tk.Label(self.userInputs, text='Charge (kV):', **text_opts)
-        self.holdChargeTimeLabel = tk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
+        self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
+        self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
+        self.holdChargeTimeLabel = ttk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
 
-        self.serialNumberEntry = tk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-        self.chargeVoltageEntry = tk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-        self.holdChargeTimeEntry = tk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        self.serialNumberEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
 
-        self.userInputOkayButton = tk.Button(self.userInputs, text='Set', command=self.setUserInputs, **button_opts)
+        self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs)
 
         self.serialNumberLabel.pack(side='left')
         self.serialNumberEntry.pack(side='left', padx=(0, userInputPadding))
@@ -57,7 +65,7 @@ class MainApp(tk.Tk):
 
         # Column for labels on the left
         self.grid_columnconfigure(0, w=1)
-        self.labels = tk.Frame(self, **border_opts)
+        self.labels = ttk.Frame(self)
         self.labels.grid(row=1, column=0)
 
         # Voltage and current are read from both the power supply and the load
@@ -68,12 +76,12 @@ class MainApp(tk.Tk):
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
 
-        self.voltageLoadLabel = tk.Label(self.labels, textvariable=self.voltageLoadText, **text_opts)
-        self.voltagePSLabel = tk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
-        self.currentLoadLabel = tk.Label(self.labels, textvariable=self.currentLoadText, **text_opts)
-        self.currentPSLabel = tk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
-        self.chargeStateLabel = tk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
-        self.countdownLabel = tk.Label(self.labels, textvariable=self.countdownText, **text_opts)
+        self.voltageLoadLabel = ttk.Label(self.labels, textvariable=self.voltageLoadText, **text_opts)
+        self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
+        self.currentLoadLabel = ttk.Label(self.labels, textvariable=self.currentLoadText, **text_opts)
+        self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
+        self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
+        self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
 
         self.voltageLoadLabel.pack(pady=labelPadding, padx=labelPadding)
         self.voltagePSLabel.pack(pady=labelPadding, padx=labelPadding)
@@ -84,22 +92,22 @@ class MainApp(tk.Tk):
 
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
-        self.buttons = tk.Frame(self)
+        self.buttons = ttk.Frame(self)
         self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=(yPaddingFrame, 0))
 
         # Button definitions and placement
-        self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
-                                    command=self.setSaveLocation, bg=green, **button_opts)
-        self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
-                                    command=self.checklist, bg=green, **button_opts)
-        self.chargeButton = tk.Button(self.buttons, text='Charge',
-                                    command=self.charge, bg=yellow, **button_opts)
-        self.dischargeButton = tk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bg=orange, **button_opts)
-        self.emergency_offButton = tk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off, bg=red, **button_opts)
-        self.resetButton = tk.Button(self.buttons, text='Reset',
-                                    command=self.reset, bg=red, **button_opts)
+        self.saveLocationButton = ttk.Button(self.buttons, text='Save Location',
+                                    command=self.setSaveLocation)
+        self.checklistButton = ttk.Button(self.buttons, text='Begin Checklist',
+                                    command=self.checklist)
+        self.chargeButton = ttk.Button(self.buttons, text='Charge',
+                                    command=self.charge)
+        self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
+                                    command=self.discharge)
+        self.emergency_offButton = ttk.Button(self.buttons, text='Emergency Off',
+                                    command=self.emergency_off)
+        self.resetButton = ttk.Button(self.buttons, text='Reset',
+                                    command=self.reset)
 
         self.saveLocationButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
@@ -194,7 +202,7 @@ class MainApp(tk.Tk):
 
         # If the user inputs have already been set, enable the checklist button
         if self.userInputsSet:
-            self.checklistButton.configure(state='normal', relief='raised')
+            self.checklistButton.configure(state='normal')
 
         # Try setting the pins automatically
         self.pinSelector()
@@ -208,9 +216,9 @@ class MainApp(tk.Tk):
         self.setPinWindow.attributes('-topmost', True)
 
         # Labels on the left, dropdowns on the right, button on the bottom
-        labelFrame = tk.Frame(self.setPinWindow)
-        optionMenuFrame = tk.Frame(self.setPinWindow)
-        buttonFrame = tk.Frame(self.setPinWindow)
+        labelFrame = ttk.Frame(self.setPinWindow)
+        optionMenuFrame = ttk.Frame(self.setPinWindow)
+        buttonFrame = ttk.Frame(self.setPinWindow)
 
         labelFrame.grid(row=0, column=0)
         optionMenuFrame.grid(row=0, column=1)
@@ -222,8 +230,8 @@ class MainApp(tk.Tk):
             for i, channel in enumerate(channelDefaults):
                 channelVariable = tk.StringVar()
                 channelVariable.set(channelDefaults[channel])
-                label = tk.Label(labelFrame, text=channel, **text_opts)
-                drop = tk.OptionMenu(optionMenuFrame, channelVariable, *options)
+                label = ttk.Label(labelFrame, text=channel, **text_opts)
+                drop = ttk.OptionMenu(optionMenuFrame, channelVariable, *options)
 
                 label.pack(anchor='w', padx=(0, setPinsPadding))
                 drop.pack(anchor='w', padx=(setPinsPadding, 0))
@@ -247,27 +255,8 @@ class MainApp(tk.Tk):
             print(self.outputPins)
             self.setPinWindow.destroy()
 
-        okayButton = tk.Button(buttonFrame, text='Set Pins', command=assignPins, **button_opts)
+        okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins)
         okayButton.pack()
-
-        # login_text = 'Please enter UMD username.'
-        # password_text = 'Please enter password.'
-        # button_text = 'Login'
-        #
-        # self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **text_opts)
-        # self.usernameEntry = tk.Entry(self.loginWindow, **entry_opts)
-        # self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **text_opts)
-        # self.passwordEntry = tk.Entry(self.loginWindow, show='*', **entry_opts)
-        # self.loginButton = tk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), **button_opts)
-        #
-        # # User can press 'Return' key to login instead of loginButton
-        # self.loginWindow.bind('<Return>', checkLogin)
-        #
-        # self.usernameLabel.pack()
-        # self.usernameEntry.pack()
-        # self.passwordLabel.pack()
-        # self.passwordEntry.pack()
-        # self.loginButton.pack()
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
@@ -298,7 +287,7 @@ class MainApp(tk.Tk):
 
             # Reset program and allow user to reset
             self.reset()
-            self.resetButton.configure(state='normal', relief='raised')
+            self.resetButton.configure(state='normal')
 
             self.serialNumber = results_df['Serial Number'].dropna().values[0]
             self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
@@ -325,13 +314,13 @@ class MainApp(tk.Tk):
         try:
             # If there is an exception, catch where the exception came from
             self.serialNumber = self.serialNumberEntry.get()
+            self.capModel = self.serialNumber[0:3]
             self.userInputError = 'chargeVoltage'
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
             self.userInputError = 'holdChargeTime'
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
             # Make sure that the serial number matches the correct format, if not raise error
-            self.capModel = self.serialNumber[0:3]
             if format.match(self.serialNumber) is None or self.capModel not in maxVoltage:
                 self.userInputError = 'serialNumber'
                 raise ValueError
@@ -344,7 +333,7 @@ class MainApp(tk.Tk):
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
-                self.checklistButton.configure(state='normal', relief='raised')
+                self.checklistButton.configure(state='normal')
 
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
@@ -383,14 +372,14 @@ class MainApp(tk.Tk):
     # Disable all buttons in the button frame
     def disableButtons(self):
         for w in self.buttons.winfo_children():
-            if isinstance(w, tk.Button):
-                w.configure(state='disabled', relief='sunken')
+            if isinstance(w, ttk.Button):
+                w.configure(state='disabled')
 
     # Enable normal operation of all buttons in the button frame
     def enableButtons(self):
         for w in self.buttons.winfo_children():
-            if isinstance(w, tk.Button):
-                w.configure(state='normal', relief='raised')
+            if isinstance(w, ttk.Button):
+                w.configure(state='normal')
 
     # Every time an item on the checklist is ticked complete, check to see if the entire list is complete
     def checklistComplete(self):
@@ -406,8 +395,8 @@ class MainApp(tk.Tk):
     def checklist(self):
         # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
         self.disableButtons()
-        self.saveLocationButton.configure(state='normal', relief='raised')
-        self.checklistButton.configure(state='normal', relief='raised')
+        self.saveLocationButton.configure(state='normal')
+        self.checklistButton.configure(state='normal')
 
         # Top level window for checklist
         self.checklist_win = tk.Toplevel()
@@ -420,11 +409,11 @@ class MainApp(tk.Tk):
             # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
             # The completion of the checklist is checked every time a Checkbutton value is changed
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
-            button = tk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, font=('Calibri', 12), selectcolor=black)
+            button = ttk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, font=('Calibri', 12), selectcolor=black)
             button.grid(row=i, column=0, sticky='w')
 
         # Add okay button to close the window
-        self.OKButton = tk.Button(self.checklist_win, text='Okay', command=self.checklistComplete, **button_opts)
+        self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete)
         self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
         # I believe wait_window functions to wait for the window to close before the rest of the app can execute the next function
@@ -453,7 +442,7 @@ class MainApp(tk.Tk):
         chargeConfirmText = 'Are you sure you want to begin charging?'
         chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
 
-        cancelButton = tk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, **button_opts)
+        cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy)
         cancelButton.pack(side='left')
 
         chargeConfirmWindow.wait_window()
@@ -478,7 +467,7 @@ class MainApp(tk.Tk):
             dischargeConfirmText = 'Are you sure you want to discharge?'
             dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
-            cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy)
             cancelButton.pack(side='left')
 
             dischargeConfirmWindow.wait_window()
@@ -509,8 +498,8 @@ class MainApp(tk.Tk):
         # Disable all buttons except for save and help, if logged in
         self.disableButtons()
         if self.loggedIn:
-            self.saveLocationButton.configure(state='normal', relief='raised')
-            self.resetButton.configure(state='normal', relief='raised')
+            self.saveLocationButton.configure(state='normal')
+            self.resetButton.configure(state='normal')
 
         self.discharged = True
         self.charging = False
@@ -533,7 +522,7 @@ class MainApp(tk.Tk):
             # Once logged in, enable the save location and help buttons
             if self.loggedIn:
                 self.loginWindow.destroy()
-                self.saveLocationButton.configure(state='normal', relief='raised')
+                self.saveLocationButton.configure(state='normal')
 
                 # Prompt save location after login
                 self.setSaveLocation()
@@ -554,15 +543,19 @@ class MainApp(tk.Tk):
         self.loginWindow = tk.Toplevel(padx=loginPadding, pady=loginPadding)
         self.loginWindow.title('Login Window')
 
+        # Center and bring popup to the top
+        self.loginWindow.attributes('-topmost', True)
+        self.eval(f'tk::PlaceWindow {str(self.loginWindow)} center')
+
         login_text = 'Please enter UMD username.'
         password_text = 'Please enter password.'
         button_text = 'Login'
 
-        self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **text_opts)
-        self.usernameEntry = tk.Entry(self.loginWindow, **entry_opts)
-        self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **text_opts)
-        self.passwordEntry = tk.Entry(self.loginWindow, show='*', **entry_opts)
-        self.loginButton = tk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), **button_opts)
+        self.usernameLabel = ttk.Label(self.loginWindow, text=login_text, **text_opts)
+        self.usernameEntry = ttk.Entry(self.loginWindow, **entry_opts)
+        self.passwordLabel = ttk.Label(self.loginWindow, text=password_text, **text_opts)
+        self.passwordEntry = ttk.Entry(self.loginWindow, show='*', **entry_opts)
+        self.loginButton = ttk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event))
 
         # User can press 'Return' key to login instead of loginButton
         self.loginWindow.bind('<Return>', checkLogin)
@@ -746,7 +739,7 @@ class MainApp(tk.Tk):
         # Disable all buttons except for save and help, if logged in
         self.disableButtons()
         if self.loggedIn:
-            self.saveLocationButton.configure(state='normal', relief='raised')
+            self.saveLocationButton.configure(state='normal')
 
     # Popup window for help
     def help(self):
@@ -791,8 +784,8 @@ class MessageWindow(tk.Toplevel):
         self.OKPress = False
 
         # Create two frames, one for the text, and the other for buttons on the bottom
-        self.topFrame = tk.Frame(self)
-        self.bottomFrame = tk.Frame(self)
+        self.topFrame = ttk.Frame(self)
+        self.bottomFrame = ttk.Frame(self)
 
         self.topFrame.pack(side='top')
         self.bottomFrame.pack(side='bottom')
@@ -803,8 +796,8 @@ class MessageWindow(tk.Toplevel):
             self.destroy()
 
         # Create and place message and okay button
-        self.message = tk.Message(self.topFrame, width=topLevelWidth, text=text, **text_opts)
-        self.OKButton = tk.Button(self.bottomFrame, text='Okay', command=OKPress, **button_opts)
+        self.message = ttk.Label(self.topFrame, wraplength=topLevelWrapLength, width=topLevelWidth, text=text, **text_opts)
+        self.OKButton = ttk.Button(self.bottomFrame, text='Okay', command=OKPress)
 
         self.message.pack(fill='both')
         self.OKButton.pack(side='left')
@@ -812,6 +805,4 @@ class MessageWindow(tk.Toplevel):
 if __name__ == "__main__":
     app = MainApp()
     app.eval('tk::PlaceWindow . center')
-    app.loginWindow.attributes('-topmost', True)
-    app.eval(f'tk::PlaceWindow {str(app.loginWindow)} center')
     app.mainloop()
