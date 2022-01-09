@@ -12,6 +12,7 @@ import pandas as pd
 import time
 import os
 import nidaqmx
+import webbrowser
 from constants import *
 
 # Tkinter has quite a high learning curve. If attempting to edit this source code without experience, I highly
@@ -112,15 +113,15 @@ class MainApp(tk.Tk):
         # Menubar at the top
         self.menubar = tk.Menu(self)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
-        self.filemenu.add_command(label='Open', command=self.donothing)
-        self.filemenu.add_command(label='Save', command=self.donothing)
+        self.filemenu.add_command(label='Open', command=self.readResults)
+        self.filemenu.add_command(label='Save', command=self.setSaveLocation)
         self.filemenu.add_separator()
         self.filemenu.add_command(label='Quit', command=self.on_closing)
         self.menubar.add_cascade(label='File', menu=self.filemenu)
 
         self.helpmenu = tk.Menu(self.menubar, tearoff=0)
         self.helpmenu.add_command(label='Help', command=self.help)
-        self.helpmenu.add_command(label='About...', command=self.donothing)
+        self.helpmenu.add_command(label='About...', command=self.openSite)
         self.menubar.add_cascade(label='Help', menu=self.helpmenu)
 
         self.config(menu=self.menubar)
@@ -178,8 +179,8 @@ class MainApp(tk.Tk):
         except Exception as e:
             print(e)
 
-    def donothing(self):
-        print('nothing')
+    def openSite(self):
+        webbrowser.open(githubSite)
 
     def setSaveLocation(self):
         # Creates folder dialog for user to choose save directory
@@ -203,14 +204,44 @@ class MainApp(tk.Tk):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
-        results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
-            self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
-            self.dischargeVoltageLoad, self.dischargeCurrentLoad]
+        self.results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
+            self.chargeTime, self.chargeVoltagePS, self.chargeVoltageLoad, self.chargeCurrentPS,
+            self.chargeCurrentLoad, self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
         # Creates a data frame which is easier to save to csv formats
-        results_df = pd.DataFrame([pd.Series(val) for val in results]).T
+        results_df = pd.DataFrame([pd.Series(val) for val in self.results]).T
         results_df.columns = columns
         results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
+
+    # Read in a csv file and plot those results
+    def readResults(self):
+        readFile = filedialog.askopenfilename(filetypes=[('Comma separated values', '.csv')])
+        if readFile != '':
+            results_df = pd.read_csv(readFile)
+
+            # Reset program and allow user to reset
+            self.reset()
+            self.resetButton.configure(state='normal', relief='raised')
+
+            self.serialNumber = results_df['Serial Number'].dropna().values[0]
+            self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
+            self.holdChargeTime = results_df['Hold Charge Time (s)'].dropna().values[0]
+            self.chargeTime = results_df['Charge Time (s)'].dropna().values
+            self.chargeVoltagePS = results_df['Charge Voltage PS (V)'].dropna().values
+            self.chargeVoltageLoad = results_df['Charge Voltage Load (V)'].dropna().values
+            self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
+            self.chargeCurrentLoad = results_df['Charge Current Load (A)'].dropna().values
+            self.dischargeTime = results_df['Discharge Time (s)'].dropna().values
+            self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].dropna().values
+            self.dischargeCurrentLoad = results_df['Discharge Current (A)'].dropna().values
+
+            # Place values for all user inputs and plots
+            self.serialNumberEntry.insert(0, self.serialNumber)
+            self.chargeVoltageEntry.insert(0, self.chargeVoltage)
+            self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
+
+            self.replotCharge()
+            self.replotDischarge()
 
     def setUserInputs(self):
         # Try to set the user inputs. If there is a ValueError, display pop up message.
@@ -345,35 +376,45 @@ class MainApp(tk.Tk):
             self.chargePress = True
 
     def discharge(self):
-        # Popup window to confirm discharge
-        dischargeConfirmName = 'Discharge'
-        dischargeConfirmText = 'Are you sure you want to discharge?'
-        dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+        # Only plot discharge and save results if charging
+        if self.charging and self.countdownTime <= 0.0:
+            # Read from the load
+            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
+            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
 
-        cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
-        cancelButton.pack(side='left')
+            # Plot results on the discharge graph and save them
+            # The only time results are saved is when there is a discharge that is preceded by charge
+            self.replotDischarge()
+            self.saveResults()
 
-        dischargeConfirmWindow.wait_window()
+        elif self.charging:
+            # Popup window to confirm discharge
+            dischargeConfirmName = 'Discharge'
+            dischargeConfirmText = 'Are you sure you want to discharge?'
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
-        if dischargeConfirmWindow.OKPress:
-            print('Discharge')
+            cancelButton = tk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, **button_opts)
+            cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
+
+            if dischargeConfirmWindow.OKPress:
+                print('Discharge')
+
+            # Read from the load
+            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
+            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
+
+            # Plot results on the discharge graph and save them
+            # The only time results are saved is when there is a discharge that is preceded by charge
+            self.replotDischarge()
+            self.saveResults()
 
         # Disable all buttons except for save and help, if logged in
         self.disableButtons()
         if self.loggedIn:
             self.saveLocationButton.configure(state='normal', relief='raised')
             self.resetButton.configure(state='normal', relief='raised')
-
-        # Only plot discharge and save results if charging
-        if self.charging:
-            # Read from the load
-            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
-            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
-
-            # Plot results on the discharge graph and save them
-            # The only time results are saved is when there is a discharge that is preceded by successful charge
-            self.replotDischarge()
-            self.saveResults()
 
         self.discharged = True
         self.charging = False
@@ -550,7 +591,6 @@ class MainApp(tk.Tk):
 
             # Set countdown time to 0 seconds once discharged
             if self.countdownTime <= 0.0:
-                self.countdownTime = 0.0
                 self.discharge()
 
         # Also update the labels with time

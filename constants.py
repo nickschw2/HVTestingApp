@@ -2,6 +2,9 @@ import re
 import matplotlib.lines as mlines
 import datetime
 
+# github website
+githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
+
 # Date
 today = datetime.date.today()
 
@@ -118,5 +121,5 @@ by the oscilloscope.\n
 
 # Saving results
 columns = ['Serial Number', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
-    'Charge Time (s)', 'Charge Voltage (V)', 'Charge Current (A)', 'Discharge Time (s)',
-    'Discharge Voltage (V)', 'Discharge Current (A)']
+    'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Voltage Load (V)', 'Charge Current PS (A)',
+    'Charge Current Load (A)', 'Discharge Time (s)', 'Discharge Voltage (V)', 'Discharge Current (A)']
