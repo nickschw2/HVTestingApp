@@ -90,6 +90,8 @@ class MainApp(tk.Tk):
         # Button definitions and placement
         self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
                                     command=self.setSaveLocation, bg=green, **button_opts)
+        self.setPinsButton = tk.Button(self.buttons, text='Set Pins',
+                                    command=self.setPins, bg=green, **button_opts)
         self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
                                     command=self.checklist, bg=green, **button_opts)
         self.chargeButton = tk.Button(self.buttons, text='Charge',
@@ -102,6 +104,7 @@ class MainApp(tk.Tk):
                                     command=self.reset, bg=red, **button_opts)
 
         self.saveLocationButton.pack(side='left', padx=buttonPadding)
+        self.setPinsButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
         self.chargeButton.pack(side='left', padx=buttonPadding)
         self.dischargeButton.pack(side='left', padx=buttonPadding)
@@ -191,6 +194,71 @@ class MainApp(tk.Tk):
         # If the user inputs have already been set, enable the checklist button
         if self.userInputsSet:
             self.checklistButton.configure(state='normal', relief='raised')
+
+        # Try setting the pins automatically
+        self.setPins()
+
+    def setPins(self):
+        # Create popup window with fields for username and password
+        self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
+        self.setPinWindow.title('Set Pins')
+        # Bring pop up to the center and top
+        self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
+        self.setPinWindow.attributes('-topmost', True)
+
+        # Options available for pins and channels to read/write
+        inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
+        outputPinOptions = ['line0', 'line1']
+
+        inputChannels = ['Load Voltage', 'Power Supply Voltage', 'Load Current', 'Power Supply Current']
+        outputChannels = ['Power Supply Switch', 'Load Switch']
+
+        # Labels on the left, dropdowns on the right
+        labelFrame = tk.Frame(self.setPinWindow)
+        optionMenuFrame = tk.Frame(self.setPinWindow)
+        labelFrame.pack(side='left')
+        optionMenuFrame.pack(side='left')
+
+        # Initialize empty dictionary for pins
+        inputPins = {}
+        outputPins = {}
+        for i, channel in enumerate(inputChannels):
+            channelVariable = tk.StringVar()
+            channelVariable.set(inputPinDefaults[channel])
+            label = tk.Label(labelFrame, text=channel, **text_opts)
+            drop = tk.OptionMenu(optionMenuFrame, channelVariable, *inputPinOptions)
+
+            label.grid(row=i, sticky='w', padx=(0, setPinsPadding))
+            drop.grid(row=i, sticky='w', padx=(setPinsPadding, 0))
+
+        for i, channel in enumerate(outputChannels):
+            channelVariable = tk.StringVar()
+            channelVariable.set(outputPinDefaults[channel])
+            label = tk.Label(labelFrame, text=channel, **text_opts)
+            drop = tk.OptionMenu(optionMenuFrame, channelVariable, *inputPinOptions)
+
+            label.grid(row=i + len(inputChannels), sticky='w', padx=(0, setPinsPadding))
+            drop.grid(row=i + len(inputChannels), sticky='w', padx=(setPinsPadding, 0))
+
+
+        # login_text = 'Please enter UMD username.'
+        # password_text = 'Please enter password.'
+        # button_text = 'Login'
+        #
+        # self.usernameLabel = tk.Label(self.loginWindow, text=login_text, **text_opts)
+        # self.usernameEntry = tk.Entry(self.loginWindow, **entry_opts)
+        # self.passwordLabel = tk.Label(self.loginWindow, text=password_text, **text_opts)
+        # self.passwordEntry = tk.Entry(self.loginWindow, show='*', **entry_opts)
+        # self.loginButton = tk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), **button_opts)
+        #
+        # # User can press 'Return' key to login instead of loginButton
+        # self.loginWindow.bind('<Return>', checkLogin)
+        #
+        # self.usernameLabel.pack()
+        # self.usernameEntry.pack()
+        # self.passwordLabel.pack()
+        # self.passwordEntry.pack()
+        # self.loginButton.pack()
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
@@ -379,7 +447,7 @@ class MainApp(tk.Tk):
         # Only plot discharge and save results if charging
         if self.charging and self.countdownTime <= 0.0:
             # Read from the load
-            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
+            oscilloscopePins = [inputPinDefaults['Load Voltage'], inputPinDefaults['Load Current']]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
 
             # Plot results on the discharge graph and save them
@@ -402,7 +470,7 @@ class MainApp(tk.Tk):
                 print('Discharge')
 
             # Read from the load
-            oscilloscopePins = [pins['voltageLoadPin'], pins['currentLoadPin']]
+            oscilloscopePins = [inputPinDefaults['Load Voltage'], inputPinDefaults['Load Current']]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
 
             # Plot results on the discharge graph and save them
@@ -516,10 +584,10 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(pins["voltageLoadPin"]) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(pins["voltagePSPin"]) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(pins["currentLoadPin"]):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(pins["currentPSPin"]):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(inputPinDefaults["Load Voltage"]) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(inputPinDefaults["Power Supply Voltage"]) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(inputPinDefaults["Load Current"]):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(inputPinDefaults["Power Supply Current"]):.2f} A')
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -564,10 +632,10 @@ class MainApp(tk.Tk):
     def updateChargePlot(self):
         # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
-        voltageLoadPoint = self.readSensor(pins['voltageLoadPin'])
-        voltagePSPoint = self.readSensor(pins['voltagePSPin'])
-        currentLoadPoint = self.readSensor(pins['currentLoadPin'])
-        currentPSPoint = self.readSensor(pins['currentPSPin'])
+        voltageLoadPoint = self.readSensor(inputPinDefaults['Load Voltage'])
+        voltagePSPoint = self.readSensor(inputPinDefaults['Power Supply Voltage'])
+        currentLoadPoint = self.readSensor(inputPinDefaults['Load Current'])
+        currentPSPoint = self.readSensor(inputPinDefaults['Power Supply Current'])
 
         self.chargeTime = np.append(self.chargeTime, self.timePoint)
         self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)

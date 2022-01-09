@@ -11,12 +11,13 @@ today = datetime.date.today()
 # NI DAQ pins
 sensorName = 'PXI1Slot2'
 digitalOutName = 'port0'
-pins = {'voltageLoadPin': 'ai0',
-'voltagePSPin': 'ai1',
-'currentLoadPin': 'ai2',
-'currentPSPin': 'ai3',
-'switchPSPin': 'line0',
-'switchLoadPin': 'line1'}
+inputPinDefaults = {'Load Voltage': 'ai0',
+'Power Supply Voltage': 'ai1',
+'Load Current': 'ai2',
+'Power Supply Current': 'ai3'}
+
+outputPinDefaults = {'Power Supply Switch': 'line0',
+'Load Switch': 'line1'}
 
 # Colors
 green = '#2ecc71'
@@ -44,6 +45,7 @@ entry_opts = {'font':('Calibri', 18), 'bg': lightGrey}
 userInputWidth = 8
 userInputPadding = 50 #pixels
 loginPadding = 20 #pixels
+setPinsPadding = 15 #pixels
 labelPadding = 10 #pixels
 buttonPadding = 50 #pixels
 yPaddingFrame = 30 #pixels
