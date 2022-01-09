@@ -90,8 +90,6 @@ class MainApp(tk.Tk):
         # Button definitions and placement
         self.saveLocationButton = tk.Button(self.buttons, text='Save Location',
                                     command=self.setSaveLocation, bg=green, **button_opts)
-        self.setPinsButton = tk.Button(self.buttons, text='Set Pins',
-                                    command=self.pinSelector, bg=green, **button_opts)
         self.checklistButton = tk.Button(self.buttons, text='Begin Checklist',
                                     command=self.checklist, bg=green, **button_opts)
         self.chargeButton = tk.Button(self.buttons, text='Charge',
@@ -104,7 +102,6 @@ class MainApp(tk.Tk):
                                     command=self.reset, bg=red, **button_opts)
 
         self.saveLocationButton.pack(side='left', padx=buttonPadding)
-        self.setPinsButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
         self.chargeButton.pack(side='left', padx=buttonPadding)
         self.dischargeButton.pack(side='left', padx=buttonPadding)
@@ -112,12 +109,16 @@ class MainApp(tk.Tk):
         self.resetButton.pack(side='left', padx=buttonPadding)
 
         self.saveFolderSet = False
+        # Initialize pins to default values
+        self.inputPins = inputPinDefaults
+        self.outputPins = outputPinDefaults
 
         # Menubar at the top
         self.menubar = tk.Menu(self)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Open', command=self.readResults)
         self.filemenu.add_command(label='Save', command=self.setSaveLocation)
+        self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
         self.filemenu.add_separator()
         self.filemenu.add_command(label='Quit', command=self.on_closing)
         self.menubar.add_cascade(label='File', menu=self.filemenu)
@@ -199,10 +200,6 @@ class MainApp(tk.Tk):
         self.pinSelector()
 
     def pinSelector(self):
-        # Initialize pins to default values
-        self.inputPins = inputPinDefaults
-        self.outputPins = outputPinDefaults
-
         # Create popup window with fields for username and password
         self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
         self.setPinWindow.title('Set Pins')
@@ -248,7 +245,7 @@ class MainApp(tk.Tk):
 
             print(self.inputPins)
             print(self.outputPins)
-            self.setPinWindow.close()
+            self.setPinWindow.destroy()
 
         okayButton = tk.Button(buttonFrame, text='Set Pins', command=assignPins, **button_opts)
         okayButton.pack()
@@ -456,18 +453,7 @@ class MainApp(tk.Tk):
             self.chargePress = True
 
     def discharge(self):
-        # Only plot discharge and save results if charging
-        if self.charging and self.countdownTime <= 0.0:
-            # Read from the load
-            oscilloscopePins = [inputPinDefaults['Load Voltage'], inputPinDefaults['Load Current']]
-            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
-
-            # Plot results on the discharge graph and save them
-            # The only time results are saved is when there is a discharge that is preceded by charge
-            self.replotDischarge()
-            self.saveResults()
-
-        elif self.charging:
+        def popup():
             # Popup window to confirm discharge
             dischargeConfirmName = 'Discharge'
             dischargeConfirmText = 'Are you sure you want to discharge?'
@@ -481,14 +467,24 @@ class MainApp(tk.Tk):
             if dischargeConfirmWindow.OKPress:
                 print('Discharge')
 
+        def saveResults():
             # Read from the load
-            oscilloscopePins = [inputPinDefaults['Load Voltage'], inputPinDefaults['Load Current']]
+            oscilloscopePins = [self.inputPins['Load Voltage'], self.inputPins['Load Current']]
             self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
             self.replotDischarge()
             self.saveResults()
+
+        if self.charging:
+            if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
+                popup()
+                saveResults()
+            else:
+                saveResults()
+        else:
+            popup()
 
         # Disable all buttons except for save and help, if logged in
         self.disableButtons()
@@ -596,10 +592,10 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(inputPinDefaults["Load Voltage"]) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(inputPinDefaults["Power Supply Voltage"]) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(inputPinDefaults["Load Current"]):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(inputPinDefaults["Power Supply Current"]):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(self.inputPins["Load Voltage"]) / 1000:.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Voltage"]) / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.inputPins["Load Current"]):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Current"]):.2f} A')
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -644,10 +640,10 @@ class MainApp(tk.Tk):
     def updateChargePlot(self):
         # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
-        voltageLoadPoint = self.readSensor(inputPinDefaults['Load Voltage'])
-        voltagePSPoint = self.readSensor(inputPinDefaults['Power Supply Voltage'])
-        currentLoadPoint = self.readSensor(inputPinDefaults['Load Current'])
-        currentPSPoint = self.readSensor(inputPinDefaults['Power Supply Current'])
+        voltageLoadPoint = self.readSensor(self.inputPins['Load Voltage'])
+        voltagePSPoint = self.readSensor(self.inputPins['Power Supply Voltage'])
+        currentLoadPoint = self.readSensor(self.inputPins['Load Current'])
+        currentPSPoint = self.readSensor(self.inputPins['Power Supply Current'])
 
         self.chargeTime = np.append(self.chargeTime, self.timePoint)
         self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)
