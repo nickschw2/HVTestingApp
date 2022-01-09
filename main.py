@@ -430,6 +430,23 @@ class MainApp(tk.Tk):
         # I believe wait_window functions to wait for the window to close before the rest of the app can execute the next function
         self.checklist_win.wait_window()
 
+    def operateSwitches(self, state):
+        # If false, power supply switch opens and load switch closes
+        # If true, power supply switch closes and load switch opens
+        try:
+            with nidaqmx.Task() as task:
+                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins["Power Supply Switch"]}')
+                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins["Load Switch"]}')
+                value = task.write([state, state])
+
+                if state:
+                    print('Charge state')
+                else:
+                    print('Discharge state')
+
+        except:
+            print('Cannot operate switches')
+
     def charge(self):
         # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
@@ -443,6 +460,8 @@ class MainApp(tk.Tk):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
+            self.operateSwitches(True)
+
             # Begin tracking time
             self.beginChargeTime = time.time()
             self.charging = True
@@ -465,7 +484,7 @@ class MainApp(tk.Tk):
             dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
-                print('Discharge')
+                self.operateSwitches(False)
 
         def saveResults():
             # Read from the load
@@ -481,6 +500,7 @@ class MainApp(tk.Tk):
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
                 popup()
                 saveResults()
+                self.operateSwitches(False)
             else:
                 saveResults()
         else:
@@ -555,6 +575,7 @@ class MainApp(tk.Tk):
 
     # Special function for closing the window and program
     def on_closing(self):
+        self.operateSwitches(False)
         plt.close('all')
         self.quit()
         self.destroy()
