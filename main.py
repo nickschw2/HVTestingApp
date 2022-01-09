@@ -23,9 +23,6 @@ from constants import *
 class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        # center the app
-        self.eval('tk::PlaceWindow . center')
-
         # set theme
         self.tk.call('source', 'Sun-Valley-ttk-theme-master/sun-valley.tcl')
         self.tk.call('set_theme', 'dark')
@@ -184,6 +181,9 @@ class MainApp(tk.Tk):
             self.loggedIn = False
             self.validateLogin()
 
+            # Reset all fields on startup, including making a connection to NI DAQ
+            self.reset()
+
             # Prompt save location after login
             self.setSaveLocation()
 
@@ -191,9 +191,6 @@ class MainApp(tk.Tk):
             self.pinSelector()
 
             self.safetyLights()
-
-            # Reset all fields on startup, including making a connection to NI DAQ
-            self.reset()
 
         except Exception as e:
             print(e)
@@ -206,6 +203,10 @@ class MainApp(tk.Tk):
         self.saveFolder = filedialog.askdirectory(initialdir=os.path.dirname(os.path.realpath(__file__)), title='Select directory for saving results.')
         if self.saveFolder != '':
             self.saveFolderSet = True
+
+        # If the user inputs have already been set, enable the checklist button
+        if self.userInputsSet:
+            self.checklistButton.configure(state='normal')
 
     def pinSelector(self):
         # Create popup window with fields for username and password
@@ -811,4 +812,6 @@ class MessageWindow(tk.Toplevel):
 
 if __name__ == "__main__":
     app = MainApp()
+    # center the app
+    app.eval('tk::PlaceWindow . center')
     app.mainloop()
