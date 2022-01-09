@@ -23,19 +23,20 @@ from constants import *
 class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
+        # center the app
+        self.eval('tk::PlaceWindow . center')
+
+        # set theme
         self.tk.call('source', 'Sun-Valley-ttk-theme-master/sun-valley.tcl')
         self.tk.call('set_theme', 'dark')
 
         # Change style
         style = ttk.Style(self)
         style.configure('TButton', **button_opts)
-        style.configure('TLabel', **text_opts)
-        style.configure('TEntry', **entry_opts)
+        style.configure('TCheckbutton', font=('Helvetica', 12))
 
+        # set title
         self.title('HV Capacitor Testing')
-
-        #Change deault color palette
-        # self.tk_setPalette(background=grey, foreground=white, activeBackground=lightGrey, activeForeground=white)
 
         # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
@@ -183,6 +184,12 @@ class MainApp(tk.Tk):
             self.loggedIn = False
             self.validateLogin()
 
+            # Prompt save location after login
+            self.setSaveLocation()
+
+            # Try setting the pins automatically
+            self.pinSelector()
+
             self.safetyLights()
 
             # Reset all fields on startup, including making a connection to NI DAQ
@@ -200,13 +207,6 @@ class MainApp(tk.Tk):
         if self.saveFolder != '':
             self.saveFolderSet = True
 
-        # If the user inputs have already been set, enable the checklist button
-        if self.userInputsSet:
-            self.checklistButton.configure(state='normal')
-
-        # Try setting the pins automatically
-        self.pinSelector()
-
     def pinSelector(self):
         # Create popup window with fields for username and password
         self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
@@ -216,25 +216,26 @@ class MainApp(tk.Tk):
         self.setPinWindow.attributes('-topmost', True)
 
         # Labels on the left, dropdowns on the right, button on the bottom
-        labelFrame = ttk.Frame(self.setPinWindow)
-        optionMenuFrame = ttk.Frame(self.setPinWindow)
-        buttonFrame = ttk.Frame(self.setPinWindow)
+        # labelFrame = ttk.Frame(self.setPinWindow)
+        # optionMenuFrame = ttk.Frame(self.setPinWindow)
 
-        labelFrame.grid(row=0, column=0)
-        optionMenuFrame.grid(row=0, column=1)
-        buttonFrame.grid(row=1, columnspan=2)
+        #
+        # labelFrame.grid(row=0, column=0)
+        # optionMenuFrame.grid(row=0, column=1)
+
 
         # This function places pin labels and dropdown menus in the popup window
         def selectPins(channelDefaults, options):
             pins = {}
+            nCols, nRows = self.setPinWindow.grid_size()
             for i, channel in enumerate(channelDefaults):
                 channelVariable = tk.StringVar()
                 channelVariable.set(channelDefaults[channel])
-                label = ttk.Label(labelFrame, text=channel, **text_opts)
-                drop = ttk.OptionMenu(optionMenuFrame, channelVariable, *options)
+                label = ttk.Label(self.setPinWindow, text=channel, **text_opts)
+                drop = ttk.OptionMenu(self.setPinWindow, channelVariable, channelDefaults[channel], *options)
 
-                label.pack(anchor='w', padx=(0, setPinsPadding))
-                drop.pack(anchor='w', padx=(setPinsPadding, 0))
+                label.grid(row=nRows + i, column=0, sticky='w', padx=(0, setPinsPadding))
+                drop.grid(row=nRows + i, column=1, sticky='w', padx=(setPinsPadding, 0))
 
                 pins[channel] = channelVariable
 
@@ -242,6 +243,11 @@ class MainApp(tk.Tk):
 
         inputPins = selectPins(inputPinDefaults, inputPinOptions)
         outputPins = selectPins(outputPinDefaults, outputPinOptions)
+
+        # Button on the bottom
+        nCols, nRows = self.setPinWindow.grid_size()
+        buttonFrame = ttk.Frame(self.setPinWindow)
+        buttonFrame.grid(row=nRows + 1, columnspan=2)
 
         # Once the okay button is pressed, assign the pins
         def assignPins():
@@ -313,21 +319,23 @@ class MainApp(tk.Tk):
         # Try to set the user inputs. If there is a ValueError, display pop up message.
         try:
             # If there is an exception, catch where the exception came from
+            self.userInputError = 'serialNumber'
             self.serialNumber = self.serialNumberEntry.get()
             self.capModel = self.serialNumber[0:3]
+            # Make sure that the serial number matches the correct format, if not raise error
+            if format.match(self.serialNumber) is None or self.capModel not in maxVoltage:
+                raise ValueError
+
             self.userInputError = 'chargeVoltage'
             self.chargeVoltage = float(self.chargeVoltageEntry.get())
+            if self.chargeVoltage > maxVoltage[self.capModel]:
+                raise ValueError
+
             self.userInputError = 'holdChargeTime'
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
-            # Make sure that the serial number matches the correct format, if not raise error
-            if format.match(self.serialNumber) is None or self.capModel not in maxVoltage:
-                self.userInputError = 'serialNumber'
-                raise ValueError
-
-            if self.chargeVoltage > maxVoltage[self.capModel]:
-                self.userInputError = 'chargeVoltage'
-                raise ValueError
+            # Initialize the countdown time to the hold charge time until the countdown begins
+            self.countdownTime = self.holdChargeTime
 
             self.userInputsSet = True
 
@@ -409,7 +417,7 @@ class MainApp(tk.Tk):
             # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
             # The completion of the checklist is checked every time a Checkbutton value is changed
             self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
-            button = ttk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step, font=('Calibri', 12), selectcolor=black)
+            button = ttk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step)
             button.grid(row=i, column=0, sticky='w')
 
         # Add okay button to close the window
@@ -524,9 +532,6 @@ class MainApp(tk.Tk):
                 self.loginWindow.destroy()
                 self.saveLocationButton.configure(state='normal')
 
-                # Prompt save location after login
-                self.setSaveLocation()
-
             # If incorrect username or password, create popup notifying the user
             else:
                 incorrectLoginName = 'Incorrect Login'
@@ -565,6 +570,8 @@ class MainApp(tk.Tk):
         self.passwordLabel.pack()
         self.passwordEntry.pack()
         self.loginButton.pack()
+
+        self.loginWindow.wait_window()
 
     # Special function for closing the window and program
     def on_closing(self):
@@ -804,5 +811,4 @@ class MessageWindow(tk.Toplevel):
 
 if __name__ == "__main__":
     app = MainApp()
-    app.eval('tk::PlaceWindow . center')
     app.mainloop()

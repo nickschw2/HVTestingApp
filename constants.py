@@ -53,8 +53,8 @@ buttonPadding = 50 #pixels
 yPaddingFrame = 30 #pixels
 plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
-topLevelWidth = 50
-topLevelWrapLength = 300
+topLevelWidth = 30
+topLevelWrapLength = 400
 border_opts = {'highlightbackground': red, 'highlightcolor': red, 'highlightthickness': 3}
 
 # Serial number format
