@@ -39,7 +39,7 @@ class MainApp(tk.Tk):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Row for user inputs on the top
-        self.userInputs = ttk.Frame(self)
+        self.userInputs = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
         self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=(0, yPaddingFrame))
 
         # User input fields along with a button for setting them
@@ -63,7 +63,7 @@ class MainApp(tk.Tk):
 
         # Column for labels on the left
         self.grid_columnconfigure(0, w=1)
-        self.labels = ttk.Frame(self)
+        self.labels = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
         self.labels.grid(row=1, column=0)
 
         # Voltage and current are read from both the power supply and the load
@@ -90,7 +90,7 @@ class MainApp(tk.Tk):
 
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
-        self.buttons = ttk.Frame(self)
+        self.buttons = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
         self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=(yPaddingFrame, 0))
 
         # Button definitions and placement
@@ -176,15 +176,21 @@ class MainApp(tk.Tk):
 
 
         try:
-            # On startup, disable buttons until login is correct
-            self.disableButtons()
-            self.loggedIn = False
-            self.validateLogin()
+            # center the app
+            self.eval('tk::PlaceWindow . center')
 
             # Reset all fields on startup, including making a connection to NI DAQ
+            self.loggedIn = False
             self.reset()
 
-            # Prompt save location after login
+            # On startup, disable buttons until login is correct
+            self.disableButtons()
+            self.validateLogin()
+
+            # If the user closes out of the application during a wait_window, no extra windows pop up
+            self.update()
+
+            # Prompt save location automatically
             self.setSaveLocation()
 
             # Try setting the pins automatically
@@ -215,15 +221,6 @@ class MainApp(tk.Tk):
         # Bring pop up to the center and top
         self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
         self.setPinWindow.attributes('-topmost', True)
-
-        # Labels on the left, dropdowns on the right, button on the bottom
-        # labelFrame = ttk.Frame(self.setPinWindow)
-        # optionMenuFrame = ttk.Frame(self.setPinWindow)
-
-        #
-        # labelFrame.grid(row=0, column=0)
-        # optionMenuFrame.grid(row=0, column=1)
-
 
         # This function places pin labels and dropdown menus in the popup window
         def selectPins(channelDefaults, options):
@@ -264,6 +261,8 @@ class MainApp(tk.Tk):
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins)
         okayButton.pack()
+
+        self.setPinWindow.wait_window()
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
@@ -349,15 +348,11 @@ class MainApp(tk.Tk):
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
             setUserInputWindow = MessageWindow(self, setUserInputName, setUserInputText)
 
-            setUserInputWindow.wait_window()
-
         # Pop up window for incorrect user inputs
         except ValueError as err:
             def incorrectUserInput(text):
                 incorrectUserInputName = 'Invalid Input'
                 incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, text)
-
-                incorrectUserInputWindow.wait_window()
 
             # Clear the user input fields
             if self.userInputError == 'chargeVoltage':
@@ -425,9 +420,6 @@ class MainApp(tk.Tk):
         self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete)
         self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
-        # I believe wait_window functions to wait for the window to close before the rest of the app can execute the next function
-        self.checklist_win.wait_window()
-
     def operateSwitches(self, state):
         # If false, power supply switch opens and load switch closes
         # If true, power supply switch closes and load switch opens
@@ -454,8 +446,6 @@ class MainApp(tk.Tk):
         cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy)
         cancelButton.pack(side='left')
 
-        chargeConfirmWindow.wait_window()
-
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
             self.operateSwitches(True)
@@ -478,8 +468,6 @@ class MainApp(tk.Tk):
 
             cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy)
             cancelButton.pack(side='left')
-
-            dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
                 self.operateSwitches(False)
@@ -538,8 +526,6 @@ class MainApp(tk.Tk):
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
                 incorrectLoginWindow = MessageWindow(self, incorrectLoginName, incorrectLoginText)
-
-                incorrectLoginWindow.wait_window()
 
                 # Clear username and password entries
                 self.usernameEntry.delete(0, 'end')
@@ -647,7 +633,7 @@ class MainApp(tk.Tk):
         self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
         self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
         self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
-        self.chargePlot.update()
+        self.chargePlot.updatePlot()
 
     def replotDischarge(self):
         # Remove lines every time the figure is plotted
@@ -656,7 +642,7 @@ class MainApp(tk.Tk):
         # Add plots
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
         self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
-        self.dischargePlot.update()
+        self.dischargePlot.updatePlot()
 
     # Retrieves and processes the data for the charging plot in a continuous loop
     def updateChargePlot(self):
@@ -754,8 +740,6 @@ class MainApp(tk.Tk):
         helpName = 'Help'
         helpWindow = MessageWindow(self, helpName, helpText)
 
-        helpWindow.wait_window()
-
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
 
@@ -769,7 +753,7 @@ class CanvasPlot(ttk.Frame):
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
 
-    def update(self):
+    def updatePlot(self):
         #update graph
         self.ax.relim()
         self.ax.autoscale_view()
@@ -812,6 +796,4 @@ class MessageWindow(tk.Toplevel):
 
 if __name__ == "__main__":
     app = MainApp()
-    # center the app
-    app.eval('tk::PlaceWindow . center')
     app.mainloop()
