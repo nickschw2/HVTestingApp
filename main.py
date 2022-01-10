@@ -25,7 +25,7 @@ class MainApp(tk.Tk):
         super().__init__()
         # set theme
         self.tk.call('source', 'Sun-Valley-ttk-theme-master/sun-valley.tcl')
-        self.tk.call('set_theme', 'dark')
+        self.tk.call('set_theme', 'light')
 
         # Change style
         style = ttk.Style(self)
@@ -40,7 +40,7 @@ class MainApp(tk.Tk):
 
         # Row for user inputs on the top
         self.userInputs = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
-        self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=(0, yPaddingFrame))
+        self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=framePadding)
 
         # User input fields along with a button for setting them
         self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
@@ -64,7 +64,7 @@ class MainApp(tk.Tk):
         # Column for labels on the left
         self.grid_columnconfigure(0, w=1)
         self.labels = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
-        self.labels.grid(row=1, column=0)
+        self.labels.grid(row=1, column=0, padx=framePadding)
 
         # Voltage and current are read from both the power supply and the load
         self.voltageLoadText = tk.StringVar()
@@ -91,7 +91,7 @@ class MainApp(tk.Tk):
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
         self.buttons = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
-        self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=(yPaddingFrame, 0))
+        self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=framePadding)
 
         # Button definitions and placement
         self.saveLocationButton = ttk.Button(self.buttons, text='Save Location',
@@ -737,8 +737,7 @@ class MainApp(tk.Tk):
 
     # Popup window for help
     def help(self):
-        helpName = 'Help'
-        helpWindow = MessageWindow(self, helpName, helpText)
+        webbrowser.open(f'{githubSite}/blob/main/README.md')
 
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
