@@ -30,7 +30,8 @@ class MainApp(tk.Tk):
         # Change style
         style = ttk.Style(self)
         style.configure('TButton', **button_opts)
-        style.configure('TCheckbutton', font=('Helvetica', 12))
+        style.configure('TCheckbutton', **text_opts)
+        style.configure('TLabelframe.Label', **text_opts)
 
         # set title
         self.title('HV Capacitor Testing')
@@ -38,8 +39,15 @@ class MainApp(tk.Tk):
         # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
+        self.saveFolderSet = False
+        # Initialize pins to default values
+        self.inputPins = inputPinDefaults
+        self.outputPins = outputPinDefaults
+        self.chargeFraction = tk.DoubleVar()
+        self.chargeFraction.set(0.0)
+
         # Row for user inputs on the top
-        self.userInputs = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
+        self.userInputs = ttk.LabelFrame(self, text='User Inputs', **frame_opts)
         self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=framePadding)
 
         # User input fields along with a button for setting them
@@ -51,7 +59,7 @@ class MainApp(tk.Tk):
         self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
 
-        self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs)
+        self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
 
         self.serialNumberLabel.pack(side='left')
         self.serialNumberEntry.pack(side='left', padx=(0, userInputPadding))
@@ -63,7 +71,7 @@ class MainApp(tk.Tk):
 
         # Column for labels on the left
         self.grid_columnconfigure(0, w=1)
-        self.labels = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
+        self.labels = ttk.LabelFrame(self, text='Capacitor State', **frame_opts)
         self.labels.grid(row=1, column=0, padx=framePadding)
 
         # Voltage and current are read from both the power supply and the load
@@ -80,50 +88,44 @@ class MainApp(tk.Tk):
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
         self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
         self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
+        self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
 
-        self.voltageLoadLabel.pack(pady=labelPadding, padx=labelPadding)
-        self.voltagePSLabel.pack(pady=labelPadding, padx=labelPadding)
-        self.currentLoadLabel.pack(pady=labelPadding, padx=labelPadding)
-        self.currentPSLabel.pack(pady=labelPadding, padx=labelPadding)
-        self.chargeStateLabel.pack(pady=labelPadding, padx=labelPadding)
-        self.countdownLabel.pack(pady=labelPadding, padx=labelPadding)
+        self.voltageLoadLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
+        self.voltagePSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
+        self.currentLoadLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
+        self.currentPSLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
+        self.chargeStateLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
+        self.countdownLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
+        self.progress.grid(column=1, row=0, rowspan=6, pady=labelPadding, padx=labelPadding)
 
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
-        self.buttons = ttk.Frame(self, borderwidth=3, relief='raised', padding=labelPadding)
+        self.buttons = ttk.LabelFrame(self, text='Operate Capacitor', **frame_opts)
         self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=framePadding)
 
         # Button definitions and placement
-        self.saveLocationButton = ttk.Button(self.buttons, text='Save Location',
-                                    command=self.setSaveLocation)
         self.checklistButton = ttk.Button(self.buttons, text='Begin Checklist',
-                                    command=self.checklist)
+                                    command=self.checklist, style='Accent.TButton')
         self.chargeButton = ttk.Button(self.buttons, text='Charge',
-                                    command=self.charge)
+                                    command=self.charge, style='Accent.TButton')
         self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge)
+                                    command=self.discharge, style='Accent.TButton')
         self.emergency_offButton = ttk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off)
+                                    command=self.emergency_off, style='Accent.TButton')
         self.resetButton = ttk.Button(self.buttons, text='Reset',
-                                    command=self.reset)
+                                    command=self.reset, style='Accent.TButton')
 
-        self.saveLocationButton.pack(side='left', padx=buttonPadding)
         self.checklistButton.pack(side='left', padx=buttonPadding)
         self.chargeButton.pack(side='left', padx=buttonPadding)
         self.dischargeButton.pack(side='left', padx=buttonPadding)
         self.emergency_offButton.pack(side='left', padx=buttonPadding)
         self.resetButton.pack(side='left', padx=buttonPadding)
 
-        self.saveFolderSet = False
-        # Initialize pins to default values
-        self.inputPins = inputPinDefaults
-        self.outputPins = outputPinDefaults
-
         # Menubar at the top
         self.menubar = tk.Menu(self)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Open', command=self.readResults)
-        self.filemenu.add_command(label='Save', command=self.setSaveLocation)
+        self.filemenu.add_command(label='Save Folder', command=self.setSaveLocation)
         self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
         self.filemenu.add_separator()
         self.filemenu.add_command(label='Quit', command=self.on_closing)
@@ -259,7 +261,7 @@ class MainApp(tk.Tk):
             print(self.outputPins)
             self.setPinWindow.destroy()
 
-        okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins)
+        okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, style='Accent.TButton')
         okayButton.pack()
 
         self.setPinWindow.wait_window()
@@ -399,7 +401,6 @@ class MainApp(tk.Tk):
     def checklist(self):
         # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
         self.disableButtons()
-        self.saveLocationButton.configure(state='normal')
         self.checklistButton.configure(state='normal')
 
         # Top level window for checklist
@@ -417,7 +418,7 @@ class MainApp(tk.Tk):
             button.grid(row=i, column=0, sticky='w')
 
         # Add okay button to close the window
-        self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete)
+        self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete, style='Accent.TButton')
         self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
     def operateSwitches(self, state):
@@ -443,8 +444,10 @@ class MainApp(tk.Tk):
         chargeConfirmText = 'Are you sure you want to begin charging?'
         chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
 
-        cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy)
+        cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, style='Accent.TButton')
         cancelButton.pack(side='left')
+
+        chargeConfirmWindow.wait_window()
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
@@ -466,8 +469,10 @@ class MainApp(tk.Tk):
             dischargeConfirmText = 'Are you sure you want to discharge?'
             dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
-            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy)
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
             cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
                 self.operateSwitches(False)
@@ -495,7 +500,6 @@ class MainApp(tk.Tk):
         # Disable all buttons except for save and help, if logged in
         self.disableButtons()
         if self.loggedIn:
-            self.saveLocationButton.configure(state='normal')
             self.resetButton.configure(state='normal')
 
         self.discharged = True
@@ -519,7 +523,6 @@ class MainApp(tk.Tk):
             # Once logged in, enable the save location and help buttons
             if self.loggedIn:
                 self.loginWindow.destroy()
-                self.saveLocationButton.configure(state='normal')
 
             # If incorrect username or password, create popup notifying the user
             else:
@@ -547,7 +550,7 @@ class MainApp(tk.Tk):
         self.usernameEntry = ttk.Entry(self.loginWindow, **entry_opts)
         self.passwordLabel = ttk.Label(self.loginWindow, text=password_text, **text_opts)
         self.passwordEntry = ttk.Entry(self.loginWindow, show='*', **entry_opts)
-        self.loginButton = ttk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event))
+        self.loginButton = ttk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), style='Accent.TButton')
 
         # User can press 'Return' key to login instead of loginButton
         self.loginWindow.bind('<Return>', checkLogin)
@@ -604,6 +607,9 @@ class MainApp(tk.Tk):
         self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Voltage"]) / 1000:.2f} kV')
         self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.inputPins["Load Current"]):.2f} A')
         self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Current"]):.2f} A')
+
+        if self.userInputsSet:
+            self.progress['value'] = 100 * self.readSensor(self.inputPins["Power Supply Voltage"]) / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -663,7 +669,7 @@ class MainApp(tk.Tk):
         self.replotCharge()
 
         # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        if voltagePSPoint >= chargeVoltageFraction * self.chargeVoltage * 1000:
+        if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000:
             # Start countdown only once
             if not self.countdownStarted:
                 self.countdownTimeStart = time.time()
@@ -730,10 +736,8 @@ class MainApp(tk.Tk):
         self.resetChargePlot()
         self.resetDischargePlot()
 
-        # Disable all buttons except for save and help, if logged in
+        # Disable all buttons if logged in
         self.disableButtons()
-        if self.loggedIn:
-            self.saveLocationButton.configure(state='normal')
 
     # Popup window for help
     def help(self):
@@ -778,8 +782,8 @@ class MessageWindow(tk.Toplevel):
         self.topFrame = ttk.Frame(self)
         self.bottomFrame = ttk.Frame(self)
 
-        self.topFrame.pack(side='top')
-        self.bottomFrame.pack(side='bottom')
+        self.topFrame.pack(side='top', padx=framePadding, pady=(framePadding, 0))
+        self.bottomFrame.pack(side='bottom', padx=framePadding, pady=framePadding)
 
         # Destroy window and set value of okay button to True
         def OKPress():
@@ -788,7 +792,7 @@ class MessageWindow(tk.Toplevel):
 
         # Create and place message and okay button
         self.message = ttk.Label(self.topFrame, wraplength=topLevelWrapLength, width=topLevelWidth, text=text, **text_opts)
-        self.OKButton = ttk.Button(self.bottomFrame, text='Okay', command=OKPress)
+        self.OKButton = ttk.Button(self.bottomFrame, text='Okay', command=OKPress, style='Accent.TButton')
 
         self.message.pack(fill='both')
         self.OKButton.pack(side='left')

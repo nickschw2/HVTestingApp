@@ -38,11 +38,6 @@ UMDRed = '#e03a3d'
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
-# Styles
-button_opts = {'font':('Helvetica', 18), 'state':'normal'}
-text_opts = {'font':('Helvetica', 18)}
-entry_opts = {'font':('Helvetica', 18), 'background': lightGrey}
-
 # Widget display constants
 userInputWidth = 8
 userInputPadding = 50 #pixels
@@ -54,8 +49,14 @@ framePadding = 20 #pixels
 plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
 topLevelWidth = 30
-topLevelWrapLength = 400
-border_opts = {'highlightbackground': red, 'highlightcolor': red, 'highlightthickness': 3}
+topLevelWrapLength = 275
+progressBarLength = 300
+
+# Styles
+button_opts = {'font':('Helvetica', 12), 'state':'normal'}
+text_opts = {'font':('Helvetica', 12)}
+entry_opts = {'font':('Helvetica', 12), 'background': lightGrey}
+frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 10}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
@@ -78,7 +79,7 @@ powerSupplyVoltage = 20e3 # V
 powerSupplyResistance = 1E4 # Ohm
 capacitorCapacitance = 200e-6 # Farads
 RCTime = powerSupplyResistance * capacitorCapacitance
-chargeVoltageFraction = 0.95
+chargeVoltageLimit = 0.95 # fraction of charge state before capacitor is considered charged
 maxVoltage = {'LBL': 5, 'BLU': 10, 'GRA': 50, '': 'N/A'}
 
 checklist_steps = ['Ensure that power supply is off',
