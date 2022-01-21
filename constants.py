@@ -56,7 +56,7 @@ progressBarLength = 300
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
 entry_opts = {'font':('Helvetica', 12), 'background': lightGrey}
-frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 10}
+frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
