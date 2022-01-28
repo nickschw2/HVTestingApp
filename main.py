@@ -1,12 +1,8 @@
 import tkinter as tk
+import plots
+import messages
 from tkinter import ttk, filedialog
-
-# Import statements for creating plots in tkinter applications
-import matplotlib
-matplotlib.use('TkAgg')
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
-
 import numpy as np
 import pandas as pd
 import time
@@ -14,6 +10,8 @@ import os
 import nidaqmx
 import webbrowser
 from constants import *
+
+# Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
 # Tkinter has quite a high learning curve. If attempting to edit this source code without experience, I highly
 # recommend going through some tutorials. The documentation on tkinter is also quite poor, but
@@ -144,8 +142,8 @@ class MainApp(tk.Tk):
         self.grid_columnconfigure(2, w=1)
 
         # Plot of charge and discharge
-        self.chargePlot = CanvasPlot(self)
-        self.dischargePlot = CanvasPlot(self)
+        self.chargePlot = plots.CanvasPlot(self)
+        self.dischargePlot = plots.CanvasPlot(self)
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
@@ -348,13 +346,13 @@ class MainApp(tk.Tk):
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
-            setUserInputWindow = MessageWindow(self, setUserInputName, setUserInputText)
+            setUserInputWindow = messages.MessageWindow(self, setUserInputName, setUserInputText)
 
         # Pop up window for incorrect user inputs
         except ValueError as err:
             def incorrectUserInput(text):
                 incorrectUserInputName = 'Invalid Input'
-                incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, text)
+                incorrectUserInputWindow = messages.MessageWindow(self, incorrectUserInputName, text)
 
             # Clear the user input fields
             if self.userInputError == 'chargeVoltage':
@@ -442,7 +440,7 @@ class MainApp(tk.Tk):
         # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
         chargeConfirmText = 'Are you sure you want to begin charging?'
-        chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
+        chargeConfirmWindow = messages.MessageWindow(self, chargeConfirmName, chargeConfirmText)
 
         cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, style='Accent.TButton')
         cancelButton.pack(side='left')
@@ -457,9 +455,18 @@ class MainApp(tk.Tk):
             self.beginChargeTime = time.time()
             self.charging = True
 
+            # Try charging
+            try:
+                with nidaqmx.Task() as task:
+                    task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
+                    value = task.read()
+
+            except:
+                print('Cannot connect to NI DAQ')
+
             # Reset the charge plot and begin continuously plotting
             self.resetChargePlot()
-            self.updateChargePlot()
+            self.updateCharge()
             self.chargePress = True
 
     def discharge(self):
@@ -467,7 +474,7 @@ class MainApp(tk.Tk):
             # Popup window to confirm discharge
             dischargeConfirmName = 'Discharge'
             dischargeConfirmText = 'Are you sure you want to discharge?'
-            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+            dischargeConfirmWindow = messages.MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
             cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
             cancelButton.pack(side='left')
@@ -528,7 +535,7 @@ class MainApp(tk.Tk):
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
-                incorrectLoginWindow = MessageWindow(self, incorrectLoginName, incorrectLoginText)
+                incorrectLoginWindow = messages.MessageWindow(self, incorrectLoginName, incorrectLoginText)
 
                 # Clear username and password entries
                 self.usernameEntry.delete(0, 'end')
@@ -651,7 +658,7 @@ class MainApp(tk.Tk):
         self.dischargePlot.updatePlot()
 
     # Retrieves and processes the data for the charging plot in a continuous loop
-    def updateChargePlot(self):
+    def updateCharge(self):
         # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
         voltageLoadPoint = self.readSensor(self.inputPins['Load Voltage'])
@@ -688,7 +695,7 @@ class MainApp(tk.Tk):
 
         # Loop through this function again continuously while charging
         if self.charging == True:
-            self.after(int(1000 / refreshRate), self.updateChargePlot)
+            self.after(int(1000 / refreshRate), self.updateCharge)
 
     def resetChargePlot(self):
         # Set time and voltage to empty array
@@ -742,60 +749,6 @@ class MainApp(tk.Tk):
     # Popup window for help
     def help(self):
         webbrowser.open(f'{githubSite}/blob/main/README.md')
-
-# Class for inserting plots into tkinter frames
-class CanvasPlot(ttk.Frame):
-
-    def __init__(self, master):
-        super().__init__(master)
-        self.master = master
-        self.fig, self.ax = plt.subplots(constrained_layout=True)
-        self.fig.patch.set_facecolor(defaultbg)
-        self.line, = self.ax.plot([],[]) #Create line object on plot
-        # Function calls to insert figure onto canvas
-        self.canvas = FigureCanvasTkAgg(self.fig, self)
-        self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
-
-    def updatePlot(self):
-        #update graph
-        self.ax.relim()
-        self.ax.autoscale_view()
-        self.canvas.draw()
-
-# Class for generating popup windows
-class MessageWindow(tk.Toplevel):
-    def __init__(self, master, name, text):
-        super().__init__(master)
-        # Bring pop up to the center and top
-        master.eval(f'tk::PlaceWindow {str(self)} center')
-        self.attributes('-topmost', True)
-        self.title(name)
-
-        self.maxWidth = 2000
-        self.maxHeight = 2000
-        self.maxsize(self.maxWidth, self.maxHeight)
-
-        # Initialize okay button to False
-        self.OKPress = False
-
-        # Create two frames, one for the text, and the other for buttons on the bottom
-        self.topFrame = ttk.Frame(self)
-        self.bottomFrame = ttk.Frame(self)
-
-        self.topFrame.pack(side='top', padx=framePadding, pady=(framePadding, 0))
-        self.bottomFrame.pack(side='bottom', padx=framePadding, pady=framePadding)
-
-        # Destroy window and set value of okay button to True
-        def OKPress():
-            self.OKPress = True
-            self.destroy()
-
-        # Create and place message and okay button
-        self.message = ttk.Label(self.topFrame, wraplength=topLevelWrapLength, width=topLevelWidth, text=text, **text_opts)
-        self.OKButton = ttk.Button(self.bottomFrame, text='Okay', command=OKPress, style='Accent.TButton')
-
-        self.message.pack(fill='both')
-        self.OKButton.pack(side='left')
 
 if __name__ == "__main__":
     app = MainApp()
