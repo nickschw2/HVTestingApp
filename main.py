@@ -1,15 +1,14 @@
 import tkinter as tk
-import plots
-import messages
 from tkinter import ttk, filedialog
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
 import os
-import nidaqmx
 import webbrowser
 from constants import *
+from plots import *
+from messages import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -31,6 +30,11 @@ class MainApp(tk.Tk):
         style.configure('TCheckbutton', **text_opts)
         style.configure('TLabelframe.Label', **text_opts)
 
+        self.configure_ui()
+        self.init_ui()
+        # self.init_DAQ()
+
+    def configure_ui(self):
         # set title
         self.title('HV Capacitor Testing')
 
@@ -142,8 +146,8 @@ class MainApp(tk.Tk):
         self.grid_columnconfigure(2, w=1)
 
         # Plot of charge and discharge
-        self.chargePlot = plots.CanvasPlot(self)
-        self.dischargePlot = plots.CanvasPlot(self)
+        self.chargePlot = CanvasPlot(self)
+        self.dischargePlot = CanvasPlot(self)
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
@@ -174,32 +178,95 @@ class MainApp(tk.Tk):
         self.chargePlot.grid(row=1, column=1, sticky='ew', padx=plotPadding)
         self.dischargePlot.grid(row=1, column=2, sticky='ew', padx=plotPadding)
 
+    def init_ui(self):
+        # Begin the operation of the program
+        # center the app
+        self.eval('tk::PlaceWindow . center')
 
-        try:
-            # center the app
-            self.eval('tk::PlaceWindow . center')
+        # Reset all fields on startup, including making a connection to NI DAQ
+        self.loggedIn = False
+        self.reset()
 
-            # Reset all fields on startup, including making a connection to NI DAQ
-            self.loggedIn = False
-            self.reset()
+        # On startup, disable buttons until login is correct
+        self.disableButtons()
+        self.validateLogin()
 
-            # On startup, disable buttons until login is correct
-            self.disableButtons()
-            self.validateLogin()
+        # If the user closes out of the application during a wait_window, no extra windows pop up
+        self.update()
 
-            # If the user closes out of the application during a wait_window, no extra windows pop up
-            self.update()
+        # Prompt save location automatically
+        self.setSaveLocation()
 
-            # Prompt save location automatically
-            self.setSaveLocation()
+        # Try setting the pins automatically
+        self.pinSelector()
 
-            # Try setting the pins automatically
-            self.pinSelector()
+        self.safetyLights()
 
-            self.safetyLights()
+    def init_DAQ():
+        voltages = []
+        frequencies = []
+        shifts = []
+        output_states = []
 
-        except Exception as e:
-            print(e)
+        for ch in inputPinDefaults:
+            branch = "Output " + ch
+            voltages.append(
+                self.channel_param_tree.get_param_value(branch, "Voltage RMS")
+            )
+            frequencies.append(
+                self.channel_param_tree.get_param_value(branch, "Frequency")
+            )
+            shifts.append(
+                self.channel_param_tree.get_param_value(branch, "Phase Shift")
+            )
+            output_states.append(
+                self.channel_param_tree.get_param_value(branch, "Toggle Output")
+            )
+
+        self.legend.update_rms_params(
+            sample_rate=self.setting_param_tree.get_param_value(
+                "Reader Config", "Sample Rate"
+            )
+        )
+
+        # When NI instrument is attached
+        if not DEBUG_MODE:
+            # initiate read threads for analog input
+            sample_rate = 10 # Hz
+            sample_size = 1000 # buffer size, need to obtain default value
+            channels = [key in outputPinDefaults]
+            dev_name = sensorName
+            self.read_thread = SignalReader(sample_rate, sample_size, channels, dev_name)
+            self.read_thread.start()
+
+            # initiate writer for analog output
+            # not handled on separate thread b/c not blocking
+
+            self.writer = SignalWriterDAQ(
+                voltages=voltages,
+                frequencies=frequencies,
+                shifts=shifts,
+                output_states=output_states,
+                sample_rate=sample_rate,
+                sample_size=sample_size,
+                channels=[key in inputPinDefaults],
+                dev_name=sensorName
+            )
+            self.writer.create_task()
+
+        # Debugging on computer without NI instrument
+        else:
+            # Use software signal generator and read from that
+            # Plot is displaying the samples and rate at which the real
+            # signal generator would write to the output DAQ
+            self.writer = SignalGeneratorBase(
+                voltages=voltages,
+                frequencies=frequencies,
+                shifts=shifts,
+                output_states=output_states,
+                sample_rate=sample_rate,
+                sample_size=sample_size
+            )
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -346,13 +413,13 @@ class MainApp(tk.Tk):
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
-            setUserInputWindow = messages.MessageWindow(self, setUserInputName, setUserInputText)
+            setUserInputWindow = MessageWindow(self, setUserInputName, setUserInputText)
 
         # Pop up window for incorrect user inputs
         except ValueError as err:
             def incorrectUserInput(text):
                 incorrectUserInputName = 'Invalid Input'
-                incorrectUserInputWindow = messages.MessageWindow(self, incorrectUserInputName, text)
+                incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, text)
 
             # Clear the user input fields
             if self.userInputError == 'chargeVoltage':
@@ -419,19 +486,13 @@ class MainApp(tk.Tk):
         self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete, style='Accent.TButton')
         self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
-    def operateSwitches(self, state):
-        # If false, power supply switch opens and load switch closes
-        # If true, power supply switch closes and load switch opens
+    def operateSwitch(self, switchName, state):
+        # If state is false, power supply switch opens and load switch closes
+        # If state is true, power supply switch closes and load switch opens
         try:
             with nidaqmx.Task() as task:
-                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins["Power Supply Switch"]}')
-                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins["Load Switch"]}')
-                value = task.write([state, state])
-
-                if state:
-                    print('Charge state')
-                else:
-                    print('Discharge state')
+                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins[switchName]}')
+                value = task.write(state)
 
         except:
             print('Cannot operate switches')
@@ -440,7 +501,7 @@ class MainApp(tk.Tk):
         # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
         chargeConfirmText = 'Are you sure you want to begin charging?'
-        chargeConfirmWindow = messages.MessageWindow(self, chargeConfirmName, chargeConfirmText)
+        chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
 
         cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, style='Accent.TButton')
         cancelButton.pack(side='left')
@@ -449,7 +510,10 @@ class MainApp(tk.Tk):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
-            self.operateSwitches(True)
+            # Operate switches
+            self.operateSwitch('Load Switch', True)
+            time.sleep(switchWaitTime)
+            self.operateSwitch('Power Supply Switch', True)
 
             # Begin tracking time
             self.beginChargeTime = time.time()
@@ -474,7 +538,7 @@ class MainApp(tk.Tk):
             # Popup window to confirm discharge
             dischargeConfirmName = 'Discharge'
             dischargeConfirmText = 'Are you sure you want to discharge?'
-            dischargeConfirmWindow = messages.MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
             cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
             cancelButton.pack(side='left')
@@ -482,7 +546,8 @@ class MainApp(tk.Tk):
             dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
-                self.operateSwitches(False)
+                # Close Load switch
+                self.operateSwitch('Load Switch', False)
 
         def saveResults():
             # Read from the load
@@ -535,7 +600,7 @@ class MainApp(tk.Tk):
             else:
                 incorrectLoginName = 'Incorrect Login'
                 incorrectLoginText = 'You have entered either a wrong name or password. Please reenter your credentials or contact nickschw@umd.edu for help'
-                incorrectLoginWindow = messages.MessageWindow(self, incorrectLoginName, incorrectLoginText)
+                incorrectLoginWindow = MessageWindow(self, incorrectLoginName, incorrectLoginText)
 
                 # Clear username and password entries
                 self.usernameEntry.delete(0, 'end')
@@ -572,7 +637,12 @@ class MainApp(tk.Tk):
 
     # Special function for closing the window and program
     def on_closing(self):
-        self.operateSwitches(False)
+        # Open power supply and close load switch
+        self.operateSwitch('Power Supply Switch', False)
+        time.sleep(switchWaitTime)
+        self.operateSwitch('Load Switch', False)
+
+        # Close window
         plt.close('all')
         self.quit()
         self.destroy()
@@ -682,6 +752,9 @@ class MainApp(tk.Tk):
                 self.countdownTimeStart = time.time()
                 self.charged = True
                 self.countdownStarted = True
+
+                # Open power supply switch
+                self.operateSwitch('Power Supply Switch', False)
 
             # Time left before discharge
             self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
