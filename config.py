@@ -1,3 +1,10 @@
+# Test mode for when we're not connected to the National Instruments hardware
+TEST_MODE = False
+powerSupplyVoltage = 20000 # V
+RCTime = 4 # seconds
+period = 4 # seconds
+
+
 # NI DAQ pins
 sensorName = 'PXI1Slot3'
 digitalOutName = 'port0'
@@ -12,9 +19,11 @@ inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
 outputPinOptions = ['line0', 'line1']
 
 # Charging constants
-chargeTime = 60 # seconds
-maxVoltagePowerSupply = 20 # kV
-voltageReferencePowerSupply = 10 # V
+# chargeTime = 60 # seconds
+# maxVoltagePowerSupply = 20 # kV
+# voltageReferencePowerSupply = 10 # V
+chargeTimeLimit = 10 # seconds
+epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']

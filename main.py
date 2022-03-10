@@ -9,6 +9,7 @@ import webbrowser
 from constants import *
 from plots import *
 from messages import *
+from config import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -648,13 +649,7 @@ class MainApp(tk.Tk):
         self.destroy()
 
     def readSensor(self, pin):
-        try:
-            with nidaqmx.Task() as task:
-                task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
-                value = task.read()
-
-        except:
-            print('Cannot connect to NI DAQ')
+        if TEST_MODE:
             if pin == 'ai0':
                 value = np.random.rand() * 1000
             elif pin == 'ai1':
@@ -666,6 +661,15 @@ class MainApp(tk.Tk):
                 value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
             else:
                 value = 'N/A'
+
+        else:
+            try:
+                with nidaqmx.Task() as task:
+                    task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
+                    value = task.read()
+
+            except:
+                print('Cannot connect to NI DAQ')
 
         return value
 
@@ -762,6 +766,26 @@ class MainApp(tk.Tk):
             # Set countdown time to 0 seconds once discharged
             if self.countdownTime <= 0.0:
                 self.discharge()
+
+        # Discharge if the voltage is not increasing
+        # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
+        notCharging = voltagePSPoint <= epsilonDesiredChargeVoltage * self.chargeVoltage and self.timePoint > chargeTimeLimit
+        if notCharging:
+            self.discharge()
+            print('Not charging')
+
+        # Also discharge if charging but not reaching the desired voltage
+        # This is determined by checking for steady state
+        # In the future it would be better to implement a more rigorous statistical test, like the student t
+        steadyState = False
+        window = 20 # number of points at the end of the data set from which to calculate slope
+        nWindows = 10 # number of windows to implement sliding window
+        lengthArray = len(self.chargeTime)
+        slopes, _ = np.array([np.polyfit(self.chargeTime[lengthArray - window - i:lengthArray - i], self.chargeVoltagePS[lengthArray - window - i:lengthArray - i], 1) for i in range(nWindows)]).T # first order linear regression
+        steadyState = np.std(slopes) / np.mean(slopes) < 0.05
+        if steadyState:
+            self.discharge()
+            print('Steady state reached without charging to desired voltage')
 
         # Also update the labels with time
         self.updateLabels()
