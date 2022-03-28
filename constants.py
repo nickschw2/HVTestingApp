@@ -9,24 +9,6 @@ githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
 # Date
 today = datetime.date.today()
 
-# NI DAQ pins
-sensorName = 'PXI1Slot2'
-digitalOutName = 'port0'
-inputPinDefaults = {'Load Voltage': 'ai0',
-'Power Supply Voltage': 'ai1',
-'Load Current': 'ai2',
-'Power Supply Current': 'ai3'}
-outputPinDefaults = {'Charge Control': 'ao0',
-'Power Supply Switch': 'line0',
-'Load Switch': 'line1'}
-inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
-outputPinOptions = ['line0', 'line1']
-
-# Charging constants
-chargeTime = 60 # seconds
-maxVoltagePowerSupply = 20 # kV
-voltageReferencePowerSupply = 10 # V
-
 # Colors
 green = '#2ecc71'
 yellow = '#f1c40f'
@@ -39,10 +21,6 @@ grey = '#636262'
 lightGrey = '#a9a1a1'
 defaultbg = '#f0f0f0'
 UMDRed = '#e03a3d'
-
-# Usernames
-acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
-acceptablePasswords = ['plasma']
 
 # Widget display constants
 userInputWidth = 8
@@ -69,7 +47,6 @@ frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 format = re.compile('.{3}\d{3}')
 
 # Plotting constants
-refreshRate = 10.0 # Hz
 voltageColor = 'blue'
 currentColor = UMDRed
 
@@ -79,14 +56,6 @@ currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$
 currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
 chargeHandles = [voltageLine, voltageDash, currentLine, currentDash]
 dischargeHandles = [voltageLine, currentLine]
-
-# Charging constants
-powerSupplyVoltage = 20e3 # V
-powerSupplyResistance = 1E4 # Ohm
-capacitorCapacitance = 200e-6 # Farads
-RCTime = powerSupplyResistance * capacitorCapacitance
-chargeVoltageLimit = 0.95 # fraction of charge state before capacitor is considered charged
-maxVoltage = {'LBL': 5, 'BLU': 10, 'GRA': 50, '': 'N/A'}
 
 checklist_steps = ['Ensure that power supply is off',
      'Ensure that the charging switch is open']
