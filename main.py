@@ -10,6 +10,7 @@ from constants import *
 from plots import *
 from messages import *
 from config import *
+from scope import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -162,7 +163,6 @@ class MainApp(tk.Tk):
         self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
 
         self.chargePlot.ax.set_xlabel('Time (s)')
-        self.dischargePlot.ax.set_xlabel('Time (s)')
 
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.chargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
@@ -346,7 +346,7 @@ class MainApp(tk.Tk):
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
         self.results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeVoltageLoad, self.chargeCurrentPS,
-            self.chargeCurrentLoad, self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
+            self.chargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in self.results]).T
@@ -371,7 +371,9 @@ class MainApp(tk.Tk):
             self.chargeVoltageLoad = results_df['Charge Voltage Load (V)'].dropna().values
             self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
             self.chargeCurrentLoad = results_df['Charge Current Load (A)'].dropna().values
-            self.dischargeTime = results_df['Discharge Time (s)'].dropna().values
+            self.dischargeTime = results_df['Discharge Time'].dropna().values
+            self.dischargeTime = results_df['Discharge Time Unit'].dropna().values[0]
+            self.dischargeTimeUnit = results_df['Discharge Time (s)'].dropna().values
             self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].dropna().values
             self.dischargeCurrentLoad = results_df['Discharge Current (A)'].dropna().values
 
@@ -553,7 +555,12 @@ class MainApp(tk.Tk):
         def saveResults():
             # Read from the load
             oscilloscopePins = [self.inputPins['Load Voltage'], self.inputPins['Load Current']]
-            self.dischargeTime, self.dischargeVoltageLoad, self.dischargeCurrentLoad = self.readOscilloscope(oscilloscopePins)
+            dischargeScope = ReadWriteScopeChannels(oscilloscopePins)
+            self.dischargeTime = dischargeScope.time
+            delf.dischargeTimeUnit = dischargeScope.tUnit
+            self.dischargeVoltageLoad = dischargeScope.data[self.inputPins['Load Voltage']]
+            self.dischargeCurrentLoad = dischargeScope.data[self.inputPins['Load Current']]
+
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
@@ -725,6 +732,7 @@ class MainApp(tk.Tk):
     def replotDischarge(self):
         # Remove lines every time the figure is plotted
         self.clearFigLines(self.dischargePlot.fig)
+        self.dischargePlot.ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
 
         # Add plots
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')

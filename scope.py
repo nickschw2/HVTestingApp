@@ -4,9 +4,13 @@ import sys
 import pyvisa as visa
 import numpy as np
 
-class ReadWriteScopeChannel():
-    def __init__(self channel):
-        self.channel = channel
+class ReadWriteScopeChannels():
+    def __init__(self, channels):
+        self.channels = channels
+        # turn self.channels into list so it doesnt throw error in trying to loop through
+        if not isinstance(self.channels, list):
+            self.channels = [self.channels]
+
         self.rm = visa.ResourceManager()
         # Get the USB device, e.g. 'USB0::0x1AB1::0x0588::DS1ED141904883'
         self.instruments = self.rm.list_resources()
@@ -17,30 +21,29 @@ class ReadWriteScopeChannel():
         self.scope = rm.open_resource(usb[0], timeout=10000, chunk_size=1024000) # bigger timeout for long mem
 
         try:
-            # Grab the raw data from channel 1
+            # Grab the raw data from channel
             self.scope.write(':STOP')
+            # Autoscale view
+            self.scope.write(':AUT')
 
-            # Get the time and voltage scales and offsets
+            self.sample_rate = self.scope.query(':ACQ:SRAT?')
+
+            # Get the time scales and offsets
             self.timescale = float(self.scope.query(':TIM:SCAL?'))
             self.timeoffset = float(self.scope.query(':TIM:OFFS?'))
-            self.voltscale = float(self.scope.query(f':CHAN{self.channel}:SCAL?'))
-            self.voltoffset = float(self.scope.query(f':CHAN{self.channel}:OFFS?'))
+            self.data = {}
+            for channel in self.channels:
+                self.scope.write(f':WAV:SOUR CHAN{channel}')
+                self.scope.write(':WAV:MODE NORM')
+                self.scope.write(':WAV:FORM ASCii')
+                rawdata = self.scope.query(':WAV:DATA?')
 
-            self.scope.write(f':WAV:SOUR CHAN{self.channel}')
-            self.scope.write(':WAV:MODE NORM')
-            self.scope.write(':WAV:FORM ASCii')
-            rawdata = self.scope.query(':WAV:DATA?')
-
-            # Format string
-            # begins with either a positive or negative number
-            beginIndex = min(rawdata.find('+'), rawdata.find('-'))
-            rawdata = rawdata[beginIndex:]
-            rawdata = rawdata.strip() # remove endline
-            self.data = np.fromstring(rawdata, dtype=float, sep=',')
-
-            data_size = len(data)
-            sample_rate = self.scope.query(':ACQ:SRAT?')
-            print(f'Data size: {data_size} points, Sample rate: {sample_rate/1e6} MHz')
+                # Format string
+                # begins with either a positive or negative number
+                beginIndex = min(rawdata.find('+'), rawdata.find('-'))
+                rawdata = rawdata[beginIndex:]
+                rawdata = rawdata.strip() # remove endline
+                self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
 
             self.scope.close()
 
@@ -55,9 +58,9 @@ class ReadWriteScopeChannel():
         # See if we should use a different time axis
         if (self.time[-1] < 1e-3):
             self.time = self.time * 1e6
-            self.tUnit = 'uS'
+            self.tUnit = 'us'
         elif (self.time[-1] < 1):
             self.time = self.time * 1e3
-            self.tUnit = 'mS'
+            self.tUnit = 'ms'
         else:
-            self.tUnit = 'S'
+            self.tUnit = 's'
