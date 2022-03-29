@@ -525,8 +525,19 @@ class MainApp(tk.Tk):
             # Try charging
             try:
                 with nidaqmx.Task() as task:
-                    task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
-                    value = task.read()
+                    task.ao_channels.add_ao_voltage_chan(f'{sensorName}/{self.outputPins['Power Supply Voltage']}')
+
+                    # Set the sampling rate
+                    # https://nidaqmx-python.readthedocs.io/en/latest/timing.html
+                    sample_rate = 100
+                    seconds_to_acquire = 30
+                    total_samples = sample_rate*seconds_to_acquire
+                    task.timing.cfg_samp_clk_timing(rate=sample_rate, samps_per_chan=total_samples)
+
+                    mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxInputVoltage
+
+                    chargeVoltageTrace = np.linspace(0, mapVoltage, total_samples) # linear charge rate
+                    task.write(chargeVoltageTrace, auto_start=True)
 
             except:
                 print('Cannot connect to NI DAQ')
@@ -571,7 +582,6 @@ class MainApp(tk.Tk):
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
                 popup()
                 saveResults()
-                self.operateSwitches(False)
             else:
                 saveResults()
         else:

@@ -1,6 +1,7 @@
 # Test mode for when we're not connected to the National Instruments hardware
 TEST_MODE = False
-powerSupplyVoltage = 20000 # V
+maxVoltagePowerSupply = 20 # kV
+maxInputVoltage = 10 # V
 RCTime = 4 # seconds
 period = 4 # seconds
 
@@ -12,7 +13,7 @@ inputPinDefaults = {'Load Voltage': 'ai0',
 'Power Supply Voltage': 'ai1',
 'Load Current': 'ai2',
 'Power Supply Current': 'ai3'}
-outputPinDefaults = {'Charge Control': 'ao0',
+outputPinDefaults = {'Power Supply Voltage': 'ao0',
 'Load Switch': 'line0',
 'Power Supply Switch': 'line1'}
 inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
