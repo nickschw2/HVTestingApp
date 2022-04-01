@@ -4,9 +4,12 @@ import sys
 import pyvisa as visa
 import numpy as np
 
-class ReadWriteScopeChannels():
-    def __init__(self, channels):
-        self.channels = channels
+# At  some point, make the change that we dont need to pass the brand name, and get it from IDN
+
+class ReadWriteScope():
+    def __init__(self, brand='Rigol'):
+        self.brand = brand
+        self.data = {}
         # turn self.channels into list so it doesnt throw error in trying to loop through
         if not isinstance(self.channels, list):
             self.channels = [self.channels]
@@ -18,38 +21,31 @@ class ReadWriteScopeChannels():
         if len(usb) != 1:
             print('Bad instrument list', self.instruments)
             sys.exit(-1)
-        self.scope = rm.open_resource(usb[0], timeout=10000, chunk_size=1024000) # bigger timeout for long mem
+        self.inst = rm.open_resource(usb[0], timeout=10000, chunk_size=1024000) # bigger timeout for long mem
 
-        try:
-            # Grab the raw data from channel
-            self.scope.write(':STOP')
-            # Autoscale view
-            self.scope.write(':AUT')
+        # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
+        if self.brand = 'Rigol':
+            # Auto scale everything
+            self.inst.write(':AUT')
 
-            self.sample_rate = self.scope.query(':ACQ:SRAT?')
+            self.sample_rate = float(self.inst.query(':ACQ:SRAT?'))
 
             # Get the time scales and offsets
-            self.timescale = float(self.scope.query(':TIM:SCAL?'))
-            self.timeoffset = float(self.scope.query(':TIM:OFFS?'))
-            self.data = {}
-            for channel in self.channels:
-                self.scope.write(f':WAV:SOUR CHAN{channel}')
-                self.scope.write(':WAV:MODE NORM')
-                self.scope.write(':WAV:FORM ASCii')
-                rawdata = self.scope.query(':WAV:DATA?')
+            self.timescale = float(self.inst.query(':TIM:SCAL?'))
+            self.timeoffset = float(self.inst.query(':TIM:OFFS?'))
 
-                # Format string
-                # begins with either a positive or negative number
-                beginIndex = min(rawdata.find('+'), rawdata.find('-'))
-                rawdata = rawdata[beginIndex:]
-                rawdata = rawdata.strip() # remove endline
-                self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
+        elif self.brand = 'LeCroy':
+            # Autoscale everything
+            self.inst.write('ASET')
 
-            self.scope.close()
+            self.sample_rate = float(self.inst.query('SCLK?').split(' ')[1])
 
-        except visa.errors.VisaIOError as e:
-            self.scope.close()
-            print(e)
+            # Get the time scales and offsets
+            self.timescale = float(self.inst.query('TDIV?').split(' ')[1])
+            self.timeoffset = float(self.inst.query('OFST?').split(' ')[1])
+
+        else:
+            raise Exception('Please provide a valid brand name of the oscilloscope')
 
         # Now, generate a time axis.
         timeBlocks = 5 # number of blocks on screen on time axis
@@ -64,3 +60,28 @@ class ReadWriteScopeChannels():
             self.tUnit = 'ms'
         else:
             self.tUnit = 's'
+
+    # stop reading data and scale
+    def stop(self):
+        # Grab the raw data from channel
+        self.inst.write(':STOP')
+
+    # pull waveform from screen
+    def get_data(self, channel):
+        if self.brand = 'Rigol':
+            self.inst.write(f':WAV:SOUR CHAN{channel}')
+            self.inst.write(':WAV:MODE NORM')
+            self.inst.write(':WAV:FORM ASCii')
+            rawdata = self.inst.query(':WAV:DATA?')
+
+            # Format string
+            # begins with either a positive or negative number
+            beginIndex = min(rawdata.find('+'), rawdata.find('-'))
+            rawdata = rawdata[beginIndex:]
+            rawdata = rawdata.strip() # remove endline
+            self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
+
+        elif self.brand = 'LeCroy':
+            offset = 2e-39
+            multiplier = 1.25e-41
+            self.data[channel] = (numpy.array(self.inst.query_binary_values("C2:WAVEFORM? DAT1")) - offset)/1.25e-41

@@ -32,6 +32,8 @@ class MainApp(tk.Tk):
         style.configure('TCheckbutton', **text_opts)
         style.configure('TLabelframe.Label', **text_opts)
 
+        self.scope = ReadWriteScope(brand='LeCroy')
+
         self.configure_ui()
         self.init_ui()
         # self.init_DAQ()
@@ -660,6 +662,9 @@ class MainApp(tk.Tk):
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
 
+        # Close visa communication with scope
+        self.scope.inst.close()
+
         # Close window
         plt.close('all')
         self.quit()
@@ -667,13 +672,13 @@ class MainApp(tk.Tk):
 
     def readSensor(self, pin):
         if TEST_MODE:
-            if pin == 'ai0':
+            if pin == '1':
                 value = np.random.rand() * 1000
-            elif pin == 'ai1':
+            elif pin == '2':
                 value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-            elif pin == 'ai2':
+            elif pin == '3':
                 value = np.random.rand() / 10
-            elif pin == 'ai3':
+            elif pin == '4':
                 period = 10 # seconds
                 value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
             else:
@@ -681,21 +686,16 @@ class MainApp(tk.Tk):
 
         else:
             try:
-                with nidaqmx.Task() as task:
-                    task.ai_channels.add_ai_voltage_chan(f'{sensorName}/{pin}')
-                    value = task.read()
+                if pin == '2' or pin == '4'
+                    value = np.mean(self.scope.get_data(pin))
+                else:
+
+
 
             except:
                 print('Cannot connect to NI DAQ')
 
         return value
-
-    # Read oscilloscope data based on pins
-    def readOscilloscope(self, pins):
-        time = np.linspace(0, 1)
-        voltageLoad = 1 - np.exp(-time)
-        currentLoad = np.exp(-time)
-        return time, voltageLoad, currentLoad
 
     # The labels for the load and power supply update in real time
     def updateLabels(self):

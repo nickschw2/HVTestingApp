@@ -5,19 +5,18 @@ maxInputVoltage = 10 # V
 RCTime = 4 # seconds
 period = 4 # seconds
 
-
 # NI DAQ pins
 sensorName = 'PXI1Slot3'
 digitalOutName = 'port0'
-inputPinDefaults = {'Load Voltage': 'ai0',
-'Power Supply Voltage': 'ai1',
-'Load Current': 'ai2',
-'Power Supply Current': 'ai3'}
+inputPinDefaults = {'Load Voltage': '1',
+'Power Supply Voltage': '2',
+'Load Current': '3',
+'Power Supply Current': '4'}
 outputPinDefaults = {'Power Supply Voltage': 'ao0',
 'Load Switch': 'line0',
 'Power Supply Switch': 'line1'}
-inputPinOptions = ['ai0', 'ai1', 'ai2', 'ai3']
-outputPinOptions = ['line0', 'line1']
+inputPinOptions = ['1', '2', '3', '4']
+outputPinOptions = ['ao0', 'line0', 'line1']
 
 # Charging constants
 # chargeTime = 60 # seconds
