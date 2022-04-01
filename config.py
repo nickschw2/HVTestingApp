@@ -1,7 +1,16 @@
 # Test mode for when we're not connected to the National Instruments hardware
 TEST_MODE = False
+
+# Power supply constants
 maxVoltagePowerSupply = 20 # kV
-maxInputVoltage = 10 # V
+maxCurrentPowerSupply = 15 # mA
+maxVoltageInput = 10 # V
+
+# Diagnostic hardware
+voltageDivider = 1000 # voltage ratio in:out
+pearsonCoil = 0.1 # V/A
+
+
 RCTime = 4 # seconds
 period = 4 # seconds
 

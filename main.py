@@ -670,15 +670,18 @@ class MainApp(tk.Tk):
         self.quit()
         self.destroy()
 
-    def readSensor(self, pin):
+    def readSensor(self, channel):
+        # return values in volts and amps
+
+        pin = self.inputPins[channel]
         if TEST_MODE:
-            if pin == '1':
+            if channel == 'Load Voltage':
                 value = np.random.rand() * 1000
-            elif pin == '2':
+            elif channel == 'Power Supply Voltage':
                 value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-            elif pin == '3':
+            elif channel == 'Load Current':
                 value = np.random.rand() / 10
-            elif pin == '4':
+            elif channel == 'Power Supply Current':
                 period = 10 # seconds
                 value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
             else:
@@ -686,9 +689,17 @@ class MainApp(tk.Tk):
 
         else:
             try:
-                if pin == '2' or pin == '4'
+                if channel == 'Load Voltage':
+                    value = self.scope.get_data(pin) * voltageDivider
+                elif channel == 'Power Supply Voltage':
                     value = np.mean(self.scope.get_data(pin))
-                else:
+                    value *= maxVoltagePowerSupply / maxInputVoltage
+                elif channel == 'Load Current':
+                    value = self.scope.get_data(pin) / pearsonCoil
+                elif channel == 'Power Supply Current':
+                    value = np.mean(self.scope.get_data(pin))
+                    value *= maxCurrentPowerSupply / maxInputVoltage
+                elif :
 
 
 
@@ -701,13 +712,13 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor(self.inputPins["Load Voltage"]) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Voltage"]) / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor(self.inputPins["Load Current"]):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor(self.inputPins["Power Supply Current"]):.2f} A')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor("Load Voltage"):.2f} kV')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor("Power Supply Voltage") / 1000:.2f} kV')
+        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor("Load Current"):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor("Power Supply Current"):.2f} A')
 
         if self.userInputsSet:
-            self.progress['value'] = 100 * self.readSensor(self.inputPins["Power Supply Voltage"]) / 1000 / self.chargeVoltage
+            self.progress['value'] = 100 * self.readSensor("Power Supply Voltage") / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -753,10 +764,10 @@ class MainApp(tk.Tk):
     def updateCharge(self):
         # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
-        voltageLoadPoint = self.readSensor(self.inputPins['Load Voltage'])
-        voltagePSPoint = self.readSensor(self.inputPins['Power Supply Voltage'])
-        currentLoadPoint = self.readSensor(self.inputPins['Load Current'])
-        currentPSPoint = self.readSensor(self.inputPins['Power Supply Current'])
+        voltageLoadPoint = self.readSensor('Load Voltage')
+        voltagePSPoint = self.readSensor('Power Supply Voltage')
+        currentLoadPoint = self.readSensor('Load Current')
+        currentPSPoint = self.readSensor('Power Supply Current')
 
         self.chargeTime = np.append(self.chargeTime, self.timePoint)
         self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)
