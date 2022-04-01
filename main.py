@@ -498,9 +498,36 @@ class MainApp(tk.Tk):
             with nidaqmx.Task() as task:
                 task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins[switchName]}')
                 value = task.write(state)
+                print(f'{switchName} in {state} state')
 
         except:
             print('Cannot operate switches')
+
+    def PowerSupplyChargeDischarge(self, action='charge'):
+        try:
+            with nidaqmx.Task() as task:
+                task.ao_channels.add_ao_voltage_chan(f'{sensorName}/{self.outputPins['Power Supply Voltage']}')
+
+                # Set the sampling rate
+                # https://nidaqmx-python.readthedocs.io/en/latest/timing.html
+                seconds_to_acquire = seconds_per_kV * self.chargeVoltage
+                total_samples = int(sample_rate*seconds_to_acquire)
+                task.timing.cfg_samp_clk_timing(rate=sample_rate, samps_per_chan=total_samples)
+
+                mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxInputVoltage
+
+                if action == 'charge':
+                    chargeVoltageTrace = np.linspace(0, mapVoltage, total_samples) # linear charge rate
+                elif action == 'discharge':
+                    chargeVoltageTrace = np.linspace(mapVoltage, 0, total_samples) # linear charge rate
+                else:
+                    chargeVoltageTrace = 0
+                    print('Please specify either "charge" or "discharge" for power supply action')
+
+                task.write(chargeVoltageTrace, auto_start=True)
+
+        except:
+            print('Cannot connect to NI DAQ')
 
     def charge(self):
         # Popup window appears to confirm charging
@@ -520,29 +547,12 @@ class MainApp(tk.Tk):
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
 
+            # Actually begin charging power supply
+            self.PowerSupplyChargeDischarge(action='charge')
+
             # Begin tracking time
             self.beginChargeTime = time.time()
             self.charging = True
-
-            # Try charging
-            try:
-                with nidaqmx.Task() as task:
-                    task.ao_channels.add_ao_voltage_chan(f'{sensorName}/{self.outputPins['Power Supply Voltage']}')
-
-                    # Set the sampling rate
-                    # https://nidaqmx-python.readthedocs.io/en/latest/timing.html
-                    sample_rate = 100
-                    seconds_to_acquire = 30
-                    total_samples = sample_rate*seconds_to_acquire
-                    task.timing.cfg_samp_clk_timing(rate=sample_rate, samps_per_chan=total_samples)
-
-                    mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxInputVoltage
-
-                    chargeVoltageTrace = np.linspace(0, mapVoltage, total_samples) # linear charge rate
-                    task.write(chargeVoltageTrace, auto_start=True)
-
-            except:
-                print('Cannot connect to NI DAQ')
 
             # Reset the charge plot and begin continuously plotting
             self.resetChargePlot()
@@ -562,8 +572,13 @@ class MainApp(tk.Tk):
             dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
-                # Close Load switch
-                self.operateSwitch('Load Switch', False)
+                # Operate switches
+                self.operateSwitch('Power Supply Switch', True)
+                time.sleep(switchWaitTime)
+                self.operateSwitch('Load Switch', True)
+
+                # Actually begin discharging power supply
+                self.PowerSupplyChargeDischarge(action='discharge')
 
         def saveResults():
             # Read from the load
@@ -699,10 +714,9 @@ class MainApp(tk.Tk):
                 elif channel == 'Power Supply Current':
                     value = np.mean(self.scope.get_data(pin))
                     value *= maxCurrentPowerSupply / maxInputVoltage
-                elif :
-
-
-
+                else:
+                    value = np.nan
+                    print('Incorrect channel chosen')
             except:
                 print('Cannot connect to NI DAQ')
 
@@ -712,10 +726,10 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {self.readSensor("Load Voltage"):.2f} kV')
+        self.voltageLoadText.set(f'V{loadSuperscript}: {np.mean(self.readSensor("Load Voltage")) / 1000:.2f} kV')
         self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor("Power Supply Voltage") / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {self.readSensor("Load Current"):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor("Power Supply Current"):.2f} A')
+        self.currentLoadText.set(f'I{loadSuperscript}: {np.mean(self.readSensor("Load Current")):.2f} A')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor("Power Supply Current") * 1000:.2f} mA')
 
         if self.userInputsSet:
             self.progress['value'] = 100 * self.readSensor("Power Supply Voltage") / 1000 / self.chargeVoltage

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plot
 import sys
 import pyvisa as visa
 import numpy as np
+from config import *
 
 # At  some point, make the change that we dont need to pass the brand name, and get it from IDN
 
@@ -16,12 +17,13 @@ class ReadWriteScope():
 
         self.rm = visa.ResourceManager()
         # Get the USB device, e.g. 'USB0::0x1AB1::0x0588::DS1ED141904883'
-        self.instruments = self.rm.list_resources()
-        usb = list(filter(lambda x: 'USB' in x, instruments))
-        if len(usb) != 1:
-            print('Bad instrument list', self.instruments)
-            sys.exit(-1)
-        self.inst = rm.open_resource(usb[0], timeout=10000, chunk_size=1024000) # bigger timeout for long mem
+        # self.instruments = self.rm.list_resources()
+        # usb = list(filter(lambda x: 'USB' in x, instruments))
+        # if len(usb) != 1:
+        #     print('Bad instrument list', self.instruments)
+        #     sys.exit(-1)
+        instrumentName = f'GPIB0::{GPIBChannel}::INSTR'
+        self.inst = rm.open_resource(instrumentName, timeout=10000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
 
         # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
         if self.brand = 'Rigol':

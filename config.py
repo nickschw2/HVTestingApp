@@ -5,6 +5,10 @@ TEST_MODE = False
 maxVoltagePowerSupply = 20 # kV
 maxCurrentPowerSupply = 15 # mA
 maxVoltageInput = 10 # V
+sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
+seconds_per_kV = 2 # Time to charge per kV
+
+GPIBChannel = 8
 
 # Diagnostic hardware
 voltageDivider = 1000 # voltage ratio in:out
