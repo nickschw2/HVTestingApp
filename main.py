@@ -6,11 +6,13 @@ import pandas as pd
 import time
 import os
 import webbrowser
+import nidaqmx
 from constants import *
 from plots import *
 from messages import *
 from config import *
 from scope import *
+from ni_daq import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -32,11 +34,9 @@ class MainApp(tk.Tk):
         style.configure('TCheckbutton', **text_opts)
         style.configure('TLabelframe.Label', **text_opts)
 
-        self.scope = ReadWriteScope(brand='LeCroy')
-
         self.configure_ui()
         self.init_ui()
-        # self.init_DAQ()
+        self.init_DAQ()
 
     def configure_ui(self):
         # set title
@@ -47,8 +47,13 @@ class MainApp(tk.Tk):
 
         self.saveFolderSet = False
         # Initialize pins to default values
-        self.inputPins = inputPinDefaults
-        self.outputPins = outputPinDefaults
+        self.scopePins = scopeChannelDefaults
+        self.NIAOPins = NIAODefaults
+        self.NIAIPins = NIAIDefaults
+        self.NIDOPins = NIDODefaults
+
+        self.dischargeTimeUnit = 's' # arbritrarily
+
         self.chargeFraction = tk.DoubleVar()
         self.chargeFraction.set(0.0)
 
@@ -80,25 +85,19 @@ class MainApp(tk.Tk):
         self.labels = ttk.LabelFrame(self, text='Capacitor State', **frame_opts)
         self.labels.grid(row=1, column=0, padx=framePadding)
 
-        # Voltage and current are read from both the power supply and the load
-        self.voltageLoadText = tk.StringVar()
+        # Voltage and current are read from the power supply
         self.voltagePSText = tk.StringVar()
-        self.currentLoadText = tk.StringVar()
         self.currentPSText = tk.StringVar()
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
 
-        self.voltageLoadLabel = ttk.Label(self.labels, textvariable=self.voltageLoadText, **text_opts)
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
-        self.currentLoadLabel = ttk.Label(self.labels, textvariable=self.currentLoadText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
         self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
         self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
         self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
 
-        self.voltageLoadLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
         self.voltagePSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
-        self.currentLoadLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
         self.chargeStateLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
         self.countdownLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
@@ -205,71 +204,15 @@ class MainApp(tk.Tk):
 
         self.safetyLights()
 
-    def init_DAQ():
-        voltages = []
-        frequencies = []
-        shifts = []
-        output_states = []
+    # There are two pieces of hardware important for communication with the test cart
+    # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
+    # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
+    def init_DAQ(self):
+        # We need both an analog input and output
+        self.NI_DAQ = NI_DAQ(dev_name, self.NIAIPins, self.NIAOPins, sample_rate)
 
-        for ch in inputPinDefaults:
-            branch = "Output " + ch
-            voltages.append(
-                self.channel_param_tree.get_param_value(branch, "Voltage RMS")
-            )
-            frequencies.append(
-                self.channel_param_tree.get_param_value(branch, "Frequency")
-            )
-            shifts.append(
-                self.channel_param_tree.get_param_value(branch, "Phase Shift")
-            )
-            output_states.append(
-                self.channel_param_tree.get_param_value(branch, "Toggle Output")
-            )
-
-        self.legend.update_rms_params(
-            sample_rate=self.setting_param_tree.get_param_value(
-                "Reader Config", "Sample Rate"
-            )
-        )
-
-        # When NI instrument is attached
-        if not DEBUG_MODE:
-            # initiate read threads for analog input
-            sample_rate = 10 # Hz
-            sample_size = 1000 # buffer size, need to obtain default value
-            channels = [key in outputPinDefaults]
-            dev_name = sensorName
-            self.read_thread = SignalReader(sample_rate, sample_size, channels, dev_name)
-            self.read_thread.start()
-
-            # initiate writer for analog output
-            # not handled on separate thread b/c not blocking
-
-            self.writer = SignalWriterDAQ(
-                voltages=voltages,
-                frequencies=frequencies,
-                shifts=shifts,
-                output_states=output_states,
-                sample_rate=sample_rate,
-                sample_size=sample_size,
-                channels=[key in inputPinDefaults],
-                dev_name=sensorName
-            )
-            self.writer.create_task()
-
-        # Debugging on computer without NI instrument
-        else:
-            # Use software signal generator and read from that
-            # Plot is displaying the samples and rate at which the real
-            # signal generator would write to the output DAQ
-            self.writer = SignalGeneratorBase(
-                voltages=voltages,
-                frequencies=frequencies,
-                shifts=shifts,
-                output_states=output_states,
-                sample_rate=sample_rate,
-                sample_size=sample_size
-            )
+        # Initialize the scope over ethernet
+        self.scope = Oscilloscope(TCPIPAddress, brand='Rigol')
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -309,8 +252,10 @@ class MainApp(tk.Tk):
 
             return pins
 
-        inputPins = selectPins(inputPinDefaults, inputPinOptions)
-        outputPins = selectPins(outputPinDefaults, outputPinOptions)
+        scopePinsOptions = selectPins(scopeChannelDefaults, scopeChannelOptions)
+        NIAOPinsOptions = selectPins(NIAODefaults, NIAOOptions)
+        NIAIPinsOptions = selectPins(NIAIDefaults, NIAIOptions)
+        NIDOPinsOptions = selectPins(NIDODefaults, NIDOOptions)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -319,14 +264,22 @@ class MainApp(tk.Tk):
 
         # Once the okay button is pressed, assign the pins
         def assignPins():
-            for channel in inputPins:
-                self.inputPins[channel] = inputPins[channel].get()
+            for channel in scopePinsOptions:
+                self.scopePins[channel] = scopePinsOptions[channel].get()
 
-            for channel in outputPins:
-                self.outputPins[channel] = outputPins[channel].get()
+            for channel in NIAOPinsOptions:
+                self.NIAOPins[channel] = NIAOPinsOptions[channel].get()
 
-            print(self.inputPins)
-            print(self.outputPins)
+            for channel in NIAIPinsOptions:
+                self.NIAIPins[channel] = NIAIPinsOptions[channel].get()
+
+            for channel in NIDOPinsOptions:
+                self.NIDOPins[channel] = NIDOPinsOptions[channel].get()
+
+            print(self.scopePins)
+            print(self.NIAOPins)
+            print(self.NIAIPins)
+            print(self.NIDOPins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, style='Accent.TButton')
@@ -347,8 +300,8 @@ class MainApp(tk.Tk):
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
         self.results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
-            self.chargeTime, self.chargeVoltagePS, self.chargeVoltageLoad, self.chargeCurrentPS,
-            self.chargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
+            self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
+            self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in self.results]).T
@@ -370,9 +323,7 @@ class MainApp(tk.Tk):
             self.holdChargeTime = results_df['Hold Charge Time (s)'].dropna().values[0]
             self.chargeTime = results_df['Charge Time (s)'].dropna().values
             self.chargeVoltagePS = results_df['Charge Voltage PS (V)'].dropna().values
-            self.chargeVoltageLoad = results_df['Charge Voltage Load (V)'].dropna().values
             self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
-            self.chargeCurrentLoad = results_df['Charge Current Load (A)'].dropna().values
             self.dischargeTime = results_df['Discharge Time'].dropna().values
             self.dischargeTime = results_df['Discharge Time Unit'].dropna().values[0]
             self.dischargeTimeUnit = results_df['Discharge Time (s)'].dropna().values
@@ -496,38 +447,34 @@ class MainApp(tk.Tk):
         # If state is true, power supply switch closes and load switch opens
         try:
             with nidaqmx.Task() as task:
-                task.do_channels.add_do_chan(f'{sensorName}/{digitalOutName}/{self.outputPins[switchName]}')
+                task.do_channels.add_do_chan(f'{dev_name}/{digitalOutName}/{self.NIDOPins[switchName]}')
                 value = task.write(state)
                 print(f'{switchName} in {state} state')
 
-        except:
+        except Exception as e:
+            print(e)
             print('Cannot operate switches')
 
-    def PowerSupplyChargeDischarge(self, action='charge'):
-        try:
-            with nidaqmx.Task() as task:
-                task.ao_channels.add_ao_voltage_chan(f'{sensorName}/{self.outputPins['Power Supply Voltage']}')
+    # Sends signal from NI analog output to charge or discharge the capacitor
+    def powerSupplyRamp(self, action='discharge'):
+        seconds_to_acquire = seconds_per_kV * self.chargeVoltage
+        total_samples = int(sample_rate*seconds_to_acquire)
 
-                # Set the sampling rate
-                # https://nidaqmx-python.readthedocs.io/en/latest/timing.html
-                seconds_to_acquire = seconds_per_kV * self.chargeVoltage
-                total_samples = int(sample_rate*seconds_to_acquire)
-                task.timing.cfg_samp_clk_timing(rate=sample_rate, samps_per_chan=total_samples)
+        mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput
 
-                mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxInputVoltage
+        if action == 'charge':
+            waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
+        elif action == 'discharge':
+            # Start the ramping down of the power supply at the current voltage
+            startVoltage = self.NI_DAQ.read()[self.NIAIPins['Power Supply Voltage']]
+            waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
+        else:
+            chargeVoltageTrace = 0
+            print('Please specify either "charge" or "discharge" for power supply action')
 
-                if action == 'charge':
-                    chargeVoltageTrace = np.linspace(0, mapVoltage, total_samples) # linear charge rate
-                elif action == 'discharge':
-                    chargeVoltageTrace = np.linspace(mapVoltage, 0, total_samples) # linear charge rate
-                else:
-                    chargeVoltageTrace = 0
-                    print('Please specify either "charge" or "discharge" for power supply action')
-
-                task.write(chargeVoltageTrace, auto_start=True)
-
-        except:
-            print('Cannot connect to NI DAQ')
+        self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
+        self.NI_DAQ.write_waveform(waveform)
+        self.NI_DAQ.start_acquisition()
 
     def charge(self):
         # Popup window appears to confirm charging
@@ -548,7 +495,7 @@ class MainApp(tk.Tk):
             self.operateSwitch('Power Supply Switch', True)
 
             # Actually begin charging power supply
-            self.PowerSupplyChargeDischarge(action='charge')
+            self.powerSupplyRamp(action='charge')
 
             # Begin tracking time
             self.beginChargeTime = time.time()
@@ -578,16 +525,14 @@ class MainApp(tk.Tk):
                 self.operateSwitch('Load Switch', True)
 
                 # Actually begin discharging power supply
-                self.PowerSupplyChargeDischarge(action='discharge')
+                self.powerSupplyRamp(action='discharge')
 
         def saveResults():
             # Read from the load
-            oscilloscopePins = [self.inputPins['Load Voltage'], self.inputPins['Load Current']]
-            dischargeScope = ReadWriteScopeChannels(oscilloscopePins)
-            self.dischargeTime = dischargeScope.time
-            delf.dischargeTimeUnit = dischargeScope.tUnit
-            self.dischargeVoltageLoad = dischargeScope.data[self.inputPins['Load Voltage']]
-            self.dischargeCurrentLoad = dischargeScope.data[self.inputPins['Load Current']]
+            oscilloscopePins = [self.scopePins['Load Voltage'], self.scopePins['Load Current']]
+            self.dischargeTime,self.dischargeTimeUnit  = self.scope.get_time()
+            self.dischargeVoltageLoad = self.scope.data[self.scopePins['Load Voltage']]
+            self.dischargeCurrentLoad = self.scope.data[self.scopePins['Load Current']]
 
 
             # Plot results on the discharge graph and save them
@@ -677,6 +622,9 @@ class MainApp(tk.Tk):
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
 
+        # Stop NI communication
+        self.NI_DAQ.close()
+
         # Close visa communication with scope
         self.scope.inst.close()
 
@@ -685,10 +633,46 @@ class MainApp(tk.Tk):
         self.quit()
         self.destroy()
 
+    def readScope(self, channel):
+        try:
+            pin = self.scopePins[channel]
+            value = self.scope.get_data(pin)
+            if channel == 'Load Voltage':
+                value *= voltageDivider
+            elif channel == 'Load Current':
+                value /= pearsonCoil
+            else:
+                print('Incorrect channel chosen')
+
+        except:
+            value = np.nan
+            print('Not connected to the scope')
+
+
+        return value
+
+    def readNI(self, channel):
+        try:
+            pin = self.NIAIPins[channel]
+            value = self.NI_DAQ.read()[pin]
+            if channel == 'Power Supply Voltage':
+                value *= maxVoltagePowerSupply / maxVoltageInput
+            elif channel == 'Power Supply Current':
+                value *= maxCurrentPowerSupply / maxVoltageInput
+            else:
+                print('Incorrect channel chosen')
+
+        except:
+            value = np.nan
+            print('Not connected to the NI DAQ')
+
+        return value
+
     def readSensor(self, channel):
         # return values in volts and amps
 
-        pin = self.inputPins[channel]
+
+        value = np.nan
         if TEST_MODE:
             if channel == 'Load Voltage':
                 value = np.random.rand() * 1000
@@ -708,17 +692,17 @@ class MainApp(tk.Tk):
                     value = self.scope.get_data(pin) * voltageDivider
                 elif channel == 'Power Supply Voltage':
                     value = np.mean(self.scope.get_data(pin))
-                    value *= maxVoltagePowerSupply / maxInputVoltage
+                    value *= maxVoltagePowerSupply / maxVoltageInput
                 elif channel == 'Load Current':
                     value = self.scope.get_data(pin) / pearsonCoil
                 elif channel == 'Power Supply Current':
                     value = np.mean(self.scope.get_data(pin))
-                    value *= maxCurrentPowerSupply / maxInputVoltage
+                    value *= maxCurrentPowerSupply / maxVoltageInput
                 else:
-                    value = np.nan
                     print('Incorrect channel chosen')
-            except:
-                print('Cannot connect to NI DAQ')
+            except Exception as e:
+                print(e)
+                print('Cannot connect to scope')
 
         return value
 
@@ -726,13 +710,11 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltageLoadText.set(f'V{loadSuperscript}: {np.mean(self.readSensor("Load Voltage")) / 1000:.2f} kV')
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readSensor("Power Supply Voltage") / 1000:.2f} kV')
-        self.currentLoadText.set(f'I{loadSuperscript}: {np.mean(self.readSensor("Load Current")):.2f} A')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readSensor("Power Supply Current") * 1000:.2f} mA')
+        self.voltagePSText.set(f'V{PSSuperscript}: {self.readNI("Power Supply Voltage") / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {self.readNI("Power Supply Current") * 1000:.2f} mA')
 
         if self.userInputsSet:
-            self.progress['value'] = 100 * self.readSensor("Power Supply Voltage") / 1000 / self.chargeVoltage
+            self.progress['value'] = 100 * self.readNI("Power Supply Voltage") / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -758,9 +740,7 @@ class MainApp(tk.Tk):
         self.clearFigLines(self.chargePlot.fig)
 
         # Add plots
-        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltageLoad / 1000, color=voltageColor)
         self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
-        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentLoad, color=currentColor)
         self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
         self.chargePlot.updatePlot()
 
@@ -778,15 +758,11 @@ class MainApp(tk.Tk):
     def updateCharge(self):
         # Retrieve charging data
         self.timePoint = time.time() - self.beginChargeTime
-        voltageLoadPoint = self.readSensor('Load Voltage')
-        voltagePSPoint = self.readSensor('Power Supply Voltage')
-        currentLoadPoint = self.readSensor('Load Current')
-        currentPSPoint = self.readSensor('Power Supply Current')
+        voltagePSPoint = self.readNI('Power Supply Voltage')
+        currentPSPoint = self.readNI('Power Supply Current')
 
         self.chargeTime = np.append(self.chargeTime, self.timePoint)
-        self.chargeVoltageLoad = np.append(self.chargeVoltageLoad, voltageLoadPoint)
         self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
-        self.chargeCurrentLoad = np.append(self.chargeCurrentLoad, currentLoadPoint)
         self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
 
         # Plot the new data
@@ -810,25 +786,25 @@ class MainApp(tk.Tk):
             if self.countdownTime <= 0.0:
                 self.discharge()
 
-        # Discharge if the voltage is not increasing
-        # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
-        notCharging = voltagePSPoint <= epsilonDesiredChargeVoltage * self.chargeVoltage and self.timePoint > chargeTimeLimit
-        if notCharging:
-            self.discharge()
-            print('Not charging')
-
-        # Also discharge if charging but not reaching the desired voltage
-        # This is determined by checking for steady state
-        # In the future it would be better to implement a more rigorous statistical test, like the student t
-        steadyState = False
-        window = 20 # number of points at the end of the data set from which to calculate slope
-        nWindows = 10 # number of windows to implement sliding window
-        lengthArray = len(self.chargeTime)
-        slopes, _ = np.array([np.polyfit(self.chargeTime[lengthArray - window - i:lengthArray - i], self.chargeVoltagePS[lengthArray - window - i:lengthArray - i], 1) for i in range(nWindows)]).T # first order linear regression
-        steadyState = np.std(slopes) / np.mean(slopes) < 0.05
-        if steadyState:
-            self.discharge()
-            print('Steady state reached without charging to desired voltage')
+        # # Discharge if the voltage is not increasing
+        # # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
+        # notCharging = voltagePSPoint <= epsilonDesiredChargeVoltage * self.chargeVoltage and self.timePoint > chargeTimeLimit
+        # if notCharging:
+        #     self.discharge()
+        #     print('Not charging')
+        #
+        # # Also discharge if charging but not reaching the desired voltage
+        # # This is determined by checking for steady state
+        # # In the future it would be better to implement a more rigorous statistical test, like the student t
+        # steadyState = False
+        # window = 20 # number of points at the end of the data set from which to calculate slope
+        # nWindows = 10 # number of windows to implement sliding window
+        # lengthArray = len(self.chargeTime)
+        # slopes, _ = np.array([np.polyfit(self.chargeTime[lengthArray - window - i:lengthArray - i], self.chargeVoltagePS[lengthArray - window - i:lengthArray - i], 1) for i in range(nWindows)]).T # first order linear regression
+        # steadyState = np.std(slopes) / np.mean(slopes) < 0.05
+        # if steadyState:
+        #     self.discharge()
+        #     print('Steady state reached without charging to desired voltage')
 
         # Also update the labels with time
         self.updateLabels()
@@ -840,9 +816,7 @@ class MainApp(tk.Tk):
     def resetChargePlot(self):
         # Set time and voltage to empty array
         self.chargeTime = np.array([])
-        self.chargeVoltageLoad = np.array([])
         self.chargeVoltagePS = np.array([])
-        self.chargeCurrentLoad = np.array([])
         self.chargeCurrentPS = np.array([])
 
         # Also need to reset the twinx axis

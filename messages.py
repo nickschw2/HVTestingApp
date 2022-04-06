@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import ttk
+from constants import *
 
 # Class for generating popup windows
 class MessageWindow(tk.Toplevel):
