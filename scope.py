@@ -18,7 +18,7 @@ class Oscilloscope():
         # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
         if self.brand == 'Rigol':
             # Auto scale everything
-            self.inst.write(':AUT')
+            # self.inst.write(':AUT')
 
             # Get the time scales and offsets
             self.timescale = float(self.inst.query(':TIM:SCAL?'))
@@ -62,14 +62,13 @@ class Oscilloscope():
             multiplier = 1.25e-41
             self.data[channel] = (numpy.array(self.inst.query_binary_values("C2:WAVEFORM? DAT1")) - offset)/1.25e-41
 
+        self.data_size = len(self.data[channel])
         return self.data[channel]
 
-    def get_time(self, channel):
-        data_size = len(self.data[channel])
-
+    def get_time(self):
         # Now, generate a time axis.
         timeBlocks = 5 # number of blocks on screen on time axis
-        self.time = numpy.linspace(self.timeoffset - timeBlocks * self.timescale, self.timeoffset + timeBlocks * self.timescale, num=data_size)
+        self.time = numpy.linspace(self.timeoffset - timeBlocks * self.timescale, self.timeoffset + timeBlocks * self.timescale, num=self.data_size)
 
         # See if we should use a different time axis
         if (self.time[-1] < 1e-3):
@@ -81,4 +80,4 @@ class Oscilloscope():
         else:
             self.tUnit = 's'
 
-        return self.time, self.tUnit
+        return (self.time, self.tUnit)

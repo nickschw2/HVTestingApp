@@ -23,7 +23,7 @@ class NI_DAQ():
         self.ao_channels = ao_channels
         self.sample_rate = sample_rate
 
-        self.data = {ai_chan: np.array([]) for ai_chan in self.ai_channels} # analog input will be stored in this data array
+        self.data = {name: np.array([]) for name in self.ai_channels} # analog input will be stored in this data array
 
         self.tasks = []
 
@@ -41,10 +41,11 @@ class NI_DAQ():
         # * Create two separate DAQmx tasks for the AI and AO
         #   C equivalent - DAQmxCreateTask
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcreatetask/
-        self.h_task_ao = nidaqmx.Task('mixedao')
+        # We need an extra task just for updating the labels that is running constantly
         self.h_task_ai = nidaqmx.Task('mixedai')
-        self.tasks.append(self.h_task_ao)
+        self.h_task_ao = nidaqmx.Task('mixedao')
         self.tasks.append(self.h_task_ai)
+        self.tasks.append(self.h_task_ao)
 
         # * Connect to analog input and output voltage channels on the named device
         #   C equivalent - DAQmxCreateAOVoltageChan
@@ -59,7 +60,24 @@ class NI_DAQ():
         '''
         SET UP ANALOG INPUT
         '''
+        self.configure_for_reading()
+        self._points_to_plot = int(self.sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
 
+        # * Register a callback funtion to be run every N samples
+        self.h_task_ai.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
+
+
+        '''
+        SET UP ANALOG OUTPUT
+        '''
+        # * Do allow sample regeneration: i.e. the buffer contents will play repeatedly (cyclically).
+        # http://zone.ni.com/reference/en-XX/help/370471AE-01/mxcprop/attr1453/
+        # For more on DAQmx write properties: http://zone.ni.com/reference/en-XX/help/370469AG-01/daqmxprop/daqmxwrite/
+        # For a discussion on regeneration mode in the context of analog output tasks see:
+        # https://forums.ni.com/t5/Multifunction-DAQ/Continuous-write-analog-voltage-NI-cDAQ-9178-with-callbacks/td-p/4036271
+        self.h_task_ao.out_stream.regen_mode = RegenerationMode.DONT_ALLOW_REGENERATION
+
+    def configure_for_reading(self):
         # * Configure the sampling rate and the number of samples
         #   ALSO: set source of the clock to be AO clock is where this example differs from basicAOandAI.py
         # ===> SET UP THE SHARED CLOCK: Use the AO sample clock for the AI task <===
@@ -68,42 +86,41 @@ class NI_DAQ():
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
         #   More details at: "help(task.cfg_samp_clk_timing)
         #   https://nidaqmx-python.readthedocs.io/en/latest/constants.html
-        self._points_to_plot = 1
         self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
-                                    source= f'/{self.dev_name}/ao/SampleClock',
-                                    samps_per_chan=self._points_to_plot,
                                     sample_mode=AcquisitionType.CONTINUOUS)
-
-
-
-        # * Register a callback funtion to be run every N samples
-        self.h_task_ai.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read)
-
-
-        '''
-        SET UP ANALOG OUTPUT
-        '''
 
         # * Configure the sampling rate and the number of samples
         #   C equivalent - DAQmxCfgSampClkTiming
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
         #   https://nidaqmx-python.readthedocs.io/en/latest/timing.html
-        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate)
+        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate,
+                                    sample_mode=AcquisitionType.CONTINUOUS)
+
+        # Configures the task to start acquiring or generating samples immediately upon starting the task.
+        self.h_task_ao.triggers.start_trigger.disable_start_trig()
 
 
-        # * Do allow sample regeneration: i.e. the buffer contents will play repeatedly (cyclically).
-        # http://zone.ni.com/reference/en-XX/help/370471AE-01/mxcprop/attr1453/
-        # For more on DAQmx write properties: http://zone.ni.com/reference/en-XX/help/370469AG-01/daqmxprop/daqmxwrite/
-        # For a discussion on regeneration mode in the context of analog output tasks see:
-        # https://forums.ni.com/t5/Multifunction-DAQ/Continuous-write-analog-voltage-NI-cDAQ-9178-with-callbacks/td-p/4036271
-        # self.h_task_ao.out_stream.regen_mode = RegenerationMode.ALLOW_REGENERATION
+    def configure_for_writing(self):
+        # * Configure the sampling rate and the number of samples
+        #   ALSO: set source of the clock to be AO clock is where this example differs from basicAOandAI.py
+        # ===> SET UP THE SHARED CLOCK: Use the AO sample clock for the AI task <===
+        # The supplied sample rate for the AI task is a nominal value. It will in fact use the AO sample clock.
+        #   C equivalent - DAQmxCfgSampClkTiming
+        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
+        #   More details at: "help(task.cfg_samp_clk_timing)
+        #   https://nidaqmx-python.readthedocs.io/en/latest/constants.html
+        self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
+                                    source= f'/{self.dev_name}/ao/SampleClock',
+                                    samps_per_chan=self.num_samples_per_channel,
+                                    sample_mode=AcquisitionType.FINITE)
 
-
-
-        # * Set the size of the output buffer
-        #   C equivalent - DAQmxCfgOutputBuffer
-        #   http://zone.ni.com/reference/en-XX/help/370471AG-01/daqmxcfunc/daqmxcfgoutputbuffer/
-        #self.h_task.cfgOutputBuffer(num_samples_per_channel);
+        # * Configure the sampling rate and the number of samples
+        #   C equivalent - DAQmxCfgSampClkTiming
+        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
+        #   https://nidaqmx-python.readthedocs.io/en/latest/timing.html
+        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate,
+                                    sample_mode=AcquisitionType.FINITE,
+                                    samps_per_chan=self.num_samples_per_channel)
 
         '''
         Set up the triggering
@@ -116,49 +133,69 @@ class NI_DAQ():
 
         # Note that now the AO task must be started before the AI task in order for the synchronisation to work
 
-    def write_waveform(self, waveform):
+
+    def write_waveform(self, waveform, force=False):
+        # Wait until previous task is done, unless being forced to overwrite previous task
+        # if not force:
+        #     self.h_task_ao.wait_until_done()
+
         # pass the waveform to the analog output
-        self.num_samples_per_channel = len(self.waveform)  # The number of samples to be stored in the buffer per channel
+        self.num_samples_per_channel = len(waveform)  # The number of samples to be stored in the buffer per channel
         print(f'Constructed a waveform of length {self.num_samples_per_channel} that will played at {self.sample_rate} samples per second')
+
+        self.configure_for_writing()
 
         # * Write the waveform to the buffer with a 2 second timeout in case it fails
         #   Writes doubles using DAQmxWriteAnalogF64
         #   http://zone.ni.com/reference/en-XX/help/370471AG-01/daqmxcfunc/daqmxwriteanalogf64/
-        self.h_task_ao.write(self.waveform, timeout=2)
+        self.h_task_ao.write(waveform, timeout=2)
 
     def read(self):
-        # Callback function that extracts data
         points = self.h_task_ai.read(number_of_samples_per_channel=self._points_to_plot)
         values = {}
-        for i, ai_chan in enumerate(ai_channels):
-            self.data[ai_chan] = np.append(self.data[ai_chan], points[i])
-            values[ai_chan] = np.mean(points[i])
-        print(self.data)
+        for i, name in enumerate(self.ai_channels):
+            self.data[name] = np.append(self.data[name], points[i])
+            values[name] = np.abs(np.mean(points[i]))
+
         return values
 
+    def read_callback(self, tTask, event_type, num_samples, callback_data):
+        # Callback function that extracts data
+        # This needs to be called for each timeframe to update the value of data
+        self.read()
+        if self.task_complete():
+            print('Done')
+            self.stop_acquisition()
+            self.configure_for_reading()
+            # self.start_acquisition()
+        return 0
+
+    def task_complete(self):
+        return self.h_task_ao.is_task_done()
 
     def start_acquisition(self):
-        if not self._task_created():
-            return
+        for task in self.tasks:
+            if not self._task_created(task):
+                return
 
         self.h_task_ao.start()
         self.h_task_ai.start() # Starting this task triggers the AO task
 
 
     def stop_acquisition(self):
-        if not self._task_created():
-            return
-
-        self.h_task_ai.stop()
-        self.h_task_ao.stop()
+        for task in self.tasks:
+            if not self._task_created(task):
+                continue
+            else:
+                task.stop()
 
     # House-keeping methods follow
-    def _task_created(self):
+    def _task_created(self, task):
         '''
         Return True if a task has been created
         '''
 
-        if isinstance(self.h_task_ao,nidaqmx.task.Task) or isinstance(self.h_task_ai,nidaqmx.task.Task):
+        if isinstance(task, nidaqmx.task.Task):
             return True
         else:
             print('No tasks created: run the set_up_tasks method')
@@ -168,16 +205,3 @@ class NI_DAQ():
         self.stop_acquisition()
         for task in self.tasks:
             task.close()
-
-if __name__ == '__main__':
-    print('\nRunning demo for AOandAI_sharedClock\n\n')
-    MIXED = AOandAI_sharedClock()
-    MIXED.set_up_tasks()
-    # MIXED.setup_plot()
-    MIXED.start_acquisition()
-    input('press return to stop')
-    MIXED.stop_acquisition()
-    MIXED.h_task_ai.close()
-    MIXED.h_task_ao.close()
-    plt.plot(MIXED.data)
-    plt.show()

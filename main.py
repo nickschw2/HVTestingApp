@@ -25,7 +25,7 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         # set theme
-        self.tk.call('source', 'Sun-Valley-ttk-theme-master/sun-valley.tcl')
+        self.tk.call('source', 'Sun-Valley-ttk-theme/sun-valley.tcl')
         self.tk.call('set_theme', 'light')
 
         # Change style
@@ -166,7 +166,7 @@ class MainApp(tk.Tk):
         self.chargePlot.ax.set_xlabel('Time (s)')
 
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        self.chargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+        self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
         self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
 
@@ -201,6 +201,7 @@ class MainApp(tk.Tk):
 
         # Try setting the pins automatically
         self.pinSelector()
+        self.updateLabels()
 
         self.safetyLights()
 
@@ -210,6 +211,7 @@ class MainApp(tk.Tk):
     def init_DAQ(self):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(dev_name, self.NIAIPins, self.NIAOPins, sample_rate)
+        self.NI_DAQ.start_acquisition()
 
         # Initialize the scope over ethernet
         self.scope = Oscilloscope(TCPIPAddress, brand='Rigol')
@@ -456,20 +458,25 @@ class MainApp(tk.Tk):
             print('Cannot operate switches')
 
     # Sends signal from NI analog output to charge or discharge the capacitor
-    def powerSupplyRamp(self, action='discharge'):
-        seconds_to_acquire = seconds_per_kV * self.chargeVoltage
-        total_samples = int(sample_rate*seconds_to_acquire)
+    def powerSupplyRamp(self, action='discharge', force=False):
+        # if not self.NI_DAQ.task_complete() and not force:
+        #     return
 
-        mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput
+        seconds_to_acquire = seconds_per_kV * self.chargeVoltage
+        total_samples = int(sample_rate * seconds_to_acquire)
+
+        mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
 
         if action == 'charge':
             waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
         elif action == 'discharge':
             # Start the ramping down of the power supply at the current voltage
-            startVoltage = self.NI_DAQ.read()[self.NIAIPins['Power Supply Voltage']]
+            # self.NI_DAQ.configure_for_reading()
+            # startVoltage = self.NI_DAQ.read()['Power Supply Voltage']
+            startVoltage = self.chargeVoltagePS[-1] / maxVoltagePowerSupply * maxVoltageInput
             waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
         else:
-            chargeVoltageTrace = 0
+            waveform = 0
             print('Please specify either "charge" or "discharge" for power supply action')
 
         self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
@@ -523,17 +530,14 @@ class MainApp(tk.Tk):
                 self.operateSwitch('Power Supply Switch', True)
                 time.sleep(switchWaitTime)
                 self.operateSwitch('Load Switch', True)
-
-                # Actually begin discharging power supply
-                self.powerSupplyRamp(action='discharge')
+                # Force discharge to occur
+                self.powerSupplyRamp(action='discharge', force=True)
 
         def saveResults():
             # Read from the load
-            oscilloscopePins = [self.scopePins['Load Voltage'], self.scopePins['Load Current']]
-            self.dischargeTime,self.dischargeTimeUnit  = self.scope.get_time()
-            self.dischargeVoltageLoad = self.scope.data[self.scopePins['Load Voltage']]
-            self.dischargeCurrentLoad = self.scope.data[self.scopePins['Load Current']]
-
+            self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage'])
+            self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current'])
+            self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
@@ -653,8 +657,8 @@ class MainApp(tk.Tk):
 
     def readNI(self, channel):
         try:
-            pin = self.NIAIPins[channel]
-            value = self.NI_DAQ.read()[pin]
+            values = self.NI_DAQ.read()
+            value = values[channel]
             if channel == 'Power Supply Voltage':
                 value *= maxVoltagePowerSupply / maxVoltageInput
             elif channel == 'Power Supply Current':
@@ -662,47 +666,10 @@ class MainApp(tk.Tk):
             else:
                 print('Incorrect channel chosen')
 
-        except:
+        except Exception as e:
             value = np.nan
             print('Not connected to the NI DAQ')
-
-        return value
-
-    def readSensor(self, channel):
-        # return values in volts and amps
-
-
-        value = np.nan
-        if TEST_MODE:
-            if channel == 'Load Voltage':
-                value = np.random.rand() * 1000
-            elif channel == 'Power Supply Voltage':
-                value = powerSupplyVoltage * ( 1 -  np.exp( -self.timePoint / RCTime ) )
-            elif channel == 'Load Current':
-                value = np.random.rand() / 10
-            elif channel == 'Power Supply Current':
-                period = 10 # seconds
-                value = np.abs(np.cos(self.timePoint * 2 * np.pi / period))
-            else:
-                value = 'N/A'
-
-        else:
-            try:
-                if channel == 'Load Voltage':
-                    value = self.scope.get_data(pin) * voltageDivider
-                elif channel == 'Power Supply Voltage':
-                    value = np.mean(self.scope.get_data(pin))
-                    value *= maxVoltagePowerSupply / maxVoltageInput
-                elif channel == 'Load Current':
-                    value = self.scope.get_data(pin) / pearsonCoil
-                elif channel == 'Power Supply Current':
-                    value = np.mean(self.scope.get_data(pin))
-                    value *= maxCurrentPowerSupply / maxVoltageInput
-                else:
-                    print('Incorrect channel chosen')
-            except Exception as e:
-                print(e)
-                print('Cannot connect to scope')
+            print(e)
 
         return value
 
@@ -710,11 +677,20 @@ class MainApp(tk.Tk):
     def updateLabels(self):
         loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
         PSSuperscript = '\u1D56\u02E2'
-        self.voltagePSText.set(f'V{PSSuperscript}: {self.readNI("Power Supply Voltage") / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {self.readNI("Power Supply Current") * 1000:.2f} mA')
+        powerSupplyVoltage = np.nan
+        powerSupplyCurrent = np.nan
+        try:
+            voltages = self.NI_DAQ.h_task_ai.read()
+            powerSupplyVoltage = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
+            powerSupplyCurrent = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
+        except:
+            print('Cannot update label (this is okay on startup)')
+
+        self.voltagePSText.set(f'V{PSSuperscript}: {powerSupplyVoltage / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {powerSupplyCurrent * 1000:.2f} mA')
 
         if self.userInputsSet:
-            self.progress['value'] = 100 * self.readNI("Power Supply Voltage") / 1000 / self.chargeVoltage
+            self.progress['value'] = 100 * powerSupplyVoltage / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -726,6 +702,8 @@ class MainApp(tk.Tk):
         else:
             self.chargeStateText.set('Not Charged')
             self.countdownText.set('Countdown: N/A')
+
+        self.after(int(1000 / refreshRate), self.updateLabels)
 
     # Removes all lines from a figure
     def clearFigLines(self, fig):
@@ -769,7 +747,7 @@ class MainApp(tk.Tk):
         self.replotCharge()
 
         # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000:
+        if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
             # Start countdown only once
             if not self.countdownStarted:
                 self.countdownTimeStart = time.time()
@@ -778,6 +756,10 @@ class MainApp(tk.Tk):
 
                 # Open power supply switch
                 self.operateSwitch('Power Supply Switch', False)
+
+
+            # Actually begin discharging power supply
+            self.powerSupplyRamp(action='discharge')
 
             # Time left before discharge
             self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
@@ -806,12 +788,9 @@ class MainApp(tk.Tk):
         #     self.discharge()
         #     print('Steady state reached without charging to desired voltage')
 
-        # Also update the labels with time
-        self.updateLabels()
-
         # Loop through this function again continuously while charging
         if self.charging == True:
-            self.after(int(1000 / refreshRate), self.updateCharge)
+            self.after(int(1000 / sample_rate), self.updateCharge)
 
     def resetChargePlot(self):
         # Set time and voltage to empty array
@@ -851,7 +830,6 @@ class MainApp(tk.Tk):
         self.timePoint = 0
         self.countdownStarted = False
         self.checklist_Checkbuttons = {}
-        self.updateLabels()
 
         # Reset plots
         self.resetChargePlot()

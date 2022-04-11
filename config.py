@@ -2,14 +2,14 @@
 TEST_MODE = False
 
 # Power supply constants
-maxVoltagePowerSupply = 20 # kV
-maxCurrentPowerSupply = 15 # mA
+maxVoltagePowerSupply = 20e3 # V
+maxCurrentPowerSupply = 15e-3 # A
 maxVoltageInput = 10 # V
 sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
-seconds_per_kV = 2 # Time to charge per kV
+seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.168.66'
+TCPIPAddress = '169.254.185.248'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
@@ -37,7 +37,7 @@ period = 4 # seconds
 # voltageReferencePowerSupply = 10 # V
 chargeTimeLimit = 10 # seconds
 epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
-chargeVoltageLimit = 0.99
+chargeVoltageLimit = 0.9 # fraction above which the capacitor will be considered charged to the desired charge
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']

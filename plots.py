@@ -18,8 +18,8 @@ class CanvasPlot(ttk.Frame):
         # self.fig.patch.set_facecolor(defaultbg)
         self.line, = self.ax.plot([],[]) #Create line object on plot
         # Autoscale both axes
-        self.ax.set_autoscalex_on(True)
-        self.ax.set_autoscaley_on(True)
+        # self.ax.set_autoscalex_on(True)
+        # self.ax.set_autoscaley_on(True)
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
