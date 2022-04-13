@@ -9,6 +9,9 @@ githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
 # Date
 today = datetime.date.today()
 
+loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
+PSSuperscript = '\u1D56\u02E2'
+
 # Colors
 green = '#2ecc71'
 yellow = '#f1c40f'

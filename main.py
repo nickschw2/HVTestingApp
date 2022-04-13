@@ -173,6 +173,17 @@ class MainApp(tk.Tk):
         self.chargePlot.ax.set_title('Charge Plot')
         self.dischargePlot.ax.set_title('Discharge Plot')
 
+        # Add lines to charging plot blit animation
+        self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[]) #Create line object on plot
+        self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[]) #Create line object on plot
+        self.timeLimit = 20 # s
+        self.chargePlot.ax.set_xlim(0, self.timeLimit)
+        self.chargeVoltageAxis.set_ylim(0, 1.2)
+        self.chargeCurrentAxis.set_ylim(0, 1)
+
+        # Add two lines and x axis for now
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine])
+
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
         self.dischargePlot.ax.legend(handles=dischargeHandles, loc='lower left')
@@ -201,7 +212,8 @@ class MainApp(tk.Tk):
 
         # Try setting the pins automatically
         self.pinSelector()
-        self.updateLabels()
+        # self.updateLabels()
+        self.updateChargeValues()
 
         self.safetyLights()
 
@@ -459,9 +471,6 @@ class MainApp(tk.Tk):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge', force=False):
-        # if not self.NI_DAQ.task_complete() and not force:
-        #     return
-
         seconds_to_acquire = seconds_per_kV * self.chargeVoltage
         total_samples = int(sample_rate * seconds_to_acquire)
 
@@ -482,6 +491,10 @@ class MainApp(tk.Tk):
         self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
         self.NI_DAQ.write_waveform(waveform)
         self.NI_DAQ.start_acquisition()
+        # if action == 'discharge':
+        #     input('press enter')
+        #     self.NI_DAQ.configure_for_reading()
+        #     self.NI_DAQ.h_task_ai.start()
 
     def charge(self):
         # Popup window appears to confirm charging
@@ -510,7 +523,8 @@ class MainApp(tk.Tk):
 
             # Reset the charge plot and begin continuously plotting
             self.resetChargePlot()
-            self.updateCharge()
+            # self.updateCharge()
+            self.updateChargeValues()
             self.chargePress = True
 
     def discharge(self):
@@ -535,8 +549,8 @@ class MainApp(tk.Tk):
 
         def saveResults():
             # Read from the load
-            self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage'])
-            self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current'])
+            self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+            self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
             self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
 
             # Plot results on the discharge graph and save them
@@ -546,11 +560,13 @@ class MainApp(tk.Tk):
 
         if self.charging:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
+                print(1)
                 popup()
                 saveResults()
             else:
                 saveResults()
         else:
+            print(2)
             popup()
 
         # Disable all buttons except for save and help, if logged in
@@ -673,13 +689,99 @@ class MainApp(tk.Tk):
 
         return value
 
+    def updateChargeValues(self):
+        voltagePSPoint = np.nan
+        currentPSPoint = np.nan
+
+        try:
+            if self.discharged:
+                self.powerSupplyRamp(action='discharge')
+                self.NI_DAQ.h_task_ao.wait_until_done()
+                self.NI_DAQ.stop_acquisition()
+                self.NI_DAQ.configure_for_reading()
+                self.NI_DAQ.h_task_ai.start()
+                self.discharged = False
+
+            # Retrieve charging data
+            # voltagePSPoint = self.readNI('Power Supply Voltage')
+            # currentPSPoint = self.readNI('Power Supply Current')
+            voltages = self.NI_DAQ.h_task_ai.read()
+            voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
+            currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
+
+        except Exception as e:
+            print('Cannot update label (this is okay on startup)')
+            print(e)
+
+        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
+
+        if self.userInputsSet:
+            self.progress['value'] = 100 * voltagePSPoint / 1000 / self.chargeVoltage
+
+        # Logic heirarchy for charge state and countdown text
+        if self.discharged:
+            self.chargeStateText.set('Discharged!')
+            self.countdownText.set(f'Coundown: 0.0 s')
+        elif self.charged:
+            self.chargeStateText.set('Charged')
+            self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
+        else:
+            self.chargeStateText.set('Not Charged')
+            self.countdownText.set('Countdown: N/A')
+
+
+
+        if self.charging:
+            self.timePoint = time.time() - self.beginChargeTime
+
+            self.chargeTime = np.append(self.chargeTime, self.timePoint)
+            self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
+            self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
+
+            # Plot the new data
+            self.replotCharge()
+
+            # Voltage reaches a certain value of chargeVoltage to begin countown clock
+            if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
+                # Start countdown only once
+                if not self.countdownStarted:
+                    self.countdownTimeStart = time.time()
+                    self.charged = True
+                    self.countdownStarted = True
+
+                    # Open power supply switch
+                    self.operateSwitch('Power Supply Switch', False)
+
+                    # Actually begin discharging power supply
+                    time.sleep(0.5) # allow some time for power supply switch to open
+                    self.powerSupplyRamp(action='discharge')
+
+                # Time left before discharge
+                self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
+                self.scope.inst.write(':SING')
+
+                # Set countdown time to 0 seconds once discharged
+                if self.countdownTime <= 0.0:
+                    self.scope.inst.write(':SING') # redundancy
+                    self.discharge()
+
+        self.after(int(1000 / refreshRate), self.updateChargeValues)
+
     # The labels for the load and power supply update in real time
     def updateLabels(self):
-        loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
-        PSSuperscript = '\u1D56\u02E2'
+
         powerSupplyVoltage = np.nan
         powerSupplyCurrent = np.nan
         try:
+            if self.discharged:
+                self.powerSupplyRamp(action='discharge')
+                self.NI_DAQ.h_task_ao.wait_until_done()
+                self.NI_DAQ.stop_acquisition()
+                self.NI_DAQ.configure_for_reading()
+                self.NI_DAQ.h_task_ai.start()
+                self.discharged = False
+
             voltages = self.NI_DAQ.h_task_ai.read()
             powerSupplyVoltage = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             powerSupplyCurrent = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
@@ -714,13 +816,25 @@ class MainApp(tk.Tk):
                     axis.lines[0].remove()
 
     def replotCharge(self):
-        # Remove lines every time the figure is plotted
-        self.clearFigLines(self.chargePlot.fig)
+        if self.charging:
+            self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
+            self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 
-        # Add plots
-        self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
-        self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
-        self.chargePlot.updatePlot()
+            if self.timePoint > self.timeLimit:
+                self.chargePlot.ax.set_xlim(self.timePoint - self.timeLimit, self.timePoint)
+            else:
+                self.chargePlot.ax.set_xlim(0, self.timeLimit)
+
+            self.bm.update()
+
+
+        # # Remove lines every time the figure is plotted
+        # self.clearFigLines(self.chargePlot.fig)
+        #
+        # # Add plots
+        # self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
+        # self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
+        # self.chargePlot.updatePlot()
 
     def replotDischarge(self):
         # Remove lines every time the figure is plotted
@@ -757,15 +871,17 @@ class MainApp(tk.Tk):
                 # Open power supply switch
                 self.operateSwitch('Power Supply Switch', False)
 
-
-            # Actually begin discharging power supply
-            self.powerSupplyRamp(action='discharge')
+                # Actually begin discharging power supply
+                time.sleep(0.5) # allow some time for power supply switch to open
+                self.powerSupplyRamp(action='discharge')
 
             # Time left before discharge
             self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
+            self.scope.inst.write(':SING')
 
             # Set countdown time to 0 seconds once discharged
             if self.countdownTime <= 0.0:
+                self.scope.inst.write(':SING') # redundancy
                 self.discharge()
 
         # # Discharge if the voltage is not increasing
@@ -799,9 +915,10 @@ class MainApp(tk.Tk):
         self.chargeCurrentPS = np.array([])
 
         # Also need to reset the twinx axis
-        self.chargeCurrentAxis.relim()
-        self.chargeCurrentAxis.autoscale_view()
+        # self.chargeCurrentAxis.relim()
+        # self.chargeCurrentAxis.autoscale_view()
 
+        self.timePoint = 0
         self.replotCharge()
 
     def resetDischargePlot(self):
@@ -824,6 +941,7 @@ class MainApp(tk.Tk):
 
         # Reset all boolean variables, time, and checklist
         self.charged = False
+        self.charging = False
         self.chargePress = False
         self.discharged = False
         self.userInputsSet = False

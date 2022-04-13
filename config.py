@@ -9,7 +9,7 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.185.248'
+TCPIPAddress = '169.254.183.132'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
@@ -44,7 +44,7 @@ acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
 # Plotting constants
-refreshRate = 100.0 # Hz
+refreshRate = 10.0 # Hz
 
 # Time between switch operations in seconds
 switchWaitTime = 0.5

@@ -163,11 +163,11 @@ class NI_DAQ():
         # Callback function that extracts data
         # This needs to be called for each timeframe to update the value of data
         self.read()
-        if self.task_complete():
-            print('Done')
-            self.stop_acquisition()
-            self.configure_for_reading()
-            # self.start_acquisition()
+        # if self.task_complete():
+        #     print('Done')
+            # self.stop_acquisition()
+            # self.configure_for_reading()
+            # self.h_task_ai.start()
         return 0
 
     def task_complete(self):
