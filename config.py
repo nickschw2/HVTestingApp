@@ -1,5 +1,5 @@
 # Test mode for when we're not connected to the National Instruments hardware
-TEST_MODE = False
+TEST_MODE = True
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -27,14 +27,10 @@ NIDOOptions = ['line0', 'line1', 'line2', 'line3']
 voltageDivider = 1000 # voltage ratio in:out
 pearsonCoil = 0.01 # V/A
 
-
-RCTime = 4 # seconds
-period = 4 # seconds
+# Testing constants
+RCTime = 0.4 # seconds
 
 # Charging constants
-# chargeTime = 60 # seconds
-# maxVoltagePowerSupply = 20 # kV
-# voltageReferencePowerSupply = 10 # V
 chargeTimeLimit = 10 # seconds
 epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
 chargeVoltageLimit = 0.9 # fraction above which the capacitor will be considered charged to the desired charge
@@ -44,7 +40,7 @@ acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
 # Plotting constants
-refreshRate = 10.0 # Hz
+refreshRate = 200.0 # Hz
 
 # Time between switch operations in seconds
 switchWaitTime = 0.5

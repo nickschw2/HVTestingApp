@@ -36,7 +36,8 @@ class MainApp(tk.Tk):
 
         self.configure_ui()
         self.init_ui()
-        self.init_DAQ()
+        if not TEST_MODE:
+            self.init_DAQ()
 
     def configure_ui(self):
         # set title
@@ -182,7 +183,7 @@ class MainApp(tk.Tk):
         self.chargeCurrentAxis.set_ylim(0, 1)
 
         # Add two lines and x axis for now
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine])
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.chargePlot.ax.xaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
@@ -459,15 +460,16 @@ class MainApp(tk.Tk):
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
         # If state is true, power supply switch closes and load switch opens
-        try:
-            with nidaqmx.Task() as task:
-                task.do_channels.add_do_chan(f'{dev_name}/{digitalOutName}/{self.NIDOPins[switchName]}')
-                value = task.write(state)
-                print(f'{switchName} in {state} state')
+        if not TEST_MODE:
+            try:
+                with nidaqmx.Task() as task:
+                    task.do_channels.add_do_chan(f'{dev_name}/{digitalOutName}/{self.NIDOPins[switchName]}')
+                    value = task.write(state)
+                    print(f'{switchName} in {state} state')
 
-        except Exception as e:
-            print(e)
-            print('Cannot operate switches')
+            except Exception as e:
+                print(e)
+                print('Cannot operate switches')
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge', force=False):
@@ -477,20 +479,21 @@ class MainApp(tk.Tk):
         mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
 
         if action == 'charge':
-            waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
+            self.waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
         elif action == 'discharge':
             # Start the ramping down of the power supply at the current voltage
             # self.NI_DAQ.configure_for_reading()
             # startVoltage = self.NI_DAQ.read()['Power Supply Voltage']
             startVoltage = self.chargeVoltagePS[-1] / maxVoltagePowerSupply * maxVoltageInput
-            waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
+            self.waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
         else:
-            waveform = 0
+            self.waveform = 0
             print('Please specify either "charge" or "discharge" for power supply action')
 
-        self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
-        self.NI_DAQ.write_waveform(waveform)
-        self.NI_DAQ.start_acquisition()
+        if not TEST_MODE:
+            self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
+            self.NI_DAQ.write_waveform(waveform)
+            self.NI_DAQ.start_acquisition()
         # if action == 'discharge':
         #     input('press enter')
         #     self.NI_DAQ.configure_for_reading()
@@ -547,11 +550,16 @@ class MainApp(tk.Tk):
                 # Force discharge to occur
                 self.powerSupplyRamp(action='discharge', force=True)
 
-        def saveResults():
+        def saveDischarge():
             # Read from the load
-            self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-            self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
-            self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+            if not TEST_MODE:
+                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
+                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+            else:
+                self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
+
+
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
@@ -560,13 +568,11 @@ class MainApp(tk.Tk):
 
         if self.charging:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
-                print(1)
                 popup()
-                saveResults()
+                saveDischarge()
             else:
-                saveResults()
+                saveDischarge()
         else:
-            print(2)
             popup()
 
         # Disable all buttons except for save and help, if logged in
@@ -642,11 +648,12 @@ class MainApp(tk.Tk):
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
 
-        # Stop NI communication
-        self.NI_DAQ.close()
+        if not TEST_MODE:
+            # Stop NI communication
+            self.NI_DAQ.close()
 
-        # Close visa communication with scope
-        self.scope.inst.close()
+            # Close visa communication with scope
+            self.scope.inst.close()
 
         # Close window
         plt.close('all')
@@ -689,6 +696,28 @@ class MainApp(tk.Tk):
 
         return value
 
+    def getChargingTestVoltages(self):
+        if hasattr(self, 'waveform') and not self.discharged:
+            voltage = np.abs(self.waveform[0] + (np.random.rand() - 0.5) * 0.01)
+            current = np.random.rand() * 0.01
+            values = [voltage, current]
+
+            # remove the first element so that the next element is acquired on the next iteration
+            self.waveform = self.waveform[1:]
+        else:
+            voltage = np.random.rand() * 0.01
+            current = np.random.rand() * 0.01
+            values = [voltage, current]
+
+        return values
+
+    def getDischargeTestValues(self):
+        time = np.linspace(0, 1, 100)
+        tUnit = 's'
+        voltage = self.chargeVoltage * voltageDivider * np.exp( - time / RCTime)
+        current = pearsonCoil * np.exp( - time / RCTime)
+        return (voltage, current, time, tUnit)
+
     def updateChargeValues(self):
         voltagePSPoint = np.nan
         currentPSPoint = np.nan
@@ -696,16 +725,20 @@ class MainApp(tk.Tk):
         try:
             if self.discharged:
                 self.powerSupplyRamp(action='discharge')
-                self.NI_DAQ.h_task_ao.wait_until_done()
-                self.NI_DAQ.stop_acquisition()
-                self.NI_DAQ.configure_for_reading()
-                self.NI_DAQ.h_task_ai.start()
+                if not TEST_MODE:
+                    self.NI_DAQ.h_task_ao.wait_until_done()
+                    self.NI_DAQ.stop_acquisition()
+                    self.NI_DAQ.configure_for_reading()
+                    self.NI_DAQ.h_task_ai.start()
                 self.discharged = False
 
             # Retrieve charging data
             # voltagePSPoint = self.readNI('Power Supply Voltage')
             # currentPSPoint = self.readNI('Power Supply Current')
-            voltages = self.NI_DAQ.h_task_ai.read()
+            if not TEST_MODE:
+                voltages = self.NI_DAQ.h_task_ai.read()
+            else:
+                voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
 
@@ -729,8 +762,6 @@ class MainApp(tk.Tk):
         else:
             self.chargeStateText.set('Not Charged')
             self.countdownText.set('Countdown: N/A')
-
-
 
         if self.charging:
             self.timePoint = time.time() - self.beginChargeTime
@@ -759,53 +790,35 @@ class MainApp(tk.Tk):
 
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
-                self.scope.inst.write(':SING')
 
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
-                    self.scope.inst.write(':SING') # redundancy
+                    if not TEST_MODE:
+                        self.scope.inst.write(':SING') # set up for single triggering event
+
                     self.discharge()
 
+            # # Discharge if the voltage is not increasing
+            # # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
+            # notCharging = voltagePSPoint <= epsilonDesiredChargeVoltage * self.chargeVoltage and self.timePoint > chargeTimeLimit
+            # if notCharging:
+            #     self.discharge()
+            #     print('Not charging')
+            #
+            # # Also discharge if charging but not reaching the desired voltage
+            # # This is determined by checking for steady state
+            # # In the future it would be better to implement a more rigorous statistical test, like the student t
+            # steadyState = False
+            # window = 20 # number of points at the end of the data set from which to calculate slope
+            # nWindows = 10 # number of windows to implement sliding window
+            # lengthArray = len(self.chargeTime)
+            # slopes, _ = np.array([np.polyfit(self.chargeTime[lengthArray - window - i:lengthArray - i], self.chargeVoltagePS[lengthArray - window - i:lengthArray - i], 1) for i in range(nWindows)]).T # first order linear regression
+            # steadyState = np.std(slopes) / np.mean(slopes) < 0.05
+            # if steadyState:
+            #     self.discharge()
+            #     print('Steady state reached without charging to desired voltage')
+
         self.after(int(1000 / refreshRate), self.updateChargeValues)
-
-    # The labels for the load and power supply update in real time
-    def updateLabels(self):
-
-        powerSupplyVoltage = np.nan
-        powerSupplyCurrent = np.nan
-        try:
-            if self.discharged:
-                self.powerSupplyRamp(action='discharge')
-                self.NI_DAQ.h_task_ao.wait_until_done()
-                self.NI_DAQ.stop_acquisition()
-                self.NI_DAQ.configure_for_reading()
-                self.NI_DAQ.h_task_ai.start()
-                self.discharged = False
-
-            voltages = self.NI_DAQ.h_task_ai.read()
-            powerSupplyVoltage = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            powerSupplyCurrent = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
-        except:
-            print('Cannot update label (this is okay on startup)')
-
-        self.voltagePSText.set(f'V{PSSuperscript}: {powerSupplyVoltage / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {powerSupplyCurrent * 1000:.2f} mA')
-
-        if self.userInputsSet:
-            self.progress['value'] = 100 * powerSupplyVoltage / 1000 / self.chargeVoltage
-
-        # Logic heirarchy for charge state and countdown text
-        if self.discharged:
-            self.chargeStateText.set('Discharged!')
-            self.countdownText.set(f'Coundown: 0.0 s')
-        elif self.charged:
-            self.chargeStateText.set('Charged')
-            self.countdownText.set(f'Coundown: {self.countdownTime:.2f} s')
-        else:
-            self.chargeStateText.set('Not Charged')
-            self.countdownText.set('Countdown: N/A')
-
-        self.after(int(1000 / refreshRate), self.updateLabels)
 
     # Removes all lines from a figure
     def clearFigLines(self, fig):
@@ -845,68 +858,6 @@ class MainApp(tk.Tk):
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
         self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
         self.dischargePlot.updatePlot()
-
-    # Retrieves and processes the data for the charging plot in a continuous loop
-    def updateCharge(self):
-        # Retrieve charging data
-        self.timePoint = time.time() - self.beginChargeTime
-        voltagePSPoint = self.readNI('Power Supply Voltage')
-        currentPSPoint = self.readNI('Power Supply Current')
-
-        self.chargeTime = np.append(self.chargeTime, self.timePoint)
-        self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
-        self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
-
-        # Plot the new data
-        self.replotCharge()
-
-        # Voltage reaches a certain value of chargeVoltage to begin countown clock
-        if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
-            # Start countdown only once
-            if not self.countdownStarted:
-                self.countdownTimeStart = time.time()
-                self.charged = True
-                self.countdownStarted = True
-
-                # Open power supply switch
-                self.operateSwitch('Power Supply Switch', False)
-
-                # Actually begin discharging power supply
-                time.sleep(0.5) # allow some time for power supply switch to open
-                self.powerSupplyRamp(action='discharge')
-
-            # Time left before discharge
-            self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
-            self.scope.inst.write(':SING')
-
-            # Set countdown time to 0 seconds once discharged
-            if self.countdownTime <= 0.0:
-                self.scope.inst.write(':SING') # redundancy
-                self.discharge()
-
-        # # Discharge if the voltage is not increasing
-        # # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
-        # notCharging = voltagePSPoint <= epsilonDesiredChargeVoltage * self.chargeVoltage and self.timePoint > chargeTimeLimit
-        # if notCharging:
-        #     self.discharge()
-        #     print('Not charging')
-        #
-        # # Also discharge if charging but not reaching the desired voltage
-        # # This is determined by checking for steady state
-        # # In the future it would be better to implement a more rigorous statistical test, like the student t
-        # steadyState = False
-        # window = 20 # number of points at the end of the data set from which to calculate slope
-        # nWindows = 10 # number of windows to implement sliding window
-        # lengthArray = len(self.chargeTime)
-        # slopes, _ = np.array([np.polyfit(self.chargeTime[lengthArray - window - i:lengthArray - i], self.chargeVoltagePS[lengthArray - window - i:lengthArray - i], 1) for i in range(nWindows)]).T # first order linear regression
-        # steadyState = np.std(slopes) / np.mean(slopes) < 0.05
-        # if steadyState:
-        #     self.discharge()
-        #     print('Steady state reached without charging to desired voltage')
-
-        # Loop through this function again continuously while charging
-        if self.charging == True:
-            self.after(int(1000 / sample_rate), self.updateCharge)
 
     def resetChargePlot(self):
         # Set time and voltage to empty array
