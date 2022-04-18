@@ -560,7 +560,6 @@ class MainApp(tk.Tk):
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
 
-
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
             self.replotDischarge()
@@ -697,7 +696,7 @@ class MainApp(tk.Tk):
         return value
 
     def getChargingTestVoltages(self):
-        if hasattr(self, 'waveform') and not self.discharged:
+        if hasattr(self, 'waveform') and not self.discharged and len(self.waveform) != 0:
             voltage = np.abs(self.waveform[0] + (np.random.rand() - 0.5) * 0.01)
             current = np.random.rand() * 0.01
             values = [voltage, current]
@@ -793,6 +792,7 @@ class MainApp(tk.Tk):
 
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
+                    self.countdownStarted = False
                     if not TEST_MODE:
                         self.scope.inst.write(':SING') # set up for single triggering event
 
