@@ -36,7 +36,7 @@ class MainApp(tk.Tk):
 
         self.configure_ui()
         self.init_ui()
-        if not TEST_MODE:
+        if not DEBUG_MODE:
             self.init_DAQ()
 
     def configure_ui(self):
@@ -213,7 +213,6 @@ class MainApp(tk.Tk):
 
         # Try setting the pins automatically
         self.pinSelector()
-        # self.updateLabels()
         self.updateChargeValues()
 
         self.safetyLights()
@@ -460,7 +459,7 @@ class MainApp(tk.Tk):
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
         # If state is true, power supply switch closes and load switch opens
-        if not TEST_MODE:
+        if not DEBUG_MODE:
             try:
                 with nidaqmx.Task() as task:
                     task.do_channels.add_do_chan(f'{dev_name}/{digitalOutName}/{self.NIDOPins[switchName]}')
@@ -490,7 +489,7 @@ class MainApp(tk.Tk):
             self.waveform = 0
             print('Please specify either "charge" or "discharge" for power supply action')
 
-        if not TEST_MODE:
+        if not DEBUG_MODE:
             self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
             self.NI_DAQ.write_waveform(waveform)
             self.NI_DAQ.start_acquisition()
@@ -552,12 +551,13 @@ class MainApp(tk.Tk):
 
         def saveDischarge():
             # Read from the load
-            if not TEST_MODE:
+            if not DEBUG_MODE:
                 self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                 self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
                 self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
+
 
 
             # Plot results on the discharge graph and save them
@@ -647,7 +647,7 @@ class MainApp(tk.Tk):
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
 
-        if not TEST_MODE:
+        if not DEBUG_MODE:
             # Stop NI communication
             self.NI_DAQ.close()
 
@@ -724,7 +724,7 @@ class MainApp(tk.Tk):
         try:
             if self.discharged:
                 self.powerSupplyRamp(action='discharge')
-                if not TEST_MODE:
+                if not DEBUG_MODE:
                     self.NI_DAQ.h_task_ao.wait_until_done()
                     self.NI_DAQ.stop_acquisition()
                     self.NI_DAQ.configure_for_reading()
@@ -734,7 +734,7 @@ class MainApp(tk.Tk):
             # Retrieve charging data
             # voltagePSPoint = self.readNI('Power Supply Voltage')
             # currentPSPoint = self.readNI('Power Supply Current')
-            if not TEST_MODE:
+            if not DEBUG_MODE:
                 voltages = self.NI_DAQ.h_task_ai.read()
             else:
                 voltages = self.getChargingTestVoltages()
@@ -793,7 +793,7 @@ class MainApp(tk.Tk):
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
                     self.countdownStarted = False
-                    if not TEST_MODE:
+                    if not DEBUG_MODE:
                         self.scope.inst.write(':SING') # set up for single triggering event
 
                     self.discharge()
@@ -829,16 +829,15 @@ class MainApp(tk.Tk):
                     axis.lines[0].remove()
 
     def replotCharge(self):
-        if self.charging:
-            self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
-            self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
+        self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
+        self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 
-            if self.timePoint > self.timeLimit:
-                self.chargePlot.ax.set_xlim(self.timePoint - self.timeLimit, self.timePoint)
-            else:
-                self.chargePlot.ax.set_xlim(0, self.timeLimit)
+        if self.timePoint > self.timeLimit:
+            self.chargePlot.ax.set_xlim(self.timePoint - self.timeLimit, self.timePoint)
+        else:
+            self.chargePlot.ax.set_xlim(0, self.timeLimit)
 
-            self.bm.update()
+        self.bm.update()
 
 
         # # Remove lines every time the figure is plotted

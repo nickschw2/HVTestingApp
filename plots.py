@@ -56,8 +56,8 @@ class BlitManager:
         if event is not None:
             if event.canvas != cv:
                 raise RuntimeError
-        self._bg = cv.copy_from_bbox(cv.figure.bbox)
-        self._draw_animated()
+            self._bg = cv.copy_from_bbox(cv.figure.bbox)
+            self._draw_animated()
 
     def add_artist(self, art):
         """
