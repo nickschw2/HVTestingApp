@@ -89,20 +89,23 @@ class MainApp(tk.Tk):
         # Voltage and current are read from the power supply
         self.voltagePSText = tk.StringVar()
         self.currentPSText = tk.StringVar()
+        self.capacitorVoltageText = tk.StringVar()
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
+        self.capacitorVoltageLabel = ttk.Label(self.labels, textvariable=self.capacitorVoltageText, **text_opts)
         self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
         self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
         self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
 
-        self.voltagePSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
-        self.currentPSLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
-        self.chargeStateLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
-        self.countdownLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
-        self.progress.grid(column=1, row=0, rowspan=6, pady=labelPadding, padx=labelPadding)
+        self.voltagePSLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
+        self.currentPSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
+        self.capacitorVoltageLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
+        self.chargeStateLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
+        self.countdownLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
+        self.progress.grid(column=1, row=0, rowspan=5, pady=labelPadding, padx=labelPadding)
 
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
@@ -177,13 +180,14 @@ class MainApp(tk.Tk):
         # Add lines to charging plot blit animation
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[]) #Create line object on plot
         self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[]) #Create line object on plot
+        self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[]) #Create line object on plot
         self.timeLimit = 20 # s
         self.chargePlot.ax.set_xlim(0, self.timeLimit)
         self.chargeVoltageAxis.set_ylim(0, 1.2)
         self.chargeCurrentAxis.set_ylim(0, 1)
 
         # Add two lines and x axis for now
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.chargePlot.ax.xaxis])
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
@@ -314,7 +318,7 @@ class MainApp(tk.Tk):
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
         self.results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
-            self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.dischargeTime,
+            self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
             self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
         # Creates a data frame which is easier to save to csv formats
@@ -338,6 +342,7 @@ class MainApp(tk.Tk):
             self.chargeTime = results_df['Charge Time (s)'].dropna().values
             self.chargeVoltagePS = results_df['Charge Voltage PS (V)'].dropna().values
             self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
+            self.capacitorVoltage = results_df['Capacitor Voltage (V)'].dropna().values
             self.dischargeTime = results_df['Discharge Time'].dropna().values
             self.dischargeTime = results_df['Discharge Time Unit'].dropna().values[0]
             self.dischargeTimeUnit = results_df['Discharge Time (s)'].dropna().values
@@ -697,16 +702,18 @@ class MainApp(tk.Tk):
 
     def getChargingTestVoltages(self):
         if hasattr(self, 'waveform') and not self.discharged and len(self.waveform) != 0:
-            voltage = np.abs(self.waveform[0] + (np.random.rand() - 0.5) * 0.01)
-            current = np.random.rand() * 0.01
-            values = [voltage, current]
+            powerSupplyVoltage = np.abs(self.waveform[0] + (np.random.rand() - 0.5) * 0.01)
+            capacitorVoltage = np.abs(self.waveform[0] + (np.random.rand() - 0.5) * 0.01)
+            powerSupplyCurrent = np.random.rand() * 0.01
+            values = [powerSupplyVoltage, powerSupplyCurrent, capacitorVoltage]
 
             # remove the first element so that the next element is acquired on the next iteration
             self.waveform = self.waveform[1:]
         else:
-            voltage = np.random.rand() * 0.01
-            current = np.random.rand() * 0.01
-            values = [voltage, current]
+            powerSupplyVoltage = np.random.rand() * 0.01
+            powerSupplyCurrent = np.random.rand() * 0.01
+            capacitorVoltage = np.random.rand() * 0.01
+            values = [powerSupplyVoltage, powerSupplyCurrent, capacitorVoltage]
 
         return values
 
@@ -720,6 +727,7 @@ class MainApp(tk.Tk):
     def updateChargeValues(self):
         voltagePSPoint = np.nan
         currentPSPoint = np.nan
+        capacitorVoltagePoint = np.nan
 
         try:
             if self.discharged:
@@ -740,6 +748,7 @@ class MainApp(tk.Tk):
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
+            capacitorVoltagePoint = voltages[2] * voltageDivider
 
         except Exception as e:
             print('Cannot update label (this is okay on startup)')
@@ -747,6 +756,7 @@ class MainApp(tk.Tk):
 
         self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
         self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
+        self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {capacitorVoltagePoint / 1000:.2f} kV')
 
         if self.userInputsSet:
             self.progress['value'] = 100 * voltagePSPoint / 1000 / self.chargeVoltage
@@ -768,12 +778,13 @@ class MainApp(tk.Tk):
             self.chargeTime = np.append(self.chargeTime, self.timePoint)
             self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
             self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
+            self.capacitorVoltage = np.append(self.capacitorVoltage, capacitorVoltagePoint)
 
             # Plot the new data
             self.replotCharge()
 
             # Voltage reaches a certain value of chargeVoltage to begin countown clock
-            if voltagePSPoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
+            if capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
                 # Start countdown only once
                 if not self.countdownStarted:
                     self.countdownTimeStart = time.time()
@@ -831,6 +842,7 @@ class MainApp(tk.Tk):
     def replotCharge(self):
         self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
+        self.capacitorVoltageLine.set_data(self.chargeTime, self.capacitorVoltage / 1000)
 
         if self.timePoint > self.timeLimit:
             self.chargePlot.ax.set_xlim(self.timePoint - self.timeLimit, self.timePoint)
@@ -863,6 +875,7 @@ class MainApp(tk.Tk):
         self.chargeTime = np.array([])
         self.chargeVoltagePS = np.array([])
         self.chargeCurrentPS = np.array([])
+        self.capacitorVoltage = np.array([])
 
         # Also need to reset the twinx axis
         # self.chargeCurrentAxis.relim()
@@ -895,7 +908,6 @@ class MainApp(tk.Tk):
         self.chargePress = False
         self.discharged = False
         self.userInputsSet = False
-        self.timePoint = 0
         self.countdownStarted = False
         self.checklist_Checkbuttons = {}
 

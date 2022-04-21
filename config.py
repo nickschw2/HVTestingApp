@@ -17,7 +17,9 @@ scopeChannelOptions = ['1', '2', '3', '4']
 dev_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
 NIAODefaults = {'Power Supply Output': 'ao0'} # analog outputs
-NIAIDefaults = {'Power Supply Voltage': 'ai0', 'Power Supply Current': 'ai1'} # analog inputs
+NIAIDefaults = {'Power Supply Voltage': 'ai0',
+    'Power Supply Current': 'ai1',
+    'Capacitor Voltage': 'ai2'} # analog inputs
 NIDODefaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1'}
 NIAOOptions = ['ao0', 'ao1']
 NIAIOptions = ['ai0', 'ai1', 'ai2', 'ai3']
@@ -33,7 +35,7 @@ RCTime = 0.4 # seconds
 # Charging constants
 chargeTimeLimit = 10 # seconds
 epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
-chargeVoltageLimit = 0.9 # fraction above which the capacitor will be considered charged to the desired charge
+chargeVoltageLimit = 0.3 # fraction above which the capacitor will be considered charged to the desired charge
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']

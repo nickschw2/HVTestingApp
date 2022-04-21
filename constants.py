@@ -11,6 +11,7 @@ today = datetime.date.today()
 
 loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
 PSSuperscript = '\u1D56\u02E2'
+CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
 
 # Colors
 green = '#2ecc71'
@@ -77,5 +78,5 @@ checklist_steps = ['Ensure that power supply is off',
 
 # Saving results
 columns = ['Serial Number', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
-    'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Current PS (A)', 'Discharge Time',
+    'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Current PS (A)', 'Capacitor Voltage (V)', 'Discharge Time',
     'Discharge Time Unit', 'Discharge Voltage (V)', 'Discharge Current (A)']
