@@ -60,90 +60,26 @@ class NI_DAQ():
         '''
         SET UP ANALOG INPUT
         '''
-        self.configure_for_reading()
         self._points_to_plot = int(self.sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
+        self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
+                                    sample_mode=AcquisitionType.CONTINUOUS,
+                                    samps_per_chan=self._points_to_plot)
 
-        # * Register a callback funtion to be run every N samples
+        # * Register a callback funtion to be run every N samples and when the AO task is done
         self.h_task_ai.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
+        self.h_task_ao.register_done_event(self.done_callback)
 
-
-        '''
-        SET UP ANALOG OUTPUT
-        '''
-        # * Do allow sample regeneration: i.e. the buffer contents will play repeatedly (cyclically).
-        # http://zone.ni.com/reference/en-XX/help/370471AE-01/mxcprop/attr1453/
-        # For more on DAQmx write properties: http://zone.ni.com/reference/en-XX/help/370469AG-01/daqmxprop/daqmxwrite/
-        # For a discussion on regeneration mode in the context of analog output tasks see:
-        # https://forums.ni.com/t5/Multifunction-DAQ/Continuous-write-analog-voltage-NI-cDAQ-9178-with-callbacks/td-p/4036271
-        self.h_task_ao.out_stream.regen_mode = RegenerationMode.DONT_ALLOW_REGENERATION
-
-    def configure_for_reading(self):
-        # * Configure the sampling rate and the number of samples
-        #   ALSO: set source of the clock to be AO clock is where this example differs from basicAOandAI.py
-        # ===> SET UP THE SHARED CLOCK: Use the AO sample clock for the AI task <===
-        # The supplied sample rate for the AI task is a nominal value. It will in fact use the AO sample clock.
-        #   C equivalent - DAQmxCfgSampClkTiming
-        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
-        #   More details at: "help(task.cfg_samp_clk_timing)
-        #   https://nidaqmx-python.readthedocs.io/en/latest/constants.html
-        self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
-                                    sample_mode=AcquisitionType.CONTINUOUS)
-
-        # * Configure the sampling rate and the number of samples
-        #   C equivalent - DAQmxCfgSampClkTiming
-        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
-        #   https://nidaqmx-python.readthedocs.io/en/latest/timing.html
-        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate,
-                                    sample_mode=AcquisitionType.CONTINUOUS)
-
-        # Configures the task to start acquiring or generating samples immediately upon starting the task.
-        self.h_task_ao.triggers.start_trigger.disable_start_trig()
-
-
-    def configure_for_writing(self):
-        # * Configure the sampling rate and the number of samples
-        #   ALSO: set source of the clock to be AO clock is where this example differs from basicAOandAI.py
-        # ===> SET UP THE SHARED CLOCK: Use the AO sample clock for the AI task <===
-        # The supplied sample rate for the AI task is a nominal value. It will in fact use the AO sample clock.
-        #   C equivalent - DAQmxCfgSampClkTiming
-        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
-        #   More details at: "help(task.cfg_samp_clk_timing)
-        #   https://nidaqmx-python.readthedocs.io/en/latest/constants.html
-        self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
-                                    source= f'/{self.dev_name}/ao/SampleClock',
-                                    samps_per_chan=self.num_samples_per_channel,
-                                    sample_mode=AcquisitionType.FINITE)
-
-        # * Configure the sampling rate and the number of samples
-        #   C equivalent - DAQmxCfgSampClkTiming
-        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgsampclktiming/
-        #   https://nidaqmx-python.readthedocs.io/en/latest/timing.html
-        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate,
-                                    sample_mode=AcquisitionType.FINITE,
-                                    samps_per_chan=self.num_samples_per_channel)
-
-        '''
-        Set up the triggering
-        '''
-        # The AO task should start as soon as the AI task starts.
-        #   More details at: "help dabs.ni.daqmx.Task.cfgDigEdgeStartTrig"
-        #   DAQmxCfgDigEdgeStartTrig
-        #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcfgdigedgestarttrig/
-        self.h_task_ao.triggers.start_trigger.cfg_dig_edge_start_trig( f'/{self.dev_name}/ai/StartTrigger' )
-
-        # Note that now the AO task must be started before the AI task in order for the synchronisation to work
-
-
-    def write_waveform(self, waveform, force=False):
-        # Wait until previous task is done, unless being forced to overwrite previous task
-        # if not force:
-        #     self.h_task_ao.wait_until_done()
+    def write_waveform(self, waveform):
+        self.waveform = waveform
 
         # pass the waveform to the analog output
         self.num_samples_per_channel = len(waveform)  # The number of samples to be stored in the buffer per channel
         print(f'Constructed a waveform of length {self.num_samples_per_channel} that will played at {self.sample_rate} samples per second')
 
-        self.configure_for_writing()
+        # * Configure the sampling rate and the number of samples to write a finite sequence of data
+        self.h_task_ao.timing.cfg_samp_clk_timing(rate = self.sample_rate,
+                                    sample_mode=AcquisitionType.FINITE,
+                                    samps_per_chan=self.num_samples_per_channel)
 
         # * Write the waveform to the buffer with a 2 second timeout in case it fails
         #   Writes doubles using DAQmxWriteAnalogF64
@@ -160,14 +96,22 @@ class NI_DAQ():
         return values
 
     def read_callback(self, tTask, event_type, num_samples, callback_data):
-        # Callback function that extracts data
-        # This needs to be called for each timeframe to update the value of data
         self.read()
-        # if self.task_complete():
-        #     print('Done')
-            # self.stop_acquisition()
-            # self.configure_for_reading()
-            # self.h_task_ai.start()
+        return 0
+
+    def done_callback(self, task_handle, status, callback_data):
+        # Stop the task to edit the timing properties
+        self.h_task_ao.stop()
+
+        # Make sure that the AO task is setup to write a single value and remain a constant
+        self.h_task_ao.timing.samp_timing_type = nidaqmx.constants.SampleTimingType.ON_DEMAND
+
+        # Restart the task before writing
+        self.h_task_ao.start()
+
+        # Write the last value in the waveform
+        self.h_task_ao.write(self.waveform[-1])
+
         return 0
 
     def task_complete(self):

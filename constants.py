@@ -54,11 +54,10 @@ format = re.compile('.{3}\d{3}')
 voltageColor = 'blue'
 currentColor = UMDRed
 
-voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{load}$')
-voltageDash = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{PS}$')
-currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{load}$')
-currentDash = mlines.Line2D([], [], color=currentColor, linestyle='--', label='I$_{PS}$')
-chargeHandles = [voltageLine, voltageDash, currentLine, currentDash]
+voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{PS}$')
+currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{PS}$')
+capacitorLine = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{cap}$')
+chargeHandles = [voltageLine, currentLine, capacitorLine]
 dischargeHandles = [voltageLine, currentLine]
 
 checklist_steps = ['Ensure that power supply is off',

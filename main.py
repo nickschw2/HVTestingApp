@@ -178,9 +178,9 @@ class MainApp(tk.Tk):
         self.dischargePlot.ax.set_title('Discharge Plot')
 
         # Add lines to charging plot blit animation
-        self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[]) #Create line object on plot
-        self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[]) #Create line object on plot
-        self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[]) #Create line object on plot
+        self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
+        self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
+        self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
         self.timeLimit = 20 # s
         self.chargePlot.ax.set_xlim(0, self.timeLimit)
         self.chargeVoltageAxis.set_ylim(0, 1.2)
@@ -476,7 +476,7 @@ class MainApp(tk.Tk):
                 print('Cannot operate switches')
 
     # Sends signal from NI analog output to charge or discharge the capacitor
-    def powerSupplyRamp(self, action='discharge', force=False):
+    def powerSupplyRamp(self, action='discharge'):
         seconds_to_acquire = seconds_per_kV * self.chargeVoltage
         total_samples = int(sample_rate * seconds_to_acquire)
 
@@ -486,7 +486,7 @@ class MainApp(tk.Tk):
             self.waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
         elif action == 'discharge':
             # Start the ramping down of the power supply at the current voltage
-            # self.NI_DAQ.configure_for_reading()
+            # self.NI_DAQ.configure_for_continuous()
             # startVoltage = self.NI_DAQ.read()['Power Supply Voltage']
             startVoltage = self.chargeVoltagePS[-1] / maxVoltagePowerSupply * maxVoltageInput
             self.waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
@@ -496,11 +496,11 @@ class MainApp(tk.Tk):
 
         if not DEBUG_MODE:
             self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
-            self.NI_DAQ.write_waveform(waveform)
+            self.NI_DAQ.write_waveform(self.waveform)
             self.NI_DAQ.start_acquisition()
         # if action == 'discharge':
         #     input('press enter')
-        #     self.NI_DAQ.configure_for_reading()
+        #     self.NI_DAQ.configure_for_continuous()
         #     self.NI_DAQ.h_task_ai.start()
 
     def charge(self):
@@ -551,8 +551,9 @@ class MainApp(tk.Tk):
                 self.operateSwitch('Power Supply Switch', True)
                 time.sleep(switchWaitTime)
                 self.operateSwitch('Load Switch', True)
+
                 # Force discharge to occur
-                self.powerSupplyRamp(action='discharge', force=True)
+                self.powerSupplyRamp(action='discharge')
 
         def saveDischarge():
             # Read from the load
@@ -562,8 +563,6 @@ class MainApp(tk.Tk):
                 self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
-
-
 
             # Plot results on the discharge graph and save them
             # The only time results are saved is when there is a discharge that is preceded by charge
@@ -729,37 +728,33 @@ class MainApp(tk.Tk):
         currentPSPoint = np.nan
         capacitorVoltagePoint = np.nan
 
-        try:
-            if self.discharged:
-                self.powerSupplyRamp(action='discharge')
-                if not DEBUG_MODE:
-                    self.NI_DAQ.h_task_ao.wait_until_done()
-                    self.NI_DAQ.stop_acquisition()
-                    self.NI_DAQ.configure_for_reading()
-                    self.NI_DAQ.h_task_ai.start()
-                self.discharged = False
-
-            # Retrieve charging data
-            # voltagePSPoint = self.readNI('Power Supply Voltage')
-            # currentPSPoint = self.readNI('Power Supply Current')
+        # try:
+        # not applicable on startup
+        if hasattr(self, 'NI_DAQ'):
             if not DEBUG_MODE:
                 voltages = self.NI_DAQ.h_task_ai.read()
+                # Retrieve charging data
+                # voltagePSPoint = self.readNI('Power Supply Voltage')
+                # currentPSPoint = self.readNI('Power Supply Current')
             else:
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
             capacitorVoltagePoint = voltages[2] * voltageDivider
 
-        except Exception as e:
-            print('Cannot update label (this is okay on startup)')
-            print(e)
+        # except Exception as e:
+        #     print('Cannot update label (this is okay on startup)')
+        #     # print(e)
+        #     type, value, traceback = sys.exc_info()
+        #     print(traceback)
+
 
         self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
         self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
         self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {capacitorVoltagePoint / 1000:.2f} kV')
 
         if self.userInputsSet:
-            self.progress['value'] = 100 * voltagePSPoint / 1000 / self.chargeVoltage
+            self.progress['value'] = 100 * capacitorVoltagePoint / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:

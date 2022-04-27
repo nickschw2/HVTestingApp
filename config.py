@@ -1,5 +1,5 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -9,7 +9,7 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.183.132'
+TCPIPAddress = '169.254.116.0'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
@@ -35,7 +35,7 @@ RCTime = 0.4 # seconds
 # Charging constants
 chargeTimeLimit = 10 # seconds
 epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
-chargeVoltageLimit = 0.3 # fraction above which the capacitor will be considered charged to the desired charge
+chargeVoltageLimit = 0.95 # fraction above which the capacitor will be considered charged to the desired charge
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
