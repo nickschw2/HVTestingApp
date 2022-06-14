@@ -7,6 +7,7 @@ import time
 import os
 import webbrowser
 import nidaqmx
+import scipy.optimize
 from constants import *
 from plots import *
 from messages import *
@@ -66,10 +67,12 @@ class MainApp(tk.Tk):
         self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
         self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
         self.holdChargeTimeLabel = ttk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
+        self.capacitanceLabel = ttk.Label(self.userInputs, text='Capacitance (uF):', **text_opts)
 
         self.serialNumberEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        self.capacitanceEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
 
         self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
 
@@ -79,6 +82,8 @@ class MainApp(tk.Tk):
         self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
         self.holdChargeTimeLabel.pack(side='left')
         self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
+        self.capacitanceLabel.pack(side='left')
+        self.capacitanceEntry.pack(side='left', padx=(0, userInputPadding))
         self.userInputOkayButton.pack(side='left')
 
         # Column for labels on the left
@@ -92,12 +97,14 @@ class MainApp(tk.Tk):
         self.capacitorVoltageText = tk.StringVar()
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
+        self.internalResistanceText = tk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
         self.capacitorVoltageLabel = ttk.Label(self.labels, textvariable=self.capacitorVoltageText, **text_opts)
         self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
         self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
+        self.internalResistanceLabel = ttk.Label(self.labels, textvariable=self.internalResistanceText, **text_opts)
         self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
 
         self.voltagePSLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
@@ -105,7 +112,8 @@ class MainApp(tk.Tk):
         self.capacitorVoltageLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
         self.chargeStateLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
         self.countdownLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
-        self.progress.grid(column=1, row=0, rowspan=5, pady=labelPadding, padx=labelPadding)
+        self.internalResistanceLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
+        self.progress.grid(column=1, row=0, rowspan=6, pady=labelPadding, padx=labelPadding)
 
         # Row for buttons on the bottom
         self.grid_rowconfigure(2, w=1)
@@ -184,14 +192,14 @@ class MainApp(tk.Tk):
         self.timeLimit = 20 # s
         self.chargePlot.ax.set_xlim(0, self.timeLimit)
         self.chargeVoltageAxis.set_ylim(0, 1.2)
-        self.chargeCurrentAxis.set_ylim(0, 1)
+        self.chargeCurrentAxis.set_ylim(0, 15)
 
         # Add two lines and x axis for now
         self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis])
 
         # Create the legends before any plot is made
-        self.chargePlot.ax.legend(handles=chargeHandles, loc='lower left')
-        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='lower left')
+        self.chargePlot.ax.legend(handles=chargeHandles, loc='upper left')
+        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper left')
 
         self.chargePlot.grid(row=1, column=1, sticky='ew', padx=plotPadding)
         self.dischargePlot.grid(row=1, column=2, sticky='ew', padx=plotPadding)
@@ -220,6 +228,10 @@ class MainApp(tk.Tk):
         self.updateChargeValues()
 
         self.safetyLights()
+
+        # Initialize internalResistance to save the discharge
+        self.internalResistance = np.nan
+        self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance:.2f} M\u03A9')
 
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
@@ -317,7 +329,7 @@ class MainApp(tk.Tk):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
-        self.results = [self.serialNumber, self.chargeVoltage, self.holdChargeTime,
+        self.results = [self.serialNumber, self.capacitance, self.internalResistance, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
             self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
@@ -337,6 +349,8 @@ class MainApp(tk.Tk):
             self.resetButton.configure(state='normal')
 
             self.serialNumber = results_df['Serial Number'].dropna().values[0]
+            self.capacitance = results_df['Capacitance (uF)'].dropna().values[0]
+            self.internalResistance = results_df['Internal Resistance (Ohms)'].dropna().values[0]
             self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
             self.holdChargeTime = results_df['Hold Charge Time (s)'].dropna().values[0]
             self.chargeTime = results_df['Charge Time (s)'].dropna().values
@@ -344,8 +358,7 @@ class MainApp(tk.Tk):
             self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
             self.capacitorVoltage = results_df['Capacitor Voltage (V)'].dropna().values
             self.dischargeTime = results_df['Discharge Time'].dropna().values
-            self.dischargeTime = results_df['Discharge Time Unit'].dropna().values[0]
-            self.dischargeTimeUnit = results_df['Discharge Time (s)'].dropna().values
+            self.dischargeTimeUnit = results_df['Discharge Time Unit'].dropna().values[0]
             self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].dropna().values
             self.dischargeCurrentLoad = results_df['Discharge Current (A)'].dropna().values
 
@@ -375,6 +388,9 @@ class MainApp(tk.Tk):
 
             self.userInputError = 'holdChargeTime'
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
+
+            self.userInputError = 'capacitance'
+            self.capacitance = float(self.capacitanceEntry.get())
 
             # Initialize the countdown time to the hold charge time until the countdown begins
             self.countdownTime = self.holdChargeTime
@@ -413,6 +429,12 @@ class MainApp(tk.Tk):
                 self.serialNumberEntry.delete(0, 'end')
 
                 incorrectUserInputText = 'Please reenter a valid format for serial number.'
+                incorrectUserInput(incorrectUserInputText)
+
+            elif self.userInputError == 'capacitance':
+                self.capacitanceEntry.delete(0, 'end')
+
+                incorrectUserInputText = 'Please reenter a valid format for capacitance.'
                 incorrectUserInput(incorrectUserInputText)
 
     # Disable all buttons in the button frame
@@ -483,13 +505,15 @@ class MainApp(tk.Tk):
         mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
 
         if action == 'charge':
+            # self.waveform = np.array([mapVoltage])
             self.waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
         elif action == 'discharge':
+            # self.waveform = np.array([0.0])
             # Start the ramping down of the power supply at the current voltage
             # self.NI_DAQ.configure_for_continuous()
             # startVoltage = self.NI_DAQ.read()['Power Supply Voltage']
             startVoltage = self.chargeVoltagePS[-1] / maxVoltagePowerSupply * maxVoltageInput
-            self.waveform = np.linspace(startVoltage, 0, total_samples) # linear charge rate
+            self.waveform = np.linspace(mapVoltage, 0, total_samples) # linear charge rate
         else:
             self.waveform = 0
             print('Please specify either "charge" or "discharge" for power supply action')
@@ -520,6 +544,7 @@ class MainApp(tk.Tk):
             self.operateSwitch('Load Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
+            time.sleep(switchWaitTime)
 
             # Actually begin charging power supply
             self.powerSupplyRamp(action='charge')
@@ -548,9 +573,9 @@ class MainApp(tk.Tk):
 
             if dischargeConfirmWindow.OKPress:
                 # Operate switches
-                self.operateSwitch('Power Supply Switch', True)
+                self.operateSwitch('Power Supply Switch', False)
                 time.sleep(switchWaitTime)
-                self.operateSwitch('Load Switch', True)
+                self.operateSwitch('Load Switch', False)
 
                 # Force discharge to occur
                 self.powerSupplyRamp(action='discharge')
@@ -574,6 +599,8 @@ class MainApp(tk.Tk):
                 popup()
                 saveDischarge()
             else:
+                self.operateSwitch('Load Switch', False)
+                self.getCapacitorInternalResistance()
                 saveDischarge()
         else:
             popup()
@@ -585,6 +612,24 @@ class MainApp(tk.Tk):
 
         self.discharged = True
         self.charging = False
+
+    def getCapacitorInternalResistance(self):
+        # Exponential decay function that decays to 0
+        def expDecay(time, m, tau):
+            return m * np.exp(-time / tau)
+
+        # Find the point at which the capacitor is isolated
+        startIndex = np.where(self.capacitorVoltage == max(self.capacitorVoltage))[0][0]
+        exponentialCapacitorVoltage = self.capacitorVoltage[startIndex:]
+        exponentialChargeTime = self.chargeTime[startIndex:]
+        exponentialChargeTime = exponentialChargeTime - exponentialChargeTime.iloc[0]
+
+        p0 = (self.chargeVoltage * voltageDivider, self.capacitance * waterResistor) # start with values near those we expect
+        params, cv = scipy.optimize.curve_fit(expDecay, exponentialChargeTime, exponentialCapacitorVoltage, p0)
+        m, tau = params
+
+        self.internalResistance = tau / self.capacitance
+        self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance:.2f} M\u03A9')
 
     # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):
@@ -742,13 +787,6 @@ class MainApp(tk.Tk):
             currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
             capacitorVoltagePoint = voltages[2] * voltageDivider
 
-        # except Exception as e:
-        #     print('Cannot update label (this is okay on startup)')
-        #     # print(e)
-        #     type, value, traceback = sys.exc_info()
-        #     print(traceback)
-
-
         self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
         self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
         self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {capacitorVoltagePoint / 1000:.2f} kV')
@@ -793,15 +831,15 @@ class MainApp(tk.Tk):
                     time.sleep(0.5) # allow some time for power supply switch to open
                     self.powerSupplyRamp(action='discharge')
 
+                    if not DEBUG_MODE:
+                        self.scope.inst.write(':SING') # set up for single triggering event
+
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
                     self.countdownStarted = False
-                    if not DEBUG_MODE:
-                        self.scope.inst.write(':SING') # set up for single triggering event
-
                     self.discharge()
 
             # # Discharge if the voltage is not increasing

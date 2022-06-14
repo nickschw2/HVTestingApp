@@ -76,6 +76,6 @@ checklist_steps = ['Ensure that power supply is off',
     # 'Turn off HV testing light']
 
 # Saving results
-columns = ['Serial Number', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
+columns = ['Serial Number', 'Capacitance (uF)', 'Internal Resistance (Ohms)', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
     'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Current PS (A)', 'Capacitor Voltage (V)', 'Discharge Time',
     'Discharge Time Unit', 'Discharge Voltage (V)', 'Discharge Current (A)']

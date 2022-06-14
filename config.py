@@ -9,7 +9,7 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.116.0'
+TCPIPAddress = '169.254.26.13'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
@@ -20,7 +20,7 @@ NIAODefaults = {'Power Supply Output': 'ao0'} # analog outputs
 NIAIDefaults = {'Power Supply Voltage': 'ai0',
     'Power Supply Current': 'ai1',
     'Capacitor Voltage': 'ai2'} # analog inputs
-NIDODefaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1'}
+NIDODefaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1', 'Voltage Divider': 'line2'}
 NIAOOptions = ['ao0', 'ao1']
 NIAIOptions = ['ai0', 'ai1', 'ai2', 'ai3']
 NIDOOptions = ['line0', 'line1', 'line2', 'line3']
@@ -28,6 +28,7 @@ NIDOOptions = ['line0', 'line1', 'line2', 'line3']
 # Diagnostic hardware
 voltageDivider = 1000 # voltage ratio in:out
 pearsonCoil = 0.01 # V/A
+waterResistor = 20e3 # Ohms
 
 # Testing constants
 RCTime = 0.4 # seconds
