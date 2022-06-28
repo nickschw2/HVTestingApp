@@ -14,6 +14,7 @@ from messages import *
 from config import *
 from scope import *
 from ni_daq import *
+from timer import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -161,26 +162,33 @@ class MainApp(tk.Tk):
         self.grid_columnconfigure(2, w=1)
 
         # Plot of charge and discharge
-        self.chargePlot = CanvasPlot(self)
-        self.dischargePlot = CanvasPlot(self)
+        # Put plots and navigation bars in their own frames
+        self.chargeFrame = ttk.Frame(self)
+        self.dischargeFrame = ttk.Frame(self)
+
+        self.chargeFrame.grid(row=1, column=1, sticky='ew', padx=plotPadding)
+        self.dischargeFrame.grid(row=1, column=2, sticky='ew', padx=plotPadding)
+
+        self.chargePlot = CanvasPlot(self.chargeFrame)
+        self.dischargePlot = CanvasPlot(self.dischargeFrame)
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
         self.chargeCurrentAxis = self.chargePlot.ax.twinx()
         self.dischargeVoltageAxis = self.dischargePlot.ax
-        self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
+        # self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
 
         self.chargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
         self.chargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
         self.dischargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
-        self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
+        # self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
 
         self.chargePlot.ax.set_xlabel('Time (s)')
 
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
         self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+        # self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
 
         self.chargePlot.ax.set_title('Charge Plot')
         self.dischargePlot.ax.set_title('Discharge Plot')
@@ -189,20 +197,30 @@ class MainApp(tk.Tk):
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
         self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
         self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
-        self.timeLimit = 20 # s
-        self.chargePlot.ax.set_xlim(0, self.timeLimit)
-        self.chargeVoltageAxis.set_ylim(0, 1.2)
-        self.chargeCurrentAxis.set_ylim(0, 15)
+        self.fitVoltageLine, = self.chargeVoltageAxis.plot([],[], color=fitColor, linestyle='-') #Create line object on plot
+        self.chargePlot.ax.set_xlim(0, plotTimeLimit)
+        self.chargeVoltageAxis.set_ylim(0, voltageYLim)
+        self.chargeCurrentAxis.set_ylim(0, currentYLim)
 
         # Add two lines and x axis for now
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis])
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.fitVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper left')
         self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper left')
 
-        self.chargePlot.grid(row=1, column=1, sticky='ew', padx=plotPadding)
-        self.dischargePlot.grid(row=1, column=2, sticky='ew', padx=plotPadding)
+        # Add navigation toolbar to plots
+        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargeFrame)
+        self.dischargePlotToolbar = NavigationToolbar2Tk(self.dischargePlot.canvas, self.dischargeFrame)
+
+        self.chargePlotToolbar.update()
+        self.dischargePlotToolbar.update()
+
+        self.chargePlot.pack(side='top')
+        self.dischargePlot.pack(side='top')
+
+        self.chargePlotToolbar.pack(side='bottom')
+        self.dischargePlotToolbar.pack(side='bottom')
 
     def init_ui(self):
         # Begin the operation of the program
@@ -231,7 +249,7 @@ class MainApp(tk.Tk):
 
         # Initialize internalResistance to save the discharge
         self.internalResistance = np.nan
-        self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance:.2f} M\u03A9')
+        self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance / 1e6:.2f} M\u03A9')
 
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
@@ -329,7 +347,7 @@ class MainApp(tk.Tk):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
-        self.results = [self.serialNumber, self.capacitance, self.internalResistance, self.chargeVoltage, self.holdChargeTime,
+        self.results = [self.serialNumber, self.capacitance, self.internalResistance, self.waterResistance, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
             self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
@@ -351,6 +369,7 @@ class MainApp(tk.Tk):
             self.serialNumber = results_df['Serial Number'].dropna().values[0]
             self.capacitance = results_df['Capacitance (uF)'].dropna().values[0]
             self.internalResistance = results_df['Internal Resistance (Ohms)'].dropna().values[0]
+            self.waterResistance = results_df['Water Resistance (Ohms)'].dropna().values[0]
             self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
             self.holdChargeTime = results_df['Hold Charge Time (s)'].dropna().values[0]
             self.chargeTime = results_df['Charge Time (s)'].dropna().values
@@ -390,7 +409,7 @@ class MainApp(tk.Tk):
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
             self.userInputError = 'capacitance'
-            self.capacitance = float(self.capacitanceEntry.get())
+            self.capacitance = float(self.capacitanceEntry.get()) * 1e-6
 
             # Initialize the countdown time to the hold charge time until the countdown begins
             self.countdownTime = self.holdChargeTime
@@ -501,6 +520,7 @@ class MainApp(tk.Tk):
     def powerSupplyRamp(self, action='discharge'):
         seconds_to_acquire = seconds_per_kV * self.chargeVoltage
         total_samples = int(sample_rate * seconds_to_acquire)
+        total_samples = 2
 
         mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
 
@@ -540,10 +560,14 @@ class MainApp(tk.Tk):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
+            self.idleMode = False
+
             # Operate switches
             self.operateSwitch('Load Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
+            self.operateSwitch('Voltage Divider Switch', True)
+            self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
             # Actually begin charging power supply
@@ -581,6 +605,12 @@ class MainApp(tk.Tk):
                 self.powerSupplyRamp(action='discharge')
 
         def saveDischarge():
+            # Close voltage divider and stop repeating timer
+            self.operateSwitch('Voltage Divider Switch', True)
+            self.voltageDividerClosed = True
+            if hasattr(self, 'switchTimer'):
+                self.switchTimer.stop()
+
             # Read from the load
             if not DEBUG_MODE:
                 self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
@@ -589,10 +619,23 @@ class MainApp(tk.Tk):
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
-            # Plot results on the discharge graph and save them
-            # The only time results are saved is when there is a discharge that is preceded by charge
-            self.replotDischarge()
-            self.saveResults()
+            if len(self.dischargeTime) != 0:
+                # get resistance of water resistor
+                self.internalResistance, chargeFitTime, chargeFitVoltage = self.getResistance(self.chargeTime, self.capacitorVoltage)
+                self.waterResistance, self.dischargeFitTime, self.dischargeFitVoltage = self.getResistance(self.dischargeTime, self.dischargeVoltageLoad)
+                self.fitVoltageLine.set_data(chargeFitTime, chargeFitVoltage / 1000)
+
+                # Plot results on the discharge graph and save them
+                # The only time results are saved is when there is a discharge that is preceded by charge
+                self.replotCharge()
+                self.replotDischarge()
+
+                self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance / 1e6:.2f} M\u03A9')
+
+                self.saveResults()
+
+            else:
+                print('Oscilloscope was not triggered successfully')
 
         if self.charging:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
@@ -600,7 +643,6 @@ class MainApp(tk.Tk):
                 saveDischarge()
             else:
                 self.operateSwitch('Load Switch', False)
-                self.getCapacitorInternalResistance()
                 saveDischarge()
         else:
             popup()
@@ -613,23 +655,29 @@ class MainApp(tk.Tk):
         self.discharged = True
         self.charging = False
 
-    def getCapacitorInternalResistance(self):
+    def getResistance(self, time, voltage):
         # Exponential decay function that decays to 0
-        def expDecay(time, m, tau):
-            return m * np.exp(-time / tau)
+        def expDecay(time, m, tau, b):
+            return m * np.exp(-time / tau) + b
 
         # Find the point at which the capacitor is isolated
-        startIndex = np.where(self.capacitorVoltage == max(self.capacitorVoltage))[0][0]
-        exponentialCapacitorVoltage = self.capacitorVoltage[startIndex:]
-        exponentialChargeTime = self.chargeTime[startIndex:]
-        exponentialChargeTime = exponentialChargeTime - exponentialChargeTime.iloc[0]
+        startIndex = np.where(voltage == max(voltage))[0][0]
+        expVoltage = voltage[startIndex:]
+        expTime = time[startIndex:]
+        nanIndices = np.isnan(expVoltage)
+        zeroIndices = expVoltage == 0
+        expVoltage = expVoltage[~np.logical_or(nanIndices, zeroIndices)]
+        expTime = expTime[~np.logical_or(nanIndices, zeroIndices)]
 
-        p0 = (self.chargeVoltage * voltageDivider, self.capacitance * waterResistor) # start with values near those we expect
-        params, cv = scipy.optimize.curve_fit(expDecay, exponentialChargeTime, exponentialCapacitorVoltage, p0)
-        m, tau = params
+        # get estimate of tau
+        tauGuess = (expTime[-1] - expTime[0]) / np.log(expVoltage[0] / expVoltage[-1])
 
-        self.internalResistance = tau / self.capacitance
-        self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance:.2f} M\u03A9')
+        p0 = (max(voltage) * voltageDivider, tauGuess, expVoltage[-1]) # start with values near those we expect
+        params, cv = scipy.optimize.curve_fit(expDecay, expTime - expTime[0], expVoltage, p0) # zero the time so that initial guess can be closer
+        m, tau, b = params
+        fitVoltage = expDecay(expTime, m, tau, b)
+
+        return tau / self.capacitance, expTime, fitVoltage
 
     # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):
@@ -691,10 +739,11 @@ class MainApp(tk.Tk):
 
     # Special function for closing the window and program
     def on_closing(self):
-        # Open power supply and close load switch
+        # Open power supply and load switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
+        self.operateSwitch('Voltage Divider Switch', False)
 
         if not DEBUG_MODE:
             # Stop NI communication
@@ -768,12 +817,17 @@ class MainApp(tk.Tk):
         current = pearsonCoil * np.exp( - time / RCTime)
         return (voltage, current, time, tUnit)
 
+    def intermittentVoltageDivider(self):
+        self.operateSwitch('Voltage Divider Switch', True)
+        time.sleep(switchWaitTime)
+        self.voltageDividerClosed = True
+        # self.scope.inst.write(':SING') # set up for single triggering event
+
     def updateChargeValues(self):
         voltagePSPoint = np.nan
         currentPSPoint = np.nan
-        capacitorVoltagePoint = np.nan
+        self.capacitorVoltagePoint = np.nan
 
-        # try:
         # not applicable on startup
         if hasattr(self, 'NI_DAQ'):
             if not DEBUG_MODE:
@@ -785,14 +839,23 @@ class MainApp(tk.Tk):
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
-            capacitorVoltagePoint = voltages[2] * voltageDivider
+
+            # Only record the voltage when the switch is closed
+            # This occurs during all of charging and intermittently when the capacitor is isolated
+            if self.voltageDividerClosed:
+                self.capacitorVoltagePoint = voltages[2] * voltageDivider
+                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')
 
         self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
         self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
-        self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {capacitorVoltagePoint / 1000:.2f} kV')
 
-        if self.userInputsSet:
-            self.progress['value'] = 100 * capacitorVoltagePoint / 1000 / self.chargeVoltage
+        # Once the DAQ has made a measurement, open up the switch again
+        if self.voltageDividerClosed and self.countdownStarted:
+            self.operateSwitch('Voltage Divider Switch', False)
+            self.voltageDividerClosed = False
+
+        if not self.idleMode and self.voltageDividerClosed:
+            self.progress['value'] = 100 * self.capacitorVoltagePoint / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
         if self.discharged:
@@ -811,13 +874,13 @@ class MainApp(tk.Tk):
             self.chargeTime = np.append(self.chargeTime, self.timePoint)
             self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
             self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
-            self.capacitorVoltage = np.append(self.capacitorVoltage, capacitorVoltagePoint)
+            self.capacitorVoltage = np.append(self.capacitorVoltage, self.capacitorVoltagePoint)
 
             # Plot the new data
             self.replotCharge()
 
             # Voltage reaches a certain value of chargeVoltage to begin countown clock
-            if capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
+            if self.capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 or self.countdownStarted:
                 # Start countdown only once
                 if not self.countdownStarted:
                     self.countdownTimeStart = time.time()
@@ -832,13 +895,15 @@ class MainApp(tk.Tk):
                     self.powerSupplyRamp(action='discharge')
 
                     if not DEBUG_MODE:
-                        self.scope.inst.write(':SING') # set up for single triggering event
+                        # Start repeated timer to measure capacitor at regular intervals
+                        self.switchTimer = RepeatedTimer(measureInterval, self.intermittentVoltageDivider)
 
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
+                    self.countdownTime = 0.0
                     self.countdownStarted = False
                     self.discharge()
 
@@ -875,12 +940,17 @@ class MainApp(tk.Tk):
     def replotCharge(self):
         self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
-        self.capacitorVoltageLine.set_data(self.chargeTime, self.capacitorVoltage / 1000)
 
-        if self.timePoint > self.timeLimit:
-            self.chargePlot.ax.set_xlim(self.timePoint - self.timeLimit, self.timePoint)
+        nanIndices = np.isnan(self.capacitorVoltage)
+        self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+
+        if self.timePoint > plotTimeLimit:
+            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
         else:
-            self.chargePlot.ax.set_xlim(0, self.timeLimit)
+            self.chargePlot.ax.set_xlim(0, plotTimeLimit)
+
+        if 1.2 * self.capacitorVoltagePoint / 1000 > voltageYLim:
+            self.chargePlot.ax.set_ylim(0, 1.2 * self.capacitorVoltagePoint / 1000)
 
         self.bm.update()
 
@@ -896,11 +966,12 @@ class MainApp(tk.Tk):
     def replotDischarge(self):
         # Remove lines every time the figure is plotted
         self.clearFigLines(self.dischargePlot.fig)
-        self.dischargePlot.ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+        self.dischargeVoltageAxis.set_xlabel(f'Time ({self.dischargeTimeUnit})')
 
         # Add plots
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
-        self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
+        # self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
+        self.dischargeVoltageAxis.plot(self.dischargeFitTime, self.dischargeFitVoltage / 1000, color=fitColor, label='V$_{fit}$')
         self.dischargePlot.updatePlot()
 
     def resetChargePlot(self):
@@ -909,23 +980,30 @@ class MainApp(tk.Tk):
         self.chargeVoltagePS = np.array([])
         self.chargeCurrentPS = np.array([])
         self.capacitorVoltage = np.array([])
+        self.chargeFitTime = np.array([])
+        self.chargeFitVoltage = np.array([])
+
+        self.fitVoltageLine.set_data(self.chargeFitTime, self.chargeFitVoltage / 1000)
 
         # Also need to reset the twinx axis
         # self.chargeCurrentAxis.relim()
         # self.chargeCurrentAxis.autoscale_view()
 
         self.timePoint = 0
+        self.capacitorVoltagePoint = 0
         self.replotCharge()
 
     def resetDischargePlot(self):
         # Set time and voltage to empty array
         self.dischargeTime = np.array([])
+        self.dischargeFitTime = np.array([])
         self.dischargeVoltageLoad = np.array([])
         self.dischargeCurrentLoad = np.array([])
+        self.dischargeFitVoltage = np.array([])
 
         # Also need to reset the twinx axis
-        self.dischargeCurrentAxis.relim()
-        self.dischargeCurrentAxis.autoscale_view()
+        # self.dischargeCurrentAxis.relim()
+        # self.dischargeCurrentAxis.autoscale_view()
 
         self.replotDischarge()
 
@@ -942,7 +1020,12 @@ class MainApp(tk.Tk):
         self.discharged = False
         self.userInputsSet = False
         self.countdownStarted = False
+        self.idleMode = True
         self.checklist_Checkbuttons = {}
+
+        # Close voltage divider
+        self.operateSwitch('Voltage Divider Switch', True)
+        self.voltageDividerClosed = True
 
         # Reset plots
         self.resetChargePlot()
@@ -950,6 +1033,9 @@ class MainApp(tk.Tk):
 
         # Disable all buttons if logged in
         self.disableButtons()
+
+        if hasattr(self, 'scope'):
+            self.scope.inst.write(':SING') # set up for single triggering event
 
     # Popup window for help
     def help(self):

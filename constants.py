@@ -39,6 +39,9 @@ displaySetTextTime = 1000 # ms
 topLevelWidth = 30
 topLevelWrapLength = 275
 progressBarLength = 300
+plotTimeLimit = 20 # s
+voltageYLim = 1.2 # kV
+currentYLim = 15 # mA
 
 # Styles
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
@@ -51,14 +54,16 @@ frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 format = re.compile('.{3}\d{3}')
 
 # Plotting constants
-voltageColor = 'blue'
+voltageColor = blue
 currentColor = UMDRed
+fitColor = orange
 
 voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{PS}$')
 capacitorLine = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{cap}$')
-chargeHandles = [voltageLine, currentLine, capacitorLine]
-dischargeHandles = [voltageLine, currentLine]
+fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$')
+chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
+dischargeHandles = [voltageLine, fitLine]
 
 checklist_steps = ['Ensure that power supply is off',
      'Ensure that the charging switch is open']
@@ -76,6 +81,6 @@ checklist_steps = ['Ensure that power supply is off',
     # 'Turn off HV testing light']
 
 # Saving results
-columns = ['Serial Number', 'Capacitance (uF)', 'Internal Resistance (Ohms)', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
+columns = ['Serial Number', 'Capacitance (uF)', 'Internal Resistance (Ohms)', 'Water Resistance (Ohms)', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
     'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Current PS (A)', 'Capacitor Voltage (V)', 'Discharge Time',
     'Discharge Time Unit', 'Discharge Voltage (V)', 'Discharge Current (A)']

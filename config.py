@@ -9,9 +9,11 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.26.13'
+TCPIPAddress = '169.254.123.252'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
+timeScale = 0.1 # seconds
+voltageScale = 200e-3 # Volts
 
 # NI DAQ parameters
 dev_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
@@ -20,7 +22,7 @@ NIAODefaults = {'Power Supply Output': 'ao0'} # analog outputs
 NIAIDefaults = {'Power Supply Voltage': 'ai0',
     'Power Supply Current': 'ai1',
     'Capacitor Voltage': 'ai2'} # analog inputs
-NIDODefaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1', 'Voltage Divider': 'line2'}
+NIDODefaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1', 'Voltage Divider Switch': 'line2'}
 NIAOOptions = ['ao0', 'ao1']
 NIAIOptions = ['ai0', 'ai1', 'ai2', 'ai3']
 NIDOOptions = ['line0', 'line1', 'line2', 'line3']
@@ -29,6 +31,7 @@ NIDOOptions = ['line0', 'line1', 'line2', 'line3']
 voltageDivider = 1000 # voltage ratio in:out
 pearsonCoil = 0.01 # V/A
 waterResistor = 20e3 # Ohms
+measureInterval = 5 # time between capacitor voltage measurements in seconds
 
 # Testing constants
 RCTime = 0.4 # seconds
@@ -43,10 +46,10 @@ acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
 acceptablePasswords = ['plasma']
 
 # Plotting constants
-refreshRate = 200.0 # Hz
+refreshRate = 100.0 # Hz
 
 # Time between switch operations in seconds
-switchWaitTime = 0.5
+switchWaitTime = 0.2
 
 # Charging constants
 maxVoltage = {'LBL': 5, 'BLU': 10, 'GRA': 50, '': 'N/A'}
