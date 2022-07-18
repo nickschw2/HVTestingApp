@@ -352,7 +352,8 @@ class MainApp(tk.Tk):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes both here and to 'columns'
-        self.results = [self.serialNumber, self.capacitance, self.internalResistance, self.waterResistance, self.chargeVoltage, self.holdChargeTime,
+        self.results = [self.serialNumber, self.capacitance, self.equivalentSeriesResistance, self.dielectricAbsorptionRatio,
+            self.polarizationIndex, self.internalResistance, self.waterResistance, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
             self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
 
@@ -373,6 +374,9 @@ class MainApp(tk.Tk):
 
             self.serialNumber = results_df['Serial Number'].dropna().values[0]
             self.capacitance = results_df['Capacitance (uF)'].dropna().values[0]
+            self.equivalentSeriesResistance = results_df['ESR (Ohms)'].dropna().values[0]
+            self.dielectricAbsorptionRatio = results_df['DAR'].dropna().values[0]
+            self.polarizationIndex = results_df['PI'].dropna().values[0]
             self.internalResistance = results_df['Internal Resistance (Ohms)'].dropna().values[0]
             self.waterResistance = results_df['Water Resistance (Ohms)'].dropna().values[0]
             self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
@@ -394,12 +398,22 @@ class MainApp(tk.Tk):
             self.replotCharge()
             self.replotDischarge()
 
+    def getCapacitorData(self, serialNumber):
+        capacitorSpecifications = pd.read_csv(capacitorSpecificationsName)
+        index = capacitorSpecifications['Serial Number'] == serialNumber
+        # If serial number is not in the list, raise ValueError
+        if not index.any():
+            raise ValueError
+
+        return capacitorSpecifications[capacitorSpecifications['Serial Number'] == serialNumber]
+
     def setUserInputs(self):
         # Try to set the user inputs. If there is a ValueError, display pop up message.
         try:
             # If there is an exception, catch where the exception came from
             self.userInputError = 'serialNumber'
             self.serialNumber = self.serialNumberEntry.get()
+            self.capacitorData = self.getCapacitorData(self.serialNumber)
             self.capModel = self.serialNumber[0:3]
             # Make sure that the serial number matches the correct format, if not raise error
             if format.match(self.serialNumber) is None or self.capModel not in maxVoltage:
@@ -413,8 +427,10 @@ class MainApp(tk.Tk):
             self.userInputError = 'holdChargeTime'
             self.holdChargeTime = float(self.holdChargeTimeEntry.get())
 
-            self.userInputError = 'capacitance'
-            self.capacitance = float(self.capacitanceEntry.get()) * 1e-6
+            self.capacitance = float(self.capacitorData['MM Capacitance (uF)']) * 1e-6
+            self.equivalentSeriesResistance = float(self.capacitorData['ESR (GOhms)']) * 1e9
+            self.dielectricAbsorptionRatio = float(self.capacitorData['DAR'])
+            self.polarizationIndex = float(self.capacitorData['PI'])
 
             # Initialize the countdown time to the hold charge time until the countdown begins
             self.countdownTime = self.holdChargeTime
@@ -452,13 +468,7 @@ class MainApp(tk.Tk):
             elif self.userInputError == 'serialNumber':
                 self.serialNumberEntry.delete(0, 'end')
 
-                incorrectUserInputText = 'Please reenter a valid format for serial number.'
-                incorrectUserInput(incorrectUserInputText)
-
-            elif self.userInputError == 'capacitance':
-                self.capacitanceEntry.delete(0, 'end')
-
-                incorrectUserInputText = 'Please reenter a valid format for capacitance.'
+                incorrectUserInputText = 'Either the serial number does not exist or the format is invalid. Please reenter a valid serial number.'
                 incorrectUserInput(incorrectUserInputText)
 
     # Disable all buttons in the button frame

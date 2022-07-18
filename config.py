@@ -10,7 +10,7 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.74.4'
+TCPIPAddress = '169.254.253.108'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 timeScale = 0.1 # seconds
