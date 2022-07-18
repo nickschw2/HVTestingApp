@@ -2,7 +2,7 @@ High Voltage Capacitor Testing Application
 
 This application is used in the [CMFX](https://ireap.umd.edu/research/centrifugal-mirror-fusion-experiment) experiment at the University of Maryland. The wiring diagram for this experiment is as show in Figure 1.
 
-![testing_diagram drawio](https://user-images.githubusercontent.com/73498784/150697927-674cf9c2-f089-4d98-a357-511fd6936872.png)
+![testing_diagram drawio (1)](https://user-images.githubusercontent.com/73498784/179305075-dc6e15e5-c4a5-41e4-bf6b-90a014ec8aaf.png)
 **Figure 1**
 
 Because of the dependency on [National Instruments DAQmx drivers](https://www.ni.com/en-us/support/downloads/drivers/download.ni-daqmx.html#428058) (which must be installed for interfacing with an NI DAQ), the program can only run on Windows or Linux OS.
