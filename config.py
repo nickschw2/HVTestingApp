@@ -1,5 +1,6 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
+ADMIN_MODE = True
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -9,11 +10,11 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.123.252'
+TCPIPAddress = '169.254.74.4'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
 timeScale = 0.1 # seconds
-voltageScale = 200e-3 # Volts
+voltageScale = 0.1 # Volts
 
 # NI DAQ parameters
 dev_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX

@@ -18,14 +18,14 @@ class Oscilloscope():
 
         # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
         if self.brand == 'Rigol':
+            self.inst.write(':STOP') # stop running scope
+
             # Initialize the scope view
             self.inst.write(f':TIM:SCAL {timeScale}')
             self.inst.write(f':TIM:OFFS {4 * timeScale}')
             self.inst.write(f':CHAN1:SCAL {voltageScale}')
             self.inst.write(f':CHAN1:OFFS {-3 * voltageScale}')
             self.inst.write(f':TRIG:EDGE:LEV {voltageScale / 2}')
-
-            self.inst.write(':SING') # set up for single triggering event
 
             # Get the time scales and offsets
             self.timeScale = float(self.inst.query(':TIM:SCAL?'))

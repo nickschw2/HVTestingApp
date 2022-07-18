@@ -68,12 +68,10 @@ class MainApp(tk.Tk):
         self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
         self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
         self.holdChargeTimeLabel = ttk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
-        self.capacitanceLabel = ttk.Label(self.userInputs, text='Capacitance (uF):', **text_opts)
 
         self.serialNumberEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-        self.capacitanceEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
 
         self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
 
@@ -83,8 +81,6 @@ class MainApp(tk.Tk):
         self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
         self.holdChargeTimeLabel.pack(side='left')
         self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
-        self.capacitanceLabel.pack(side='left')
-        self.capacitanceEntry.pack(side='left', padx=(0, userInputPadding))
         self.userInputOkayButton.pack(side='left')
 
         # Column for labels on the left
@@ -233,16 +229,25 @@ class MainApp(tk.Tk):
 
         # On startup, disable buttons until login is correct
         self.disableButtons()
-        self.validateLogin()
+
+        if ADMIN_MODE:
+            self.loggedIn = True
+            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/test'
+            self.saveFolderSet = True
+            self.scopePins = scopeChannelDefaults
+            self.NIAOPins = NIAODefaults
+            self.NIAIPins = NIAIDefaults
+            self.NIDOPins = NIDODefaults
+
+        else:
+            # Prompt for login, save location, and pin selector automatically
+            self.validateLogin()
+            self.setSaveLocation()
+            self.pinSelector()
 
         # If the user closes out of the application during a wait_window, no extra windows pop up
         self.update()
 
-        # Prompt save location automatically
-        self.setSaveLocation()
-
-        # Try setting the pins automatically
-        self.pinSelector()
         self.updateChargeValues()
 
         self.safetyLights()
@@ -614,7 +619,7 @@ class MainApp(tk.Tk):
             # Read from the load
             if not DEBUG_MODE:
                 self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
+                # self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
                 self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
@@ -639,9 +644,13 @@ class MainApp(tk.Tk):
 
         if self.charging:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
+                self.scope.inst.write(':TFOR') # set up for single triggering event
+                time.sleep(0.1)
                 popup()
                 saveDischarge()
             else:
+                self.scope.inst.write(':TFOR') # set up for single triggering event
+                time.sleep(0.1)
                 self.operateSwitch('Load Switch', False)
                 saveDischarge()
         else:
@@ -739,7 +748,7 @@ class MainApp(tk.Tk):
 
     # Special function for closing the window and program
     def on_closing(self):
-        # Open power supply and load switch and close load switch
+        # Open power supply and voltage divider switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
@@ -821,7 +830,6 @@ class MainApp(tk.Tk):
         self.operateSwitch('Voltage Divider Switch', True)
         time.sleep(switchWaitTime)
         self.voltageDividerClosed = True
-        # self.scope.inst.write(':SING') # set up for single triggering event
 
     def updateChargeValues(self):
         voltagePSPoint = np.nan
@@ -901,6 +909,10 @@ class MainApp(tk.Tk):
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
+                # Set scope to trigger just before closing switch
+                if self.countdownTime <= 2.0:
+                    self.scope.inst.write(':SING') # set up for single triggering event
+
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
                     self.countdownTime = 0.0
@@ -949,8 +961,8 @@ class MainApp(tk.Tk):
         else:
             self.chargePlot.ax.set_xlim(0, plotTimeLimit)
 
-        if 1.2 * self.capacitorVoltagePoint / 1000 > voltageYLim:
-            self.chargePlot.ax.set_ylim(0, 1.2 * self.capacitorVoltagePoint / 1000)
+        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.capacitorVoltage) / 1000 > voltageYLim:
+            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.capacitorVoltage) / 1000)
 
         self.bm.update()
 
@@ -1035,7 +1047,7 @@ class MainApp(tk.Tk):
         self.disableButtons()
 
         if hasattr(self, 'scope'):
-            self.scope.inst.write(':SING') # set up for single triggering event
+            self.scope.inst.write(':STOP') # Run the scope
 
     # Popup window for help
     def help(self):
