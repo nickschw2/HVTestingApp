@@ -10,11 +10,9 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 seconds_per_kV = 10 # Time to charge per kV
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.253.108'
+TCPIPAddress = '169.254.151.246'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2'}
 scopeChannelOptions = ['1', '2', '3', '4']
-timeScale = 0.1 # seconds
-voltageScale = 0.1 # Volts
 
 # NI DAQ parameters
 dev_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX

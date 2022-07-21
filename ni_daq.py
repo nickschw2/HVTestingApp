@@ -14,7 +14,61 @@
 
 import nidaqmx
 from nidaqmx.constants import (AcquisitionType,RegenerationMode)
+from nidaqmx.stream_readers import (
+    AnalogSingleChannelReader, AnalogMultiChannelReader)
+from nidaqmx.stream_writers import (
+    AnalogSingleChannelWriter, AnalogMultiChannelWriter)
 import numpy as np
+
+# class NI_DAQ():
+#     def __init__(self, dev_name, ai_channels, ao_channels, sample_rate, autoconnect=True):
+#         self.dev_name = dev_name
+#         self.ai_channels = ai_channels
+#         self.ao_channels = ao_channels
+#         self.sample_rate = sample_rate
+#
+#         self.data = {name: np.array([]) for name in self.ai_channels} # analog input will be stored in this data array
+#
+#         self.tasks = []
+#
+#         if autoconnect:
+#             self.set_up_tasks()
+#             print('NI DAQ has been successfully initialized')
+#
+#     def set_up_tasks(self):
+#         '''
+#         Creates AI and AO tasks. Builds a waveform that is played out through AO using
+#         regeneration. Connects AI to a callback function to handling plotting of data.
+#         '''
+#
+#         # Create two separate DAQmx tasks for the AI and AO
+#         self.read_task = nidaqmx.Task('mixedai')
+#         self.write_task = nidaqmx.Task('mixedao')
+#         self.tasks.append(self.read_task)
+#         self.tasks.append(self.write_task)
+#
+#         # Connect to analog input and output voltage channels on the named device
+#         for name, ai_chan in self.ai_channels.items():
+#             self.read_task.ai_channels.add_ai_voltage_chan(f'{self.dev_name}/{ai_chan}')
+#
+#         for name, ao_chan in self.ao_channels.items():
+#             self.write_task.ao_channels.add_ao_voltage_chan(f'{self.dev_name}/{ao_chan}')
+#
+#         # Create stream readers and writers for more efficient performance
+#         self.writer = AnalogMultiChannelWriter(write_task.out_stream)
+#         self.reader = AnalogMultiChannelReader(read_task.in_stream)
+#
+#         '''
+#         SET UP ANALOG INPUT
+#         '''
+#         self._points_to_plot = int(self.sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
+#         self.read_task.timing.cfg_samp_clk_timing(self.sample_rate,
+#                                     sample_mode=AcquisitionType.CONTINUOUS,
+#                                     samps_per_chan=self._points_to_plot)
+#
+#         # * Register a callback funtion to be run every N samples and when the AO task is done
+#         self.h_task_ai.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
+#         self.h_task_ao.register_done_event(self.done_callback)
 
 class NI_DAQ():
     def __init__(self, dev_name, ai_channels, ao_channels, sample_rate, autoconnect=True):

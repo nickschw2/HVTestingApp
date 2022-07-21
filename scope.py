@@ -15,18 +15,10 @@ class Oscilloscope():
         self.rm = visa.ResourceManager()
         instrumentName = f'TCPIP::{TCPIPChannel}::INSTR'
         self.inst = self.rm.open_resource(instrumentName, timeout=10000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
+        self.reset()
 
         # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
         if self.brand == 'Rigol':
-            self.inst.write(':STOP') # stop running scope
-
-            # Initialize the scope view
-            self.inst.write(f':TIM:SCAL {timeScale}')
-            self.inst.write(f':TIM:OFFS {4 * timeScale}')
-            self.inst.write(f':CHAN1:SCAL {voltageScale}')
-            self.inst.write(f':CHAN1:OFFS {-3 * voltageScale}')
-            self.inst.write(f':TRIG:EDGE:LEV {voltageScale / 2}')
-
             # Get the time scales and offsets
             self.timeScale = float(self.inst.query(':TIM:SCAL?'))
             self.timeOffset = float(self.inst.query(':TIM:OFFS?'))
@@ -36,10 +28,28 @@ class Oscilloscope():
 
         print('Oscilloscope has been initialized successfully.')
 
-    # stop reading data and scale
-    def stop(self):
-        # Grab the raw data from channel
-        self.inst.write(':STOP')
+    def setScale(self, chargeVoltage, capacitance):
+        RCTime = waterResistor * capacitance
+        timeScale = RCTime / 2
+        voltageScale = chargeVoltage / 5
+
+        # Initialize the scope view
+        self.inst.write(f':TIM:SCAL {timeScale}')
+        self.inst.write(f':TIM:OFFS {4 * timeScale}')
+        self.inst.write(f':CHAN1:SCAL {voltageScale}')
+        self.inst.write(f':CHAN1:OFFS {-3 * voltageScale}')
+        self.inst.write(f':TRIG:EDGE:LEV {2 * voltageScale}')
+
+        # Get the time scales and offsets
+        self.timeScale = float(self.inst.query(':TIM:SCAL?'))
+        self.timeOffset = float(self.inst.query(':TIM:OFFS?'))
+
+    # stop reading data
+    def reset(self):
+        if self.brand == 'Rigol':
+            self.inst.write(':CLE') # clear all waveforms from screen
+            self.inst.write(':STOP') # stop running scope
+            self.inst.write(':SING') # setup for single trigger event
 
     # pull waveform from screen
     def get_data(self, channel):
@@ -61,8 +71,8 @@ class Oscilloscope():
 
     def get_time(self):
         # If there is no data on the scope, return empty array
-        if isinstance(self.data_size, int):
-            return (np.array([]), 's')
+        # if isinstance(self.data_size, int):
+        #     return (np.array([]), 's')
 
         # Now, generate a time axis.
         timeBlocks = 5 # number of blocks on screen on time axis

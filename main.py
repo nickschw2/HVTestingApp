@@ -7,7 +7,7 @@ import time
 import os
 import webbrowser
 import nidaqmx
-import scipy.optimize
+import scipy.optimize, scipy.signal
 from constants import *
 from plots import *
 from messages import *
@@ -118,7 +118,7 @@ class MainApp(tk.Tk):
         self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=framePadding)
 
         # Button definitions and placement
-        self.checklistButton = ttk.Button(self.buttons, text='Begin Checklist',
+        self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
                                     command=self.checklist, style='Accent.TButton')
         self.chargeButton = ttk.Button(self.buttons, text='Charge',
                                     command=self.charge, style='Accent.TButton')
@@ -202,8 +202,8 @@ class MainApp(tk.Tk):
         self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.fitVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
 
         # Create the legends before any plot is made
-        self.chargePlot.ax.legend(handles=chargeHandles, loc='upper left')
-        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper left')
+        self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
+        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper right')
 
         # Add navigation toolbar to plots
         self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargeFrame)
@@ -437,6 +437,9 @@ class MainApp(tk.Tk):
 
             self.userInputsSet = True
 
+            # Set the scale on the oscilloscope based on inputs
+            self.scope.setScale(self.chargeVoltage, self.capacitance)
+
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
                 self.checklistButton.configure(state='normal')
@@ -483,39 +486,58 @@ class MainApp(tk.Tk):
             if isinstance(w, ttk.Button):
                 w.configure(state='normal')
 
-    # Every time an item on the checklist is ticked complete, check to see if the entire list is complete
-    def checklistComplete(self):
-        complete = False
-        complete = all([cb.get() for keys, cb in self.checklist_Checkbuttons.items()])
-
-        # Only if the user inputs are also set will the buttons be enabled
-        if complete and self.userInputsSet and len(self.checklist_Checkbuttons) !=0:
-            self.enableButtons()
-
-        self.checklist_win.destroy()
+    # def checklist(self):
+    #     # Function to determine if the checklist is complete
+    #     def checklistComplete():
+    #         complete = False
+    #         complete = all([cb.get() for keys, cb in self.checklist_Checkbuttons.items()])
+    #
+    #         # Only if the user inputs are also set will the buttons be enabled
+    #         if complete and self.userInputsSet and len(self.checklist_Checkbuttons) !=0:
+    #             self.enableButtons()
+    #
+    #         self.checklist_win.destroy()
+    #
+    #     # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
+    #     self.disableButtons()
+    #     self.checklistButton.configure(state='normal')
+    #
+    #     # Top level window for checklist
+    #     self.checklist_win = tk.Toplevel()
+    #     # Bring pop up to the center and top
+    #     self.eval(f'tk::PlaceWindow {str(self.checklist_win)} center')
+    #     self.checklist_win.attributes('-topmost', True)
+    #
+    #     # Create a Checkbutton for each item on the checklist
+    #     for i, step in enumerate(checklist_steps):
+    #         # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
+    #         # The completion of the checklist is checked every time a Checkbutton value is changed
+    #         self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
+    #         button = ttk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step)
+    #         button.grid(row=i, column=0, sticky='w')
+    #
+    #     # Add okay button to close the window
+    #     OKButton = ttk.Button(self.checklist_win, text='Okay', command=checklistComplete, style='Accent.TButton')
+    #     OKButton.grid(row=len(checklist_steps) + 1, column=0)
 
     def checklist(self):
         # Any time the checklist is opened, all buttons are disabled except for the save, help, and checklist
         self.disableButtons()
         self.checklistButton.configure(state='normal')
 
-        # Top level window for checklist
-        self.checklist_win = tk.Toplevel()
-        # Bring pop up to the center and top
-        self.eval(f'tk::PlaceWindow {str(self.checklist_win)} center')
-        self.checklist_win.attributes('-topmost', True)
+        # Popup window appears to confirm charging
+        checklistName = 'Checklist Complete?'
+        checklistText = 'Has the checklist been completed?'
+        checklistWindow = MessageWindow(self, checklistName, checklistText)
 
-        # Create a Checkbutton for each item on the checklist
-        for i, step in enumerate(checklist_steps):
-            # A BooleanVar is linked to each Checkbutton and its state is updated any time a check is changed
-            # The completion of the checklist is checked every time a Checkbutton value is changed
-            self.checklist_Checkbuttons[f'c{i + 1}'] = tk.BooleanVar()
-            button = ttk.Checkbutton(self.checklist_win, variable=self.checklist_Checkbuttons[f'c{i + 1}'], text=f'Step {i + 1}: ' + step)
-            button.grid(row=i, column=0, sticky='w')
+        checklistWindow.OKButton['text'] = 'Yes'
+        cancelButton = ttk.Button(checklistWindow.bottomFrame, text='Cancel', command=checklistWindow.destroy, style='Accent.TButton')
+        cancelButton.pack(side='left')
 
-        # Add okay button to close the window
-        self.OKButton = ttk.Button(self.checklist_win, text='Okay', command=self.checklistComplete, style='Accent.TButton')
-        self.OKButton.grid(row=len(checklist_steps) + 1, column=0)
+        checklistWindow.wait_window()
+
+        if checklistWindow.OKPress and self.userInputsSet:
+            self.enableButtons()
 
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
@@ -628,6 +650,7 @@ class MainApp(tk.Tk):
 
             # Read from the load
             if not DEBUG_MODE:
+                time.sleep(1)
                 self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                 # self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
                 self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
@@ -654,13 +677,9 @@ class MainApp(tk.Tk):
 
         if self.charging:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
-                self.scope.inst.write(':TFOR') # set up for single triggering event
-                time.sleep(0.1)
                 popup()
                 saveDischarge()
             else:
-                self.scope.inst.write(':TFOR') # set up for single triggering event
-                time.sleep(0.1)
                 self.operateSwitch('Load Switch', False)
                 saveDischarge()
         else:
@@ -680,7 +699,11 @@ class MainApp(tk.Tk):
             return m * np.exp(-time / tau) + b
 
         # Find the point at which the capacitor is isolated
-        startIndex = np.where(voltage == max(voltage))[0][0]
+        try:
+            peaks, _ = scipy.signal.find_peaks(voltage, width=10)
+            startIndex = peaks[-1]
+        except:
+            startIndex = np.where(voltage == max(voltage))[0][0]
         expVoltage = voltage[startIndex:]
         expTime = time[startIndex:]
         nanIndices = np.isnan(expVoltage)
@@ -692,7 +715,7 @@ class MainApp(tk.Tk):
         tauGuess = (expTime[-1] - expTime[0]) / np.log(expVoltage[0] / expVoltage[-1])
 
         p0 = (max(voltage) * voltageDivider, tauGuess, expVoltage[-1]) # start with values near those we expect
-        params, cv = scipy.optimize.curve_fit(expDecay, expTime - expTime[0], expVoltage, p0) # zero the time so that initial guess can be closer
+        params, cv = scipy.optimize.curve_fit(expDecay, expTime, expVoltage, p0) # zero the time so that initial guess can be closer
         m, tau, b = params
         fitVoltage = expDecay(expTime, m, tau, b)
 
@@ -771,8 +794,13 @@ class MainApp(tk.Tk):
             # Close visa communication with scope
             self.scope.inst.close()
 
-        # Close window
+        # Close plots
         plt.close('all')
+
+        # Cancel all scheduled callbacks
+        for after_id in self.tk.eval('after info').split():
+            self.after_cancel(after_id)
+
         self.quit()
         self.destroy()
 
@@ -919,10 +947,6 @@ class MainApp(tk.Tk):
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
-                # Set scope to trigger just before closing switch
-                if self.countdownTime <= 2.0:
-                    self.scope.inst.write(':SING') # set up for single triggering event
-
                 # Set countdown time to 0 seconds once discharged
                 if self.countdownTime <= 0.0:
                     self.countdownTime = 0.0
@@ -1057,7 +1081,7 @@ class MainApp(tk.Tk):
         self.disableButtons()
 
         if hasattr(self, 'scope'):
-            self.scope.inst.write(':STOP') # Run the scope
+            self.scope.reset() # Reset the scope
 
     # Popup window for help
     def help(self):
