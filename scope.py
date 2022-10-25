@@ -1,20 +1,25 @@
 import numpy
-import matplotlib.pyplot as plot
-import sys
 import pyvisa as visa
 import numpy as np
 from config import *
+from messages import *
 
 # At  some point, make the change that we dont need to pass the brand name, and get it from IDN
 
 class Oscilloscope():
-    def __init__(self, TCPIPChannel, brand='Rigol'):
+    def __init__(self, brand='Rigol'):
         self.brand = brand
         self.data = {}
 
         self.rm = visa.ResourceManager()
-        instrumentName = f'TCPIP::{TCPIPChannel}::INSTR'
-        self.inst = self.rm.open_resource(instrumentName, timeout=10000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
+        self.connectInstrument()
+
+        # Set LAN to static
+        self.inst.write(':LAN:MAN ON')
+        self.inst.write(':LAN:AUT OFF')
+        self.inst.write(':LAN:DHCP OFF')
+        self.inst.write(':LAN:APPL')
+
         self.reset()
 
         # We have a LeCroy 9305 and a Rigol MSO5000 Series scope, commands differe between the two
@@ -28,17 +33,36 @@ class Oscilloscope():
 
         print('Oscilloscope has been initialized successfully.')
 
+    def connectInstrument(self):
+        instrumentName = self.findIPAddress()
+        self.inst = self.rm.open_resource(instrumentName, timeout=5000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
+
+    def findIPAddress(self):
+        resources = self.rm.list_resources()
+        return resources[0]
+
     def setScale(self, chargeVoltage, capacitance):
         RCTime = waterResistor * capacitance
-        timeScale = RCTime / 2
+        timeScale = RCTime / 2 * 0.01
         voltageScale = chargeVoltage / 5
+        currentScale = 20e3 / 500 * 0.01 / 2
+        interferometerScale = 0.4 #Volts
 
         # Initialize the scope view
         self.inst.write(f':TIM:SCAL {timeScale}')
         self.inst.write(f':TIM:OFFS {4 * timeScale}')
+
+        self.inst.write(':CHAN1:DISP 1')
+        self.inst.write(':CHAN2:DISP 1')
+        self.inst.write(':CHAN3:DISP 1')
+
         self.inst.write(f':CHAN1:SCAL {voltageScale}')
-        self.inst.write(f':CHAN1:OFFS {-3 * voltageScale}')
+        self.inst.write(f':CHAN1:OFFS {-1 * voltageScale}')
         self.inst.write(f':TRIG:EDGE:LEV {2 * voltageScale}')
+        self.inst.write(f':CHAN2:SCAL {currentScale}')
+        self.inst.write(f':CHAN2:OFFS {-0 * currentScale}')
+        self.inst.write(f':CHAN3:SCAL {interferometerScale}')
+        self.inst.write(f':CHAN3:OFFS {-0.3 * interferometerScale}')
 
         # Get the time scales and offsets
         self.timeScale = float(self.inst.query(':TIM:SCAL?'))

@@ -15,6 +15,7 @@ from config import *
 from scope import *
 from ni_daq import *
 from timer import *
+from gpib import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -40,6 +41,7 @@ class MainApp(tk.Tk):
         self.init_ui()
         if not DEBUG_MODE:
             self.init_DAQ()
+            self.init_PulseGenerator()
 
     def configure_ui(self):
         # set title
@@ -51,9 +53,9 @@ class MainApp(tk.Tk):
         self.saveFolderSet = False
         # Initialize pins to default values
         self.scopePins = scopeChannelDefaults
-        self.NIAOPins = NIAODefaults
-        self.NIAIPins = NIAIDefaults
-        self.NIDOPins = NIDODefaults
+        self.ao_Pins = ao_Defaults
+        self.ai_Pins = ai_Defaults
+        self.do_Pins = do_Defaults
 
         self.dischargeTimeUnit = 's' # arbritrarily
 
@@ -172,19 +174,19 @@ class MainApp(tk.Tk):
         self.chargeVoltageAxis = self.chargePlot.ax
         self.chargeCurrentAxis = self.chargePlot.ax.twinx()
         self.dischargeVoltageAxis = self.dischargePlot.ax
-        # self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
+        self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
 
         self.chargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
         self.chargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
         self.dischargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
-        # self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
+        self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
 
         self.chargePlot.ax.set_xlabel('Time (s)')
 
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
         self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        # self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+        self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
 
         self.chargePlot.ax.set_title('Charge Plot')
         self.dischargePlot.ax.set_title('Discharge Plot')
@@ -232,12 +234,12 @@ class MainApp(tk.Tk):
 
         if ADMIN_MODE:
             self.loggedIn = True
-            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/test'
+            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
             self.saveFolderSet = True
             self.scopePins = scopeChannelDefaults
-            self.NIAOPins = NIAODefaults
-            self.NIAIPins = NIAIDefaults
-            self.NIDOPins = NIDODefaults
+            self.ao_Pins = ao_Defaults
+            self.ai_Pins = ai_Defaults
+            self.do_Pins = do_Defaults
 
         else:
             # Prompt for login, save location, and pin selector automatically
@@ -261,11 +263,24 @@ class MainApp(tk.Tk):
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
     def init_DAQ(self):
         # We need both an analog input and output
-        self.NI_DAQ = NI_DAQ(dev_name, self.NIAIPins, self.NIAOPins, sample_rate)
-        self.NI_DAQ.start_acquisition()
+        self.NI_DAQ = NI_DAQ(input_name, output_name, sample_rate, ai_channels=self.ai_Pins, ao_channels=self.ao_Pins)
 
         # Initialize the scope over ethernet
-        self.scope = Oscilloscope(TCPIPAddress, brand='Rigol')
+        try:
+            self.scope = Oscilloscope()
+        except visa.errors.VisaIOError:
+            scopeErrorName = 'Oscilloscope Connection'
+            scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
+            scopeErrorWindow = MessageWindow(self, scopeErrorName, scopeErrorText)
+
+            scopeErrorWindow.wait_window()
+
+            # If the user presses the Okay button, charging begins
+            if scopeErrorWindow.OKPress:
+                self.on_closing()
+
+    def init_PulseGenerator(self):
+        self.pulseGenerator = PulseGenerator()
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -306,9 +321,9 @@ class MainApp(tk.Tk):
             return pins
 
         scopePinsOptions = selectPins(scopeChannelDefaults, scopeChannelOptions)
-        NIAOPinsOptions = selectPins(NIAODefaults, NIAOOptions)
-        NIAIPinsOptions = selectPins(NIAIDefaults, NIAIOptions)
-        NIDOPinsOptions = selectPins(NIDODefaults, NIDOOptions)
+        ao_PinsOptions = selectPins(ao_Defaults, ao_Options)
+        ai_PinsOptions = selectPins(ai_Defaults, ai_Options)
+        do_PinsOptions = selectPins(do_Defaults, do_Options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -320,19 +335,19 @@ class MainApp(tk.Tk):
             for channel in scopePinsOptions:
                 self.scopePins[channel] = scopePinsOptions[channel].get()
 
-            for channel in NIAOPinsOptions:
-                self.NIAOPins[channel] = NIAOPinsOptions[channel].get()
+            for channel in ao_PinsOptions:
+                self.ao_Pins[channel] = ao_PinsOptions[channel].get()
 
-            for channel in NIAIPinsOptions:
-                self.NIAIPins[channel] = NIAIPinsOptions[channel].get()
+            for channel in ai_PinsOptions:
+                self.ai_Pins[channel] = ai_PinsOptions[channel].get()
 
-            for channel in NIDOPinsOptions:
-                self.NIDOPins[channel] = NIDOPinsOptions[channel].get()
+            for channel in do_PinsOptions:
+                self.do_Pins[channel] = do_PinsOptions[channel].get()
 
             print(self.scopePins)
-            print(self.NIAOPins)
-            print(self.NIAIPins)
-            print(self.NIDOPins)
+            print(self.ao_Pins)
+            print(self.ai_Pins)
+            print(self.do_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, style='Accent.TButton')
@@ -355,7 +370,7 @@ class MainApp(tk.Tk):
         self.results = [self.serialNumber, self.capacitance, self.equivalentSeriesResistance, self.dielectricAbsorptionRatio,
             self.polarizationIndex, self.internalResistance, self.waterResistance, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
-            self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad]
+            self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.interferometer]
 
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in self.results]).T
@@ -372,23 +387,24 @@ class MainApp(tk.Tk):
             self.reset()
             self.resetButton.configure(state='normal')
 
-            self.serialNumber = results_df['Serial Number'].dropna().values[0]
-            self.capacitance = results_df['Capacitance (uF)'].dropna().values[0]
-            self.equivalentSeriesResistance = results_df['ESR (Ohms)'].dropna().values[0]
-            self.dielectricAbsorptionRatio = results_df['DAR'].dropna().values[0]
-            self.polarizationIndex = results_df['PI'].dropna().values[0]
-            self.internalResistance = results_df['Internal Resistance (Ohms)'].dropna().values[0]
-            self.waterResistance = results_df['Water Resistance (Ohms)'].dropna().values[0]
-            self.chargeVoltage = results_df['Charged Voltage (kV)'].dropna().values[0]
-            self.holdChargeTime = results_df['Hold Charge Time (s)'].dropna().values[0]
-            self.chargeTime = results_df['Charge Time (s)'].dropna().values
-            self.chargeVoltagePS = results_df['Charge Voltage PS (V)'].dropna().values
-            self.chargeCurrentPS = results_df['Charge Current PS (A)'].dropna().values
-            self.capacitorVoltage = results_df['Capacitor Voltage (V)'].dropna().values
-            self.dischargeTime = results_df['Discharge Time'].dropna().values
-            self.dischargeTimeUnit = results_df['Discharge Time Unit'].dropna().values[0]
-            self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].dropna().values
-            self.dischargeCurrentLoad = results_df['Discharge Current (A)'].dropna().values
+            self.serialNumber = results_df['Serial Number'].values[0]
+            self.capacitance = results_df['Capacitance (uF)'].values[0]
+            self.equivalentSeriesResistance = results_df['ESR (Ohms)'].values[0]
+            self.dielectricAbsorptionRatio = results_df['DAR'].values[0]
+            self.polarizationIndex = results_df['PI'].values[0]
+            self.internalResistance = results_df['Internal Resistance (Ohms)'].values[0]
+            self.waterResistance = results_df['Water Resistance (Ohms)'].values[0]
+            self.chargeVoltage = results_df['Charged Voltage (kV)'].values[0]
+            self.holdChargeTime = results_df['Hold Charge Time (s)'].values[0]
+            self.chargeTime = results_df['Charge Time (s)'].values
+            self.chargeVoltagePS = results_df['Charge Voltage PS (V)'].values
+            self.chargeCurrentPS = results_df['Charge Current PS (A)'].values
+            self.capacitorVoltage = results_df['Capacitor Voltage (V)'].values
+            self.dischargeTime = results_df['Discharge Time'].values
+            self.dischargeTimeUnit = results_df['Discharge Time Unit'].values[0]
+            self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].values
+            self.dischargeCurrentLoad = results_df['Discharge Current (A)'].values
+            self.interferometer = results_df['Interferometer (V)'].values
 
             # Place values for all user inputs and plots
             self.serialNumberEntry.insert(0, self.serialNumber)
@@ -545,7 +561,7 @@ class MainApp(tk.Tk):
         if not DEBUG_MODE:
             try:
                 with nidaqmx.Task() as task:
-                    task.do_channels.add_do_chan(f'{dev_name}/{digitalOutName}/{self.NIDOPins[switchName]}')
+                    task.do_channels.add_do_chan(f'{output_name}/{digitalOutName}/{self.do_Pins[switchName]}')
                     value = task.write(state)
                     print(f'{switchName} in {state} state')
 
@@ -555,34 +571,15 @@ class MainApp(tk.Tk):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge'):
-        seconds_to_acquire = seconds_per_kV * self.chargeVoltage
-        total_samples = int(sample_rate * seconds_to_acquire)
-        total_samples = 2
-
         mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
 
         if action == 'charge':
-            # self.waveform = np.array([mapVoltage])
-            self.waveform = np.linspace(0, mapVoltage, total_samples) # linear charge rate
-        elif action == 'discharge':
-            # self.waveform = np.array([0.0])
-            # Start the ramping down of the power supply at the current voltage
-            # self.NI_DAQ.configure_for_continuous()
-            # startVoltage = self.NI_DAQ.read()['Power Supply Voltage']
-            startVoltage = self.chargeVoltagePS[-1] / maxVoltagePowerSupply * maxVoltageInput
-            self.waveform = np.linspace(mapVoltage, 0, total_samples) # linear charge rate
+            value = mapVoltage
         else:
-            self.waveform = 0
-            print('Please specify either "charge" or "discharge" for power supply action')
+            value = 0
 
         if not DEBUG_MODE:
-            self.NI_DAQ.stop_acquisition() # clear any task that may be currently processing
-            self.NI_DAQ.write_waveform(self.waveform)
-            self.NI_DAQ.start_acquisition()
-        # if action == 'discharge':
-        #     input('press enter')
-        #     self.NI_DAQ.configure_for_continuous()
-        #     self.NI_DAQ.h_task_ai.start()
+            self.NI_DAQ.write_value(value)
 
     def charge(self):
         # Popup window appears to confirm charging
@@ -650,18 +647,33 @@ class MainApp(tk.Tk):
 
             # Read from the load
             if not DEBUG_MODE:
-                time.sleep(1)
-                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                # self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) * pearsonCoil
-                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+                try:
+                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
+                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+                except visa.errors.VisaIOError:
+                    self.scope.connectInstrument()
+                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
+                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+                    # self.dischargeVoltageLoad = np.array([])
+                    # self.dischargeTime = np.array([])
+                    # self.dischargeTimeUnit = 's'
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
             if len(self.dischargeTime) != 0:
                 # get resistance of water resistor
-                self.internalResistance, chargeFitTime, chargeFitVoltage = self.getResistance(self.chargeTime, self.capacitorVoltage)
-                self.waterResistance, self.dischargeFitTime, self.dischargeFitVoltage = self.getResistance(self.dischargeTime, self.dischargeVoltageLoad)
+                try:
+                    self.internalResistance, chargeFitTime, chargeFitVoltage = self.getResistance(self.chargeTime, self.capacitorVoltage)
+                    self.waterResistance, self.dischargeFitTime, self.dischargeFitVoltage = self.getResistance(self.dischargeTime, self.dischargeVoltageLoad)
+                except:
+                    self.internalResistance, chargeFitTime, chargeFitVoltage = (0, 0, 0)
+                    self.waterResistance, self.dischargeFitTime, self.dischargeFitVoltage = (0, 0, 0)
                 self.fitVoltageLine.set_data(chargeFitTime, chargeFitVoltage / 1000)
+                self.waterResistance /= 1000
 
                 # Plot results on the discharge graph and save them
                 # The only time results are saved is when there is a discharge that is preceded by charge
@@ -680,6 +692,8 @@ class MainApp(tk.Tk):
                 popup()
                 saveDischarge()
             else:
+                self.pulseGenerator.triggerIgnitron()
+                time.sleep(hardCloseWaitTime)
                 self.operateSwitch('Load Switch', False)
                 saveDischarge()
         else:
@@ -705,7 +719,13 @@ class MainApp(tk.Tk):
         except:
             startIndex = np.where(voltage == max(voltage))[0][0]
         expVoltage = voltage[startIndex:]
-        expTime = time[startIndex:]
+        if ignitronInstalled:
+            endIndex = (expVoltage < 0).argmax()
+        else:
+            endIndex = len(time) - 1
+
+        expVoltage = voltage[startIndex:endIndex]
+        expTime = time[startIndex:endIndex]
         nanIndices = np.isnan(expVoltage)
         zeroIndices = expVoltage == 0
         expVoltage = expVoltage[~np.logical_or(nanIndices, zeroIndices)]
@@ -715,9 +735,13 @@ class MainApp(tk.Tk):
         tauGuess = (expTime[-1] - expTime[0]) / np.log(expVoltage[0] / expVoltage[-1])
 
         p0 = (max(voltage) * voltageDivider, tauGuess, expVoltage[-1]) # start with values near those we expect
-        params, cv = scipy.optimize.curve_fit(expDecay, expTime, expVoltage, p0) # zero the time so that initial guess can be closer
-        m, tau, b = params
-        fitVoltage = expDecay(expTime, m, tau, b)
+        try:
+            params, cv = scipy.optimize.curve_fit(expDecay, expTime, expVoltage, p0) # zero the time so that initial guess can be closer
+            m, tau, b = params
+            fitVoltage = expDecay(expTime, m, tau, b)
+        except:
+            tau = 0
+            fitVoltage = np.zeros(len(expTime))
 
         return tau / self.capacitance, expTime, fitVoltage
 
@@ -792,7 +816,11 @@ class MainApp(tk.Tk):
             self.NI_DAQ.close()
 
             # Close visa communication with scope
-            self.scope.inst.close()
+            if hasattr(self, 'scope'):
+                try:
+                    self.scope.inst.close()
+                except visa.errors.VisaIOError:
+                    pass
 
         # Close plots
         plt.close('all')
@@ -879,21 +907,20 @@ class MainApp(tk.Tk):
             if not DEBUG_MODE:
                 voltages = self.NI_DAQ.h_task_ai.read()
                 # Retrieve charging data
-                # voltagePSPoint = self.readNI('Power Supply Voltage')
-                # currentPSPoint = self.readNI('Power Supply Current')
+                # voltages = self.NI_DAQ.read()
             else:
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            currentPSPoint = voltages[1] * maxCurrentPowerSupply / maxVoltageInput
+            currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
 
             # Only record the voltage when the switch is closed
             # This occurs during all of charging and intermittently when the capacitor is isolated
             if self.voltageDividerClosed:
-                self.capacitorVoltagePoint = voltages[2] * voltageDivider
-                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')
+                self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
+                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {np.abs(self.capacitorVoltagePoint) / 1000:.2f} kV')
 
-        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
+        self.voltagePSText.set(f'V{PSSuperscript}: {np.abs(voltagePSPoint) / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {np.abs(currentPSPoint) * 1000:.2f} mA')
 
         # Once the DAQ has made a measurement, open up the switch again
         if self.voltageDividerClosed and self.countdownStarted:
@@ -995,8 +1022,8 @@ class MainApp(tk.Tk):
         else:
             self.chargePlot.ax.set_xlim(0, plotTimeLimit)
 
-        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.capacitorVoltage) / 1000 > voltageYLim:
-            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.capacitorVoltage) / 1000)
+        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
+            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
 
         self.bm.update()
 
@@ -1016,7 +1043,7 @@ class MainApp(tk.Tk):
 
         # Add plots
         self.dischargeVoltageAxis.plot(self.dischargeTime, self.dischargeVoltageLoad / 1000, color=voltageColor, label='V$_{load}$')
-        # self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
+        self.dischargeCurrentAxis.plot(self.dischargeTime, self.dischargeCurrentLoad, color=currentColor, label='I$_{load}$')
         self.dischargeVoltageAxis.plot(self.dischargeFitTime, self.dischargeFitVoltage / 1000, color=fitColor, label='V$_{fit}$')
         self.dischargePlot.updatePlot()
 
@@ -1048,8 +1075,8 @@ class MainApp(tk.Tk):
         self.dischargeFitVoltage = np.array([])
 
         # Also need to reset the twinx axis
-        # self.dischargeCurrentAxis.relim()
-        # self.dischargeCurrentAxis.autoscale_view()
+        self.dischargeCurrentAxis.relim()
+        self.dischargeCurrentAxis.autoscale_view()
 
         self.replotDischarge()
 

@@ -66,7 +66,7 @@ currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$
 capacitorLine = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{cap}$')
 fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$')
 chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
-dischargeHandles = [voltageLine, fitLine]
+dischargeHandles = [voltageLine, currentLine, fitLine]
 
 checklist_steps = ['Ensure that power supply is off',
      'Ensure that the charging switch is open']
@@ -86,4 +86,4 @@ checklist_steps = ['Ensure that power supply is off',
 # Saving results
 columns = ['Serial Number', 'Capacitance (uF)', 'ESR (Ohms)', 'DAR', 'PI', 'Internal Resistance (Ohms)', 'Water Resistance (Ohms)', 'Charged Voltage (kV)', 'Hold Charge Time (s)',
     'Charge Time (s)', 'Charge Voltage PS (V)', 'Charge Current PS (A)', 'Capacitor Voltage (V)', 'Discharge Time',
-    'Discharge Time Unit', 'Discharge Voltage (V)', 'Discharge Current (A)']
+    'Discharge Time Unit', 'Discharge Voltage (V)', 'Discharge Current (A)', 'Interferometer (V)']
