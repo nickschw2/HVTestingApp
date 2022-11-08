@@ -1,6 +1,7 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
-ADMIN_MODE = True
+ADMIN_MODE = False
+SHOT_MODE = True
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -10,7 +11,7 @@ sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
 TCPIPAddress = '169.254.55.65'
-scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3'}
+scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -38,7 +39,7 @@ waterResistor = 500 # Ohms
 measureInterval = 5 # time between capacitor voltage measurements in seconds
 
 # Testing constants
-RCTime = 0.4 # seconds
+RCTime = 0.2 # seconds
 
 # Charging constants
 chargeTimeLimit = 10 # seconds

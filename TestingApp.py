@@ -227,7 +227,7 @@ class TestingApp(tk.Tk):
             self.operateSwitch('Power Supply Switch', True)
             self.operateSwitch('Voltage Divider Switch', True)
             self.voltageDividerClosed = True
-            time.sleep(switchWaitTime)
+            time.sleep(switchWaitTime)s
 
             # Actually begin charging power supply
             self.powerSupplyRamp(action='charge')

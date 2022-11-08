@@ -370,7 +370,7 @@ class MainApp(tk.Tk):
         self.results = [self.serialNumber, self.capacitance, self.equivalentSeriesResistance, self.dielectricAbsorptionRatio,
             self.polarizationIndex, self.internalResistance, self.waterResistance, self.chargeVoltage, self.holdChargeTime,
             self.chargeTime, self.chargeVoltagePS, self.chargeCurrentPS, self.capacitorVoltage, self.dischargeTime,
-            self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.interferometer]
+            self.dischargeTimeUnit, self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.interferometer, self.diamagnetic]
 
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in self.results]).T
@@ -405,6 +405,7 @@ class MainApp(tk.Tk):
             self.dischargeVoltageLoad = results_df['Discharge Voltage (V)'].values
             self.dischargeCurrentLoad = results_df['Discharge Current (A)'].values
             self.interferometer = results_df['Interferometer (V)'].values
+            self.diamagnetic = results_df['Diamagnetic (V)'].values
 
             # Place values for all user inputs and plots
             self.serialNumberEntry.insert(0, self.serialNumber)
@@ -581,6 +582,22 @@ class MainApp(tk.Tk):
         if not DEBUG_MODE:
             self.NI_DAQ.write_value(value)
 
+    def triggerShot(self):
+        # Set up a task to trigger the gating of the camera based off the pulse generator signal
+        with nidaqmx.Task() as task:
+            freq = 20
+            duty_cycle = 0.001
+            task.co_channels.add_co_pulse_chan_freq(f'{output_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
+            task.channels.co_pulse_term = f'/{output_name}/PFI0'
+
+            n_pulses = 10
+            task.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)
+            task.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{output_name}/PFI1', trigger_edge=nidaqmx.constants.Edge.RISING)
+
+            task.start()
+            self.pulseGenerator.triggerIgnitron()
+            task.wait_until_done(timeout=np.inf)
+
     def charge(self):
         # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
@@ -651,12 +668,14 @@ class MainApp(tk.Tk):
                     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
                     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
                 except visa.errors.VisaIOError:
                     self.scope.connectInstrument()
                     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
                     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
                     # self.dischargeVoltageLoad = np.array([])
                     # self.dischargeTime = np.array([])
@@ -692,7 +711,7 @@ class MainApp(tk.Tk):
                 popup()
                 saveDischarge()
             else:
-                self.pulseGenerator.triggerIgnitron()
+                self.triggerShot()
                 time.sleep(hardCloseWaitTime)
                 self.operateSwitch('Load Switch', False)
                 saveDischarge()
@@ -906,12 +925,14 @@ class MainApp(tk.Tk):
         if hasattr(self, 'NI_DAQ'):
             if not DEBUG_MODE:
                 voltages = self.NI_DAQ.h_task_ai.read()
-                # Retrieve charging data
                 # voltages = self.NI_DAQ.read()
+                # Retrieve charging data
+                # voltages = self.NI_DAQ.data
             else:
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
             currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
+            # voltagePSPoint = voltages[]
 
             # Only record the voltage when the switch is closed
             # This occurs during all of charging and intermittently when the capacitor is isolated

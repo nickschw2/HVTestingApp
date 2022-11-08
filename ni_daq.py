@@ -67,7 +67,7 @@ class NI_DAQ():
         SET UP ANALOG INPUT
         '''
         if len(self.ai_channels) != 0:
-            self._points_to_plot = int(self.sample_rate) # somewhat arbritrarily, the number of points to read at once from the buffer
+            self._points_to_plot = int(self.sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
             self.h_task_ai.timing.cfg_samp_clk_timing(self.sample_rate,
                                     sample_mode=AcquisitionType.CONTINUOUS,
                                     samps_per_chan=self._points_to_plot)
