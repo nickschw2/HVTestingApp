@@ -1,7 +1,7 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
 ADMIN_MODE = False
-SHOT_MODE = True
+SHOT_MODE = False
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V

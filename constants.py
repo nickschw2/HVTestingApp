@@ -68,21 +68,6 @@ fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$'
 chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
 dischargeHandles = [voltageLine, currentLine, fitLine]
 
-checklist_steps = ['Ensure that power supply is off',
-     'Ensure that the charging switch is open']
-    # 'Check system is grounded',
-    # 'Turn on power supply',
-    # 'Enter serial number, charge voltage, and hold charge time',
-    # 'Exit room and ensure nobody else is present',
-    # 'Turn on HV Testing Light',
-    # 'Close charging switch',
-    # 'Increase voltage on power supply',
-    # 'Open charging switch',
-    # 'Trigger ignitron',
-    # 'Save scope and video data',
-    # 'Enter room, turn off power supply, and "idiot stick" all HV lines',
-    # 'Turn off HV testing light']
-
 # Saving results
 columns = ['Serial Number',
     'Capacitance (uF)',
@@ -103,3 +88,23 @@ columns = ['Serial Number',
     'Discharge Current (A)',
     'Interferometer (V)',
     'Diamagnetic (V)']
+
+# columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
+#     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
+#     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
+#     'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
+#     'polarizationIndex': {'name': 'PI', 'type': 'scalar'},
+#     'internalResistance': {'name': 'Internal Resistance (Ohms)', 'type': 'scalar'},
+#     'waterResistance': {'name': 'Water Resistance (Ohms)', 'type': 'scalar'},
+#     'chargeVoltage': {'name': 'Charged Voltage (kV)', 'type': 'scalar'},
+#     'holdChargeTime': {'name': 'Hold Charge Time (s)', 'type': 'scalar'},
+#     'chargeTime': {'name': 'Charge Time (s)', 'type': 'array'},
+#     'chargeVoltagePS': {'name': 'Charge Voltage PS (V)', 'type': 'array'},
+#     'chargeCurrentPS': {'name': 'Charge Current PS (A)', 'type': 'array'},
+#     'capacitorVoltage': {'name': 'Capacitor Voltage (V)', 'type': 'array'},
+#     'dischargeTime': {'name': 'Discharge Time', 'type': 'array'},
+#     'dischargeTimeUnit': {'name': 'Discharge Time Unit', 'type': 'scalar'},
+#     'dischargeVoltageLoad': {'name': 'Discharge Voltage (V)', 'type': 'array'},
+#     'dischargeCurrentLoad': {'name': 'Discharge Current (A)', 'type': 'array'},
+#     'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
+#     'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'}}

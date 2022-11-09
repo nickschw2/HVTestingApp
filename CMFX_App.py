@@ -1,8 +1,17 @@
 from TestingApp import *
 
-class CapTestingApp(TestingApp):
+class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
+        # set theme
+        self.tk.call('source', 'Sun-Valley-ttk-theme/sun-valley.tcl')
+        self.tk.call('set_theme', 'light')
+
+        # Change style
+        style = ttk.Style(self)
+        style.configure('TButton', **button_opts)
+        style.configure('TCheckbutton', **text_opts)
+        style.configure('TLabelframe.Label', **text_opts)
 
         self.configure_ui()
         self.init_ui()
@@ -16,13 +25,6 @@ class CapTestingApp(TestingApp):
 
         # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
-
-        self.saveFolderSet = False
-        # Initialize pins to default values
-        self.scopePins = scopeChannelDefaults
-        self.ao_Pins = ao_Defaults
-        self.ai_Pins = ai_Defaults
-        self.do_Pins = do_Defaults
 
         self.dischargeTimeUnit = 's' # arbritrarily
 
@@ -224,6 +226,14 @@ class CapTestingApp(TestingApp):
         # Initialize internalResistance to save the discharge
         self.internalResistance = np.nan
         self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance / 1e6:.2f} M\u03A9')
+
+    def pinSelector(self):
+        # Create popup window with fields for username and password
+        self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
+        self.setPinWindow.title('Set Pins')
+        # Bring pop up to the center and top
+        self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
+        self.setPinWindow.attributes('-topmost', True)
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
