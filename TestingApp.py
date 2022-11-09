@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
+import sv_ttk
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -28,8 +29,7 @@ class TestingApp(tk.Tk):
     def __init__(self):
         super().__init__()
         # set theme
-        self.tk.call('source', 'Sun-Valley-ttk-theme/sun-valley.tcl')
-        self.tk.call('set_theme', 'light')
+        sv_ttk.set_theme('light')
 
         # Change style
         style = ttk.Style(self)

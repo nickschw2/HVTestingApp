@@ -3,15 +3,6 @@ from TestingApp import *
 class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
-        # set theme
-        self.tk.call('source', 'Sun-Valley-ttk-theme/sun-valley.tcl')
-        self.tk.call('set_theme', 'light')
-
-        # Change style
-        style = ttk.Style(self)
-        style.configure('TButton', **button_opts)
-        style.configure('TCheckbutton', **text_opts)
-        style.configure('TLabelframe.Label', **text_opts)
 
         self.configure_ui()
         self.init_ui()
@@ -21,173 +12,176 @@ class CMFX_App(TestingApp):
 
     def configure_ui(self):
         # set title
-        self.title('HV Capacitor Testing')
+        self.title('CMFX App')
 
         # This line of code is customary to quit the application when it is closed
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
-        self.dischargeTimeUnit = 's' # arbritrarily
+        self.console = ttk.LabelFrame(self, text='Console', style='Accent.TLabelframe')
 
-        self.chargeFraction = tk.DoubleVar()
-        self.chargeFraction.set(0.0)
-
-        # Row for user inputs on the top
-        self.userInputs = ttk.LabelFrame(self, text='User Inputs', **frame_opts)
-        self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=framePadding)
-
-        # User input fields along with a button for setting them
-        self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
-        self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
-        self.holdChargeTimeLabel = ttk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
-
-        self.serialNumberEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-        self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
-
-        self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
-
-        self.serialNumberLabel.pack(side='left')
-        self.serialNumberEntry.pack(side='left', padx=(0, userInputPadding))
-        self.chargeVoltageLabel.pack(side='left')
-        self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
-        self.holdChargeTimeLabel.pack(side='left')
-        self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
-        self.userInputOkayButton.pack(side='left')
-
-        # Column for labels on the left
-        self.grid_columnconfigure(0, w=1)
-        self.labels = ttk.LabelFrame(self, text='Capacitor State', **frame_opts)
-        self.labels.grid(row=1, column=0, padx=framePadding)
-
-        # Voltage and current are read from the power supply
-        self.voltagePSText = tk.StringVar()
-        self.currentPSText = tk.StringVar()
-        self.capacitorVoltageText = tk.StringVar()
-        self.chargeStateText = tk.StringVar()
-        self.countdownText = tk.StringVar()
-        self.internalResistanceText = tk.StringVar()
-
-        self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
-        self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
-        self.capacitorVoltageLabel = ttk.Label(self.labels, textvariable=self.capacitorVoltageText, **text_opts)
-        self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
-        self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
-        self.internalResistanceLabel = ttk.Label(self.labels, textvariable=self.internalResistanceText, **text_opts)
-        self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
-
-        self.voltagePSLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
-        self.currentPSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
-        self.capacitorVoltageLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
-        self.chargeStateLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
-        self.countdownLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
-        self.internalResistanceLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
-        self.progress.grid(column=1, row=0, rowspan=6, pady=labelPadding, padx=labelPadding)
-
-        # Row for buttons on the bottom
-        self.grid_rowconfigure(2, w=1)
-        self.buttons = ttk.LabelFrame(self, text='Operate Capacitor', **frame_opts)
-        self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=framePadding)
-
-        # Button definitions and placement
-        self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
-                                    command=self.checklist, style='Accent.TButton')
-        self.chargeButton = ttk.Button(self.buttons, text='Charge',
-                                    command=self.charge, style='Accent.TButton')
-        self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, style='Accent.TButton')
-        self.emergency_offButton = ttk.Button(self.buttons, text='Emergency Off',
-                                    command=self.emergency_off, style='Accent.TButton')
-        self.resetButton = ttk.Button(self.buttons, text='Reset',
-                                    command=self.reset, style='Accent.TButton')
-
-        self.checklistButton.pack(side='left', padx=buttonPadding)
-        self.chargeButton.pack(side='left', padx=buttonPadding)
-        self.dischargeButton.pack(side='left', padx=buttonPadding)
-        self.emergency_offButton.pack(side='left', padx=buttonPadding)
-        self.resetButton.pack(side='left', padx=buttonPadding)
-
-        # Menubar at the top
-        self.menubar = tk.Menu(self)
-        self.filemenu = tk.Menu(self.menubar, tearoff=0)
-        self.filemenu.add_command(label='Open', command=self.readResults)
-        self.filemenu.add_command(label='Save Folder', command=self.setSaveLocation)
-        self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
-        self.filemenu.add_separator()
-        self.filemenu.add_command(label='Quit', command=self.on_closing)
-        self.menubar.add_cascade(label='File', menu=self.filemenu)
-
-        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
-        self.helpmenu.add_command(label='Help', command=self.help)
-        self.helpmenu.add_command(label='About...', command=self.openSite)
-        self.menubar.add_cascade(label='Help', menu=self.helpmenu)
-
-        self.config(menu=self.menubar)
-
-        # Configure Graphs
-        self.grid_rowconfigure(1, w=1)
-        self.grid_columnconfigure(1, w=1)
-        self.grid_columnconfigure(2, w=1)
-
-        # Plot of charge and discharge
-        # Put plots and navigation bars in their own frames
-        self.chargeFrame = ttk.Frame(self)
-        self.dischargeFrame = ttk.Frame(self)
-
-        self.chargeFrame.grid(row=1, column=1, sticky='ew', padx=plotPadding)
-        self.dischargeFrame.grid(row=1, column=2, sticky='ew', padx=plotPadding)
-
-        self.chargePlot = CanvasPlot(self.chargeFrame)
-        self.dischargePlot = CanvasPlot(self.dischargeFrame)
-
-        # Create two y-axes for current and voltage
-        self.chargeVoltageAxis = self.chargePlot.ax
-        self.chargeCurrentAxis = self.chargePlot.ax.twinx()
-        self.dischargeVoltageAxis = self.dischargePlot.ax
-        self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
-
-        self.chargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
-        self.chargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
-        self.dischargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
-        self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
-
-        self.chargePlot.ax.set_xlabel('Time (s)')
-
-        self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
-        self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
-        self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
-
-        self.chargePlot.ax.set_title('Charge Plot')
-        self.dischargePlot.ax.set_title('Discharge Plot')
-
-        # Add lines to charging plot blit animation
-        self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
-        self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
-        self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
-        self.fitVoltageLine, = self.chargeVoltageAxis.plot([],[], color=fitColor, linestyle='-') #Create line object on plot
-        self.chargePlot.ax.set_xlim(0, plotTimeLimit)
-        self.chargeVoltageAxis.set_ylim(0, voltageYLim)
-        self.chargeCurrentAxis.set_ylim(0, currentYLim)
-
-        # Add two lines and x axis for now
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.fitVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
-
-        # Create the legends before any plot is made
-        self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
-        self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper right')
-
-        # Add navigation toolbar to plots
-        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargeFrame)
-        self.dischargePlotToolbar = NavigationToolbar2Tk(self.dischargePlot.canvas, self.dischargeFrame)
-
-        self.chargePlotToolbar.update()
-        self.dischargePlotToolbar.update()
-
-        self.chargePlot.pack(side='top')
-        self.dischargePlot.pack(side='top')
-
-        self.chargePlotToolbar.pack(side='bottom')
-        self.dischargePlotToolbar.pack(side='bottom')
+        # self.dischargeTimeUnit = 's' # arbritrarily
+        #
+        # # Initialize the charge fraction to 0
+        # self.chargeFraction = tk.DoubleVar()
+        # self.chargeFraction.set(0.0)
+        #
+        # # Row for user inputs on the top
+        # self.userInputs = ttk.LabelFrame(self, text='User Inputs', **frame_opts)
+        # self.userInputs.grid(row=0, columnspan=3, sticky='ns', pady=framePadding)
+        #
+        # # User input fields along with a button for setting them
+        # self.serialNumberLabel = ttk.Label(self.userInputs, text='Cap Serial #:', **text_opts)
+        # self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
+        # self.holdChargeTimeLabel = ttk.Label(self.userInputs, text='Hold Charge (s):', **text_opts)
+        #
+        # self.serialNumberEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        # self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        # self.holdChargeTimeEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
+        #
+        # self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
+        #
+        # self.serialNumberLabel.pack(side='left')
+        # self.serialNumberEntry.pack(side='left', padx=(0, userInputPadding))
+        # self.chargeVoltageLabel.pack(side='left')
+        # self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
+        # self.holdChargeTimeLabel.pack(side='left')
+        # self.holdChargeTimeEntry.pack(side='left', padx=(0, userInputPadding))
+        # self.userInputOkayButton.pack(side='left')
+        #
+        # # Column for labels on the left
+        # self.grid_columnconfigure(0, w=1)
+        # self.labels = ttk.LabelFrame(self, text='Capacitor State', **frame_opts)
+        # self.labels.grid(row=1, column=0, padx=framePadding)
+        #
+        # # Voltage and current are read from the power supply
+        # self.voltagePSText = tk.StringVar()
+        # self.currentPSText = tk.StringVar()
+        # self.capacitorVoltageText = tk.StringVar()
+        # self.chargeStateText = tk.StringVar()
+        # self.countdownText = tk.StringVar()
+        # self.internalResistanceText = tk.StringVar()
+        #
+        # self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
+        # self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
+        # self.capacitorVoltageLabel = ttk.Label(self.labels, textvariable=self.capacitorVoltageText, **text_opts)
+        # self.chargeStateLabel = ttk.Label(self.labels, textvariable=self.chargeStateText, **text_opts)
+        # self.countdownLabel = ttk.Label(self.labels, textvariable=self.countdownText, **text_opts)
+        # self.internalResistanceLabel = ttk.Label(self.labels, textvariable=self.internalResistanceText, **text_opts)
+        # self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
+        #
+        # self.voltagePSLabel.grid(column=0, row=0, pady=labelPadding, padx=labelPadding)
+        # self.currentPSLabel.grid(column=0, row=1, pady=labelPadding, padx=labelPadding)
+        # self.capacitorVoltageLabel.grid(column=0, row=2, pady=labelPadding, padx=labelPadding)
+        # self.chargeStateLabel.grid(column=0, row=3, pady=labelPadding, padx=labelPadding)
+        # self.countdownLabel.grid(column=0, row=4, pady=labelPadding, padx=labelPadding)
+        # self.internalResistanceLabel.grid(column=0, row=5, pady=labelPadding, padx=labelPadding)
+        # self.progress.grid(column=1, row=0, rowspan=6, pady=labelPadding, padx=labelPadding)
+        #
+        # # Row for buttons on the bottom
+        # self.grid_rowconfigure(2, w=1)
+        # self.buttons = ttk.LabelFrame(self, text='Operate Capacitor', **frame_opts)
+        # self.buttons.grid(row=2, columnspan=3, sticky='ns', pady=framePadding)
+        #
+        # # Button definitions and placement
+        # self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
+        #                             command=self.checklist, style='Accent.TButton')
+        # self.chargeButton = ttk.Button(self.buttons, text='Charge',
+        #                             command=self.charge, style='Accent.TButton')
+        # self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
+        #                             command=self.discharge, style='Accent.TButton')
+        # self.emergency_offButton = ttk.Button(self.buttons, text='Emergency Off',
+        #                             command=self.emergency_off, style='Accent.TButton')
+        # self.resetButton = ttk.Button(self.buttons, text='Reset',
+        #                             command=self.reset, style='Accent.TButton')
+        #
+        # self.checklistButton.pack(side='left', padx=buttonPadding)
+        # self.chargeButton.pack(side='left', padx=buttonPadding)
+        # self.dischargeButton.pack(side='left', padx=buttonPadding)
+        # self.emergency_offButton.pack(side='left', padx=buttonPadding)
+        # self.resetButton.pack(side='left', padx=buttonPadding)
+        #
+        # # Menubar at the top
+        # self.menubar = tk.Menu(self)
+        # self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        # self.filemenu.add_command(label='Open', command=self.readResults)
+        # self.filemenu.add_command(label='Save Folder', command=self.setSaveLocation)
+        # self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
+        # self.filemenu.add_separator()
+        # self.filemenu.add_command(label='Quit', command=self.on_closing)
+        # self.menubar.add_cascade(label='File', menu=self.filemenu)
+        #
+        # self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        # self.helpmenu.add_command(label='Help', command=self.help)
+        # self.helpmenu.add_command(label='About...', command=self.openSite)
+        # self.menubar.add_cascade(label='Help', menu=self.helpmenu)
+        #
+        # self.config(menu=self.menubar)
+        #
+        # # Configure Graphs
+        # self.grid_rowconfigure(1, w=1)
+        # self.grid_columnconfigure(1, w=1)
+        # self.grid_columnconfigure(2, w=1)
+        #
+        # # Plot of charge and discharge
+        # # Put plots and navigation bars in their own frames
+        # self.chargeFrame = ttk.Frame(self)
+        # self.dischargeFrame = ttk.Frame(self)
+        #
+        # self.chargeFrame.grid(row=1, column=1, sticky='ew', padx=plotPadding)
+        # self.dischargeFrame.grid(row=1, column=2, sticky='ew', padx=plotPadding)
+        #
+        # self.chargePlot = CanvasPlot(self.chargeFrame)
+        # self.dischargePlot = CanvasPlot(self.dischargeFrame)
+        #
+        # # Create two y-axes for current and voltage
+        # self.chargeVoltageAxis = self.chargePlot.ax
+        # self.chargeCurrentAxis = self.chargePlot.ax.twinx()
+        # self.dischargeVoltageAxis = self.dischargePlot.ax
+        # self.dischargeCurrentAxis = self.dischargePlot.ax.twinx()
+        #
+        # self.chargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
+        # self.chargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
+        # self.dischargeVoltageAxis.tick_params(axis='y', labelcolor=voltageColor)
+        # self.dischargeCurrentAxis.tick_params(axis='y', labelcolor=currentColor)
+        #
+        # self.chargePlot.ax.set_xlabel('Time (s)')
+        #
+        # self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
+        # self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
+        # self.dischargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
+        # self.dischargeCurrentAxis.set_ylabel('Current (A)', color=currentColor)
+        #
+        # self.chargePlot.ax.set_title('Charge Plot')
+        # self.dischargePlot.ax.set_title('Discharge Plot')
+        #
+        # # Add lines to charging plot blit animation
+        # self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
+        # self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
+        # self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
+        # self.fitVoltageLine, = self.chargeVoltageAxis.plot([],[], color=fitColor, linestyle='-') #Create line object on plot
+        # self.chargePlot.ax.set_xlim(0, plotTimeLimit)
+        # self.chargeVoltageAxis.set_ylim(0, voltageYLim)
+        # self.chargeCurrentAxis.set_ylim(0, currentYLim)
+        #
+        # # Add two lines and x axis for now
+        # self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.fitVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
+        #
+        # # Create the legends before any plot is made
+        # self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
+        # self.dischargePlot.ax.legend(handles=dischargeHandles, loc='upper right')
+        #
+        # # Add navigation toolbar to plots
+        # self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargeFrame)
+        # self.dischargePlotToolbar = NavigationToolbar2Tk(self.dischargePlot.canvas, self.dischargeFrame)
+        #
+        # self.chargePlotToolbar.update()
+        # self.dischargePlotToolbar.update()
+        #
+        # self.chargePlot.pack(side='top')
+        # self.dischargePlot.pack(side='top')
+        #
+        # self.chargePlotToolbar.pack(side='bottom')
+        # self.dischargePlotToolbar.pack(side='bottom')
 
     def init_ui(self):
         # Begin the operation of the program
@@ -226,14 +220,6 @@ class CMFX_App(TestingApp):
         # Initialize internalResistance to save the discharge
         self.internalResistance = np.nan
         self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance / 1e6:.2f} M\u03A9')
-
-    def pinSelector(self):
-        # Create popup window with fields for username and password
-        self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
-        self.setPinWindow.title('Set Pins')
-        # Bring pop up to the center and top
-        self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
-        self.setPinWindow.attributes('-topmost', True)
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
