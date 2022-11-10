@@ -17,6 +17,7 @@ from scope import *
 from ni_daq import *
 from timer import *
 from gpib import *
+from console import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
