@@ -29,6 +29,10 @@ lightGrey = '#a9a1a1'
 defaultbg = '#f0f0f0'
 UMDRed = '#e03a3d'
 
+sv_blue = '#005fb8'
+sv_selfg = '#fafafa'
+sv_bg = '#a0a0a0'
+
 # Widget display constants
 userInputWidth = 8
 userInputPadding = 50 #pixels

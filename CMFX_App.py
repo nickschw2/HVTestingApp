@@ -18,20 +18,20 @@ class CMFX_App(TestingApp):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Notebook creates tabs at the top
-        self.notebook = ttk.Notebook(self, style='Accent.TNotebook')
+        self.notebook = ttk.Notebook(self, takefocus=False)
         self.notebook.pack(expand=True, side='top')
 
         tabNames = ['System Status', 'Charging', 'Results']
         self.notebookFrames = {}
         for tabName in tabNames:
-            frame = ttk.Frame(self.notebook, style='Accent.TFrame', **frame_opts)
+            frame = ttk.Frame(self.notebook, **frame_opts)
             frame.pack(expand=True)
             self.notebook.add(frame, text=tabName)
             self.notebookFrames[tabName] = frame
 
         # Add status indicators to notebook
         # Add frame for text labels
-        self.labels = ttk.LabelFrame(self.notebookFrames['System Status'], text='High Voltage Status', style='Accent.TLabelframe', **frame_opts)
+        self.labels = ttk.LabelFrame(self.notebookFrames['System Status'], text='High Voltage Status', **frame_opts)
         self.labels.pack(side='left')
 
         # Voltage and current are read from the power supply
@@ -42,31 +42,54 @@ class CMFX_App(TestingApp):
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
         self.capacitorVoltageLabel = ttk.Label(self.labels, textvariable=self.capacitorVoltageText, **text_opts)
-        self.progress = ttk.Progressbar(self.labels, orient='vertical', value=0, mode='determinate', length=progressBarLength)
 
         self.voltagePSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.capacitorVoltageLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
-        self.progress.pack(side='right', fill='y', pady=labelPadding, padx=labelPadding)
 
         # Add charging input to notebook
-        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', style='Accent.TLabelframe', **frame_opts)
+        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', **frame_opts)
         self.userInputs.pack(side='top')
 
-        self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', style='Accent.TLabel', **text_opts)
-        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, style='Accent.TEntry', **entry_opts)
+        self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):', **text_opts)
+        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, **entry_opts)
         self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, style='Accent.TButton')
 
         self.chargeVoltageLabel.pack(side='left')
         self.chargeVoltageEntry.pack(side='left', padx=(0, userInputPadding))
         self.userInputOkayButton.pack(side='left')
 
+        # New frame for plot and other indicators in one row
+        self.chargingStatusFrame = ttk.Frame(self.notebookFrames['Charging'], **frame_opts)
+        self.chargingStatusFrame.pack(side='top')
+
+        # Frame for indicators
+        self.chargingIndicatorsFrame = ttk.Frame(self.chargingStatusFrame, **frame_opts)
+        self.chargingIndicatorsFrame.pack(side='left')
+
+        # Add progress bar to notebook
+        self.canvas = tk.Canvas(self.chargingIndicatorsFrame, width=200, height=200, bg=sv_selfg)
+        self.canvas.pack(side='top')
+
+        self.progressBar = CircularProgressbar(self.canvas, 0, 0, 200, 200, 20)
+        # self.progressBar.start()
+
+        # Add status widgets
+        self.chargeStateText = tk.StringVar()
+        self.countdownText = tk.StringVar()
+
+        self.chargeStateLabel = ttk.Label(self.chargingIndicatorsFrame, textvariable=self.chargeStateText, **text_opts)
+        self.countdownLabel = ttk.Label(self.chargingIndicatorsFrame, textvariable=self.countdownText, **text_opts)
+
+        self.chargeStateLabel.pack(side='top')
+        self.countdownLabel.pack(side='top')
+
         # Plot of charge
         # Put plots and navigation bar in their own frames
-        self.chargeFrame = ttk.Frame(self.notebookFrames['Charging'], style='Accent.TFrame', **frame_opts)
-        self.chargeFrame.pack(side='top')
+        self.chargePlotFrame = ttk.Frame(self.chargingStatusFrame, **frame_opts)
+        self.chargePlotFrame.pack(side='right')
 
-        self.chargePlot = CanvasPlot(self.chargeFrame)
+        self.chargePlot = CanvasPlot(self.chargePlotFrame)
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
@@ -97,14 +120,14 @@ class CMFX_App(TestingApp):
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
 
         # Add navigation toolbar to plots
-        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargeFrame)
+        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargePlotFrame)
         self.chargePlotToolbar.update()
 
         self.chargePlot.pack(side='top')
         self.chargePlotToolbar.pack(side='bottom')
 
         # Row for buttons on the bottom
-        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', style='Accent.TLabelframe', **frame_opts)
+        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', **frame_opts)
         self.buttons.pack(side='top')
 
         # Button definitions and placement
@@ -122,8 +145,24 @@ class CMFX_App(TestingApp):
         self.dischargeButton.pack(side='left', padx=buttonPadding)
         self.resetButton.pack(side='left', padx=buttonPadding)
 
+        # Add features to Results tab
+        # Frame for selecting which plots to show
+        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', **frame_opts)
+        self.selectorFrame.pack(side='left')
+
+        plotOptions = ['Voltage/Current', 'Interferometer', 'Diamagnetic']
+        self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', takefocus=False)
+        self.resultsPlotCombobox.current(0)
+        self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot())
+        self.resultsPlotCombobox.pack(side='top')
+
+
+        # Frame for displaying the results plots
+        self.resultsPlotFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Results', **frame_opts)
+        self.resultsPlotFrame.pack(side='right')
+
         # Console output will always be visible, displays system output
-        self.consoleFrame = ttk.LabelFrame(self, text='Console', style='Accent.TLabelframe', **frame_opts)
+        self.consoleFrame = ttk.LabelFrame(self, text='Console', **frame_opts)
         self.consoleFrame.pack(expand=True, side='bottom')
 
         self.console = Console(self.consoleFrame)
@@ -149,6 +188,7 @@ class CMFX_App(TestingApp):
 
     def init_ui(self):
         print('init_ui')
+        self.reset()
 
     def readResults(self):
         print('read results')
@@ -158,6 +198,14 @@ class CMFX_App(TestingApp):
 
     def reset(self):
         print('reset')
+        self.chargeStateText.set('Idle')
+        self.countdownText.set('Coundtown')
+        self.voltagePSText.set('voltage_PS')
+        self.currentPSText.set('current_PS')
+        self.capacitorVoltageText.set('V_cap')
 
     def setUserInputs(self):
         print('set user inputs')
+
+    def changeResultsPlot(self):
+        print(self.resultsPlotCombobox.get())
