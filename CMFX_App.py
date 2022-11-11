@@ -150,12 +150,17 @@ class CMFX_App(TestingApp):
         self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', **frame_opts)
         self.selectorFrame.pack(side='left')
 
+        # Selector for showing a certain plot
         plotOptions = ['Voltage/Current', 'Interferometer', 'Diamagnetic']
         self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', takefocus=False)
         self.resultsPlotCombobox.current(0)
-        self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot())
+        self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot)
         self.resultsPlotCombobox.pack(side='top')
 
+        # Initialize list of checkbuttons
+        self.resultsCheckbuttons = []
+        self.resultsPlots = {}
+        self.changeResultsPlot('') # Have to pass a dummy variable
 
         # Frame for displaying the results plots
         self.resultsPlotFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Results', **frame_opts)
@@ -207,5 +212,26 @@ class CMFX_App(TestingApp):
     def setUserInputs(self):
         print('set user inputs')
 
-    def changeResultsPlot(self):
-        print(self.resultsPlotCombobox.get())
+    def changeResultsPlot(self, event):
+        # Remove all checkbuttons
+        for checkButton in self.resultsCheckbuttons:
+            checkButton.pack_forget()
+
+        self.resultsCheckbuttons = []
+
+        plotSelection = self.resultsPlotCombobox.get()
+
+        ########## NEED TO CHANGE THESE NAMES INTO DICTIONARIES ########
+        checkbuttonNames = ['Voltage', 'Current']
+        if plotSelection == 'Voltage/Current':
+            checkbuttonNames = ['Voltage', 'Current']
+        elif plotSelection == 'Interferometer':
+            checkbuttonNames = ['Central']
+        elif plotSelection == 'Diamagnetic':
+            checkbuttonNames = ['Axial', 'Radial']
+
+        for checkbuttonName in checkbuttonNames:
+            checkbutton = ttk.Checkbutton(self.selectorFrame, text=checkbuttonName, style='Switch.TCheckbutton')
+            checkbutton.invoke()
+            checkbutton.pack(anchor='w')
+            self.resultsCheckbuttons.append(checkbutton)
