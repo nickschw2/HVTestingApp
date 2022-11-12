@@ -12,15 +12,15 @@ from constants import *
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
 
-    def __init__(self, master):
+    def __init__(self, master, **kwargs):
         super().__init__(master)
         self.master = master
-        self.fig, self.ax = plt.subplots(constrained_layout=True)
+        self.fig, self.ax = plt.subplots(constrained_layout=True, **kwargs)
         # self.fig.patch.set_facecolor(defaultbg)
         self.line, = self.ax.plot([],[]) #Create line object on plot
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
-        self.canvas.get_tk_widget().pack(expand=1, fill=tk.BOTH)
+        self.canvas.get_tk_widget().pack(expand=True, fill=tk.BOTH)
 
     def updatePlot(self):
         #update graph

@@ -4,8 +4,11 @@ class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
 
+        # Create and show user interface
         self.configure_ui()
         self.init_ui()
+
+        # Connect to instruments
         if not DEBUG_MODE:
             self.init_DAQ()
             self.init_PulseGenerator()
@@ -29,12 +32,12 @@ class CMFX_App(TestingApp):
             self.notebook.add(frame, text=tabName)
             self.notebookFrames[tabName] = frame
 
-        # Add status indicators to notebook
+        #### SYSTEM STATUS SECTION ####
         # Add frame for text labels
         self.labels = ttk.LabelFrame(self.notebookFrames['System Status'], text='High Voltage Status', **frame_opts)
         self.labels.pack(side='left')
 
-        # Voltage and current are read from the power supply
+        # Create text variables for status indicators, associate with labels, and place
         self.voltagePSText = tk.StringVar()
         self.currentPSText = tk.StringVar()
         self.capacitorVoltageText = tk.StringVar()
@@ -47,6 +50,7 @@ class CMFX_App(TestingApp):
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.capacitorVoltageLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
 
+        #### CHARGING SECTION ####
         # Add charging input to notebook
         self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', **frame_opts)
         self.userInputs.pack(side='top')
@@ -74,7 +78,7 @@ class CMFX_App(TestingApp):
         self.progressBar = CircularProgressbar(self.canvas, 0, 0, 200, 200, 20)
         # self.progressBar.start()
 
-        # Add status widgets
+        # Add status variables, associate with labels, and place them
         self.chargeStateText = tk.StringVar()
         self.countdownText = tk.StringVar()
 
@@ -85,11 +89,7 @@ class CMFX_App(TestingApp):
         self.countdownLabel.pack(side='top')
 
         # Plot of charge
-        # Put plots and navigation bar in their own frames
-        self.chargePlotFrame = ttk.Frame(self.chargingStatusFrame, **frame_opts)
-        self.chargePlotFrame.pack(side='right')
-
-        self.chargePlot = CanvasPlot(self.chargePlotFrame)
+        self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
@@ -102,8 +102,6 @@ class CMFX_App(TestingApp):
 
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=voltageColor)
         self.chargeCurrentAxis.set_ylabel('Current (mA)', color=currentColor)
-
-        self.chargePlot.ax.set_title('Charge Plot')
 
         # Add lines to charging plot blit animation
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
@@ -120,11 +118,11 @@ class CMFX_App(TestingApp):
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
 
         # Add navigation toolbar to plots
-        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargePlotFrame)
+        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargingStatusFrame)
         self.chargePlotToolbar.update()
 
-        self.chargePlot.pack(side='top')
-        self.chargePlotToolbar.pack(side='bottom')
+        # Place plot with toolbar in frame
+        self.chargePlot.pack(side='right')
 
         # Row for buttons on the bottom
         self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', **frame_opts)
@@ -145,33 +143,59 @@ class CMFX_App(TestingApp):
         self.dischargeButton.pack(side='left', padx=buttonPadding)
         self.resetButton.pack(side='left', padx=buttonPadding)
 
-        # Add features to Results tab
+        #### RESULTS SECTION ####
+        # Frame for displaying the results plots
+        self.resultsPlotFrame = ttk.Frame(self.notebookFrames['Results'], **frame_opts)
+        self.resultsPlotFrame.pack(side='right')
+
+        # Add plot and toolbar to frame
+        self.resultsPlot = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
+        self.resultsPlot.ax.grid(which='both')
+        self.resultsPlotToolbar = NavigationToolbar2Tk(self.resultsPlot.canvas, self.resultsPlotFrame)
+        self.resultsPlotToolbar.update()
+
+        self.resultsPlot.pack()
+
         # Frame for selecting which plots to show
         self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', **frame_opts)
-        self.selectorFrame.pack(side='left')
+        self.selectorFrame.pack(side='left', anchor='n')
 
         # Selector for showing a certain plot
-        plotOptions = ['Voltage/Current', 'Interferometer', 'Diamagnetic']
-        self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', takefocus=False)
-        self.resultsPlotCombobox.current(0)
+        plotOptions = list(resultsPlots.keys())
+        self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly')
+        self.resultsPlotCombobox.current(0) # Initializes the current value to first option
         self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot)
         self.resultsPlotCombobox.pack(side='top')
 
-        # Initialize list of checkbuttons
-        self.resultsCheckbuttons = []
-        self.resultsPlots = {}
-        self.changeResultsPlot('') # Have to pass a dummy variable
+        # Initialize checkbuttons
+        self.resultsCheckbuttons = {}
+        for plotOption, plotProperties in resultsPlots.items():
+            # Need to create a dictionary for each checkbutton corresponding to its label
+            self.resultsCheckbuttons[plotOption] = {}
+            for label in plotProperties['lines']:
+                checkbutton = ttk.Checkbutton(self.selectorFrame, text=label, style='Switch.TCheckbutton')
+                checkbutton.invoke() # Initialize it to be turned on
+                checkbutton.bind('<Button>', self.changeResultsPlot)
+                self.resultsCheckbuttons[plotOption][label] = checkbutton
 
-        # Frame for displaying the results plots
-        self.resultsPlotFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Results', **frame_opts)
-        self.resultsPlotFrame.pack(side='right')
+        # Set initial state, have to pass a dummy variable
+        self.changeResultsPlot(None)
 
-        # Console output will always be visible, displays system output
+        #### CONSOLE SECTION ####
+        # Create frame to hold console and scroll bar
         self.consoleFrame = ttk.LabelFrame(self, text='Console', **frame_opts)
-        self.consoleFrame.pack(expand=True, side='bottom')
+        self.consoleFrame.pack(fill='x', side='bottom')
 
-        self.console = Console(self.consoleFrame)
-        self.console.pack(expand=True, fill='x')
+        # Console will output the sys.stdout messages
+        # Scrollbar is attached to console
+        self.scrollbar = ttk.Scrollbar(self.consoleFrame, orient='vertical')
+        self.scrollbar.pack(side='right', fill='y')
+
+        # Height is number of lines to be displayed
+        # Link the textbox to scrollbar as well so that the length of bar corresponds
+        self.console = Console(self.consoleFrame, height=10, yscrollcommand=self.scrollbar.set)
+        self.scrollbar.config(command=self.console.yview)
+        self.console.pack(side='left', fill='x', expand=True)
 
         # Menubar at the top
         self.menubar = tk.Menu(self)
@@ -193,6 +217,10 @@ class CMFX_App(TestingApp):
 
     def init_ui(self):
         print('init_ui')
+        # Begin the operation of the program
+        # center the app
+        self.eval('tk::PlaceWindow . center')
+
         self.reset()
 
     def readResults(self):
@@ -213,25 +241,49 @@ class CMFX_App(TestingApp):
         print('set user inputs')
 
     def changeResultsPlot(self, event):
-        # Remove all checkbuttons
-        for checkButton in self.resultsCheckbuttons:
-            checkButton.pack_forget()
-
-        self.resultsCheckbuttons = []
-
+        # Get value of combobox and associated checkbuttons
         plotSelection = self.resultsPlotCombobox.get()
+        checkbuttons = self.resultsCheckbuttons[plotSelection]
 
-        ########## NEED TO CHANGE THESE NAMES INTO DICTIONARIES ########
-        checkbuttonNames = ['Voltage', 'Current']
-        if plotSelection == 'Voltage/Current':
-            checkbuttonNames = ['Voltage', 'Current']
-        elif plotSelection == 'Interferometer':
-            checkbuttonNames = ['Central']
-        elif plotSelection == 'Diamagnetic':
-            checkbuttonNames = ['Axial', 'Radial']
+        # Need to tell if event came from the combobox or a checkbutton
+        # event==None is for dummy variable instantiation
+        if event==None or isinstance(event.widget, ttk.Combobox):
+            # Remove current checkbuttons
+            for widget in self.selectorFrame.winfo_children():
+                if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
+                    widget.pack_forget()
 
-        for checkbuttonName in checkbuttonNames:
-            checkbutton = ttk.Checkbutton(self.selectorFrame, text=checkbuttonName, style='Switch.TCheckbutton')
-            checkbutton.invoke()
-            checkbutton.pack(anchor='w')
-            self.resultsCheckbuttons.append(checkbutton)
+            # Remove current lines from plot
+            self.clearFigLines(self.resultsPlot.fig)
+
+            # Change checkbuttons to new selection
+            for checkbutton in checkbuttons.values():
+                checkbutton.pack(anchor='w')
+
+            # Change plot to new selection
+            plotProperties = resultsPlots[plotSelection]
+            axis = self.resultsPlot.ax
+            axis.set_xlabel(f'Time ({timeUnit})')
+            axis.set_ylabel(plotProperties['ylabel'])
+            axis.set_prop_cycle(None) # Reset the color cycle
+
+            # Some place to store the current lines on the plot to change visibility later
+            self.currentLines = {}
+            for label, data in plotProperties['lines'].items():
+                visible = checkbuttons[label].instate(['selected'])
+                line = axis.plot(timeArray, data, label=label, visible=visible)
+                self.currentLines[label] = line[0]
+
+            axis.legend()
+
+        # Change visibility of line when the checkbutton for that line is changed
+        elif isinstance(event.widget, ttk.Checkbutton):
+            label = event.widget.cget('text')
+            line = self.currentLines[label]
+            visible = checkbuttons[label].instate(['!selected'])
+            line.set_visible(visible)
+
+            self.resultsPlot.ax.legend()
+
+        # Update plot
+        self.resultsPlot.updatePlot()
