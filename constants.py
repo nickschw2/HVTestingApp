@@ -53,7 +53,7 @@ currentYLim = 15 # mA
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
 entry_opts = {'font':('Helvetica', 12), 'background': lightGrey}
-frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
+frame_opts = {'font':('Helvetica', 12), 'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001

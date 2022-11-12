@@ -1,5 +1,5 @@
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from tkinter import filedialog
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -28,6 +28,15 @@ from console import *
 class TestingApp(ttk.Window):
     def __init__(self):
         super().__init__(themename='superhero')
+        style = ttk.Style()
+        style.configure('TButton', **button_opts)
+        style.configure('TFrame', **frame_opts)
+        style.configure('TLabelframe.Label', **text_opts)
+        style.configure('TEntry', **entry_opts)
+        style.configure('TLabel', **text_opts)
+        style.configure('TNotebook.Tab', **text_opts)
+        style.configure('TCheckbutton', **text_opts)
+        self.option_add('*TCombobox*Listbox.font', text_opts)
 
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
