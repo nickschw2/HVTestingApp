@@ -26,7 +26,7 @@ class CapTestingApp(TestingApp):
 
         self.dischargeTimeUnit = 's' # arbritrarily
 
-        self.chargeFraction = tk.DoubleVar()
+        self.chargeFraction = ttk.DoubleVar()
         self.chargeFraction.set(0.0)
 
         # Row for user inputs on the top
@@ -58,12 +58,12 @@ class CapTestingApp(TestingApp):
         self.labels.grid(row=1, column=0, padx=framePadding)
 
         # Voltage and current are read from the power supply
-        self.voltagePSText = tk.StringVar()
-        self.currentPSText = tk.StringVar()
-        self.capacitorVoltageText = tk.StringVar()
-        self.chargeStateText = tk.StringVar()
-        self.countdownText = tk.StringVar()
-        self.internalResistanceText = tk.StringVar()
+        self.voltagePSText = ttk.StringVar()
+        self.currentPSText = ttk.StringVar()
+        self.capacitorVoltageText = ttk.StringVar()
+        self.chargeStateText = ttk.StringVar()
+        self.countdownText = ttk.StringVar()
+        self.internalResistanceText = ttk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
@@ -105,8 +105,8 @@ class CapTestingApp(TestingApp):
         self.resetButton.pack(side='left', padx=buttonPadding)
 
         # Menubar at the top
-        self.menubar = tk.Menu(self)
-        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar = ttk.Menu(self)
+        self.filemenu = ttk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Open', command=self.readResults)
         self.filemenu.add_command(label='Save Folder', command=self.setSaveLocation)
         self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
@@ -114,7 +114,7 @@ class CapTestingApp(TestingApp):
         self.filemenu.add_command(label='Quit', command=self.on_closing)
         self.menubar.add_cascade(label='File', menu=self.filemenu)
 
-        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu = ttk.Menu(self.menubar, tearoff=0)
         self.helpmenu.add_command(label='Help', command=self.help)
         self.helpmenu.add_command(label='About...', command=self.openSite)
         self.menubar.add_cascade(label='Help', menu=self.helpmenu)

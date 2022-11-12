@@ -1,6 +1,5 @@
-import tkinter as tk
-from tkinter import ttk, filedialog
-import sv_ttk
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,17 +25,9 @@ from console import *
 # this website has the best I can find (http://www.tcl.tk/man/tcl8.5/TkCmd/contents.htm). At times you may
 # need to manually go into the tkinter source code to investigate the behavior/capabilities of some code.
 
-class TestingApp(tk.Tk):
+class TestingApp(ttk.Window):
     def __init__(self):
-        super().__init__()
-        # set theme
-        sv_ttk.set_theme('light')
-
-        # Change style
-        style = ttk.Style(self)
-        style.configure('TButton', **button_opts)
-        style.configure('TCheckbutton', **text_opts)
-        style.configure('TLabelframe.Label', **text_opts)
+        super().__init__(themename='superhero')
 
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
@@ -77,7 +68,7 @@ class TestingApp(tk.Tk):
 
     def pinSelector(self):
         # Create popup window with fields for username and password
-        self.setPinWindow = tk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
+        self.setPinWindow = ttk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
         self.setPinWindow.title('Set Pins')
         # Bring pop up to the center and top
         self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
@@ -88,7 +79,7 @@ class TestingApp(tk.Tk):
             pins = {}
             nCols, nRows = self.setPinWindow.grid_size()
             for i, channel in enumerate(channelDefaults):
-                channelVariable = tk.StringVar()
+                channelVariable = ttk.StringVar()
                 channelVariable.set(channelDefaults[channel])
                 label = ttk.Label(self.setPinWindow, text=channel, **text_opts)
                 drop = ttk.OptionMenu(self.setPinWindow, channelVariable, channelDefaults[channel], *options)
@@ -258,7 +249,7 @@ class TestingApp(tk.Tk):
                 self.passwordEntry.delete(0, 'end')
 
         # Create popup window with fields for username and password
-        self.loginWindow = tk.Toplevel(padx=loginPadding, pady=loginPadding)
+        self.loginWindow = ttk.Toplevel(padx=loginPadding, pady=loginPadding)
         self.loginWindow.title('Login Window')
 
         # Center and bring popup to the top

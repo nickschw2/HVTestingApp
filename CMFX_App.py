@@ -38,9 +38,9 @@ class CMFX_App(TestingApp):
         self.labels.pack(side='left')
 
         # Create text variables for status indicators, associate with labels, and place
-        self.voltagePSText = tk.StringVar()
-        self.currentPSText = tk.StringVar()
-        self.capacitorVoltageText = tk.StringVar()
+        self.voltagePSText = ttk.StringVar()
+        self.currentPSText = ttk.StringVar()
+        self.capacitorVoltageText = ttk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.labels, textvariable=self.voltagePSText, **text_opts)
         self.currentPSLabel = ttk.Label(self.labels, textvariable=self.currentPSText, **text_opts)
@@ -72,15 +72,13 @@ class CMFX_App(TestingApp):
         self.chargingIndicatorsFrame.pack(side='left')
 
         # Add progress bar to notebook
-        self.canvas = tk.Canvas(self.chargingIndicatorsFrame, width=200, height=200, bg=sv_selfg)
-        self.canvas.pack(side='top')
-
-        self.progressBar = CircularProgressbar(self.canvas, 0, 0, 200, 200, 20)
-        # self.progressBar.start()
+        self.progressBar = ttk.widgets.Meter(master=self.chargingIndicatorsFrame,
+                                             stripethickness=10, subtext='Charging', textright='%')
+        self.progressBar.pack(side='top')
 
         # Add status variables, associate with labels, and place them
-        self.chargeStateText = tk.StringVar()
-        self.countdownText = tk.StringVar()
+        self.chargeStateText = ttk.StringVar()
+        self.countdownText = ttk.StringVar()
 
         self.chargeStateLabel = ttk.Label(self.chargingIndicatorsFrame, textvariable=self.chargeStateText, **text_opts)
         self.countdownLabel = ttk.Label(self.chargingIndicatorsFrame, textvariable=self.countdownText, **text_opts)
@@ -198,8 +196,8 @@ class CMFX_App(TestingApp):
         self.console.pack(side='left', fill='x', expand=True)
 
         # Menubar at the top
-        self.menubar = tk.Menu(self)
-        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar = ttk.Menu(self)
+        self.filemenu = ttk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label='Open', command=self.readResults)
         self.filemenu.add_command(label='Save Folder', command=self.setSaveLocation)
         self.filemenu.add_command(label='Set Pins', command=self.pinSelector)
@@ -207,7 +205,7 @@ class CMFX_App(TestingApp):
         self.filemenu.add_command(label='Quit', command=self.on_closing)
         self.menubar.add_cascade(label='File', menu=self.filemenu)
 
-        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu = ttk.Menu(self.menubar, tearoff=0)
         self.helpmenu.add_command(label='Help', command=self.help)
         self.helpmenu.add_command(label='About...', command=self.openSite)
         self.menubar.add_cascade(label='Help', menu=self.helpmenu)

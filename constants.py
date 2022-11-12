@@ -1,7 +1,6 @@
 import re
 import matplotlib.lines as mlines
 import datetime
-from tkinter import ttk
 
 # github website
 githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
