@@ -95,11 +95,11 @@ class NI_DAQ():
         for task in self.tasks:
             if not self._task_created(task):
                 return
-        if len(self.ao_channels) != 0:
-            self.h_task_ao.start()
+        # if len(self.ao_channels) != 0:
+        #     self.h_task_ao.start()
 
         if len(self.ai_channels) != 0:
-            self.h_task_ai.start() # Starting this task triggers the AO task
+            self.h_task_ai.start()
 
 
     def stop_acquisition(self):

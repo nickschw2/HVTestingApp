@@ -384,12 +384,14 @@ class CapTestingApp(TestingApp):
                     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
                     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
                 except visa.errors.VisaIOError:
                     self.scope.connectInstrument()
                     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
                     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
                     # self.dischargeVoltageLoad = np.array([])
                     # self.dischargeTime = np.array([])
@@ -425,7 +427,7 @@ class CapTestingApp(TestingApp):
                 popup()
                 saveDischarge()
             else:
-                self.pulseGenerator.triggerIgnitron()
+                self.triggerShot()
                 time.sleep(hardCloseWaitTime)
                 self.operateSwitch('Load Switch', False)
                 saveDischarge()
@@ -491,23 +493,27 @@ class CapTestingApp(TestingApp):
         # not applicable on startup
         if hasattr(self, 'NI_DAQ'):
             if not DEBUG_MODE:
-                voltages = self.NI_DAQ.h_task_ai.read()
+                # voltages = self.NI_DAQ.h_task_ai.read()
                 # Retrieve charging data
-                # voltages = self.NI_DAQ.data
+                self.chargeVoltagePS = self.NI_DAQ.data['Power Supply Voltage']
+                self.chargeCurrentPS = self.NI_DAQ.data['Power Supply Current']
+                self.capacitorVoltage = self.NI_DAQ.data['Capacitor Voltage']
             else:
                 voltages = self.getChargingTestVoltages()
-            voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
-            # voltagePSPoint = voltages[]
+            # voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
+            # currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
+            voltagePSPoint = self.chargeVoltagePS[-1]
+            currentPSPoint = self.chargeCurrentPS[-1]
 
             # Only record the voltage when the switch is closed
             # This occurs during all of charging and intermittently when the capacitor is isolated
+            # ADD NEW STYLE OF GETTING VOLTAGE FOR CAPACITOR VOLTAGE POINT
             if self.voltageDividerClosed:
                 self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
-                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {np.abs(self.capacitorVoltagePoint) / 1000:.2f} kV')
+                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')
 
-        self.voltagePSText.set(f'V{PSSuperscript}: {np.abs(voltagePSPoint) / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {np.abs(currentPSPoint) * 1000:.2f} mA')
+        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
 
         # Once the DAQ has made a measurement, open up the switch again
         if self.voltageDividerClosed and self.countdownStarted:

@@ -192,6 +192,22 @@ class TestingApp(ttk.Window):
         if not DEBUG_MODE:
             self.NI_DAQ.write_value(value)
 
+    def triggerShot(self):
+        # Set up a task to trigger the gating of the camera based off the pulse generator signal
+        with nidaqmx.Task() as task:
+            freq = 10000
+            duty_cycle = 0.5
+            task.co_channels.add_co_pulse_chan_freq(f'{output_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
+            task.channels.co_pulse_term = f'/{output_name}/PFI0'
+
+            n_pulses = 1
+            task.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)
+            task.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{output_name}/PFI1', trigger_edge=nidaqmx.constants.Edge.RISING)
+
+            task.start()
+            self.pulseGenerator.triggerStart()
+            task.wait_until_done(timeout=np.inf)
+
     def charge(self):
         # Popup window appears to confirm charging
         chargeConfirmName = 'Begin charging'
