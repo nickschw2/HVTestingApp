@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import ttkbootstrap as ttk
 from constants import *
 
-# Eventually implement blitting to speed up plotting: https://matplotlib.org/stable/tutorials/advanced/blitting.html
-
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
 

@@ -53,7 +53,8 @@ currentYLim = 15 # mA
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
 entry_opts = {'font':('Helvetica', 12), 'background': lightGrey}
-frame_opts = {'font':('Helvetica', 12), 'borderwidth': 3, 'relief': 'raised', 'padding': 12}
+# frame_opts = {'font':('Helvetica', 12), 'borderwidth': 3, 'relief': 'raised', 'padding': 12}
+frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
@@ -92,24 +93,24 @@ columns = ['Serial Number',
     'Interferometer (V)',
     'Diamagnetic (V)']
 
-import numpy as np
-timeArray = np.linspace(0, 300, 10000)
-timeUnit = 'ms'
-RCTime = 50
-voltage = 100 * np.exp(-timeArray / RCTime)
-current = -100 * np.exp(-timeArray / RCTime)
-interferometer = np.sin(4 * np.pi / 300 * timeArray)
-diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
-diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
-
-dischargeLines = {'Voltage': voltage, 'Current': current}
-interferometerLines = {'Central': interferometer}
-diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
-
-resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
-    'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
-    'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
-    }
+# import numpy as np
+# timeArray = np.linspace(0, 300, 10000)
+# timeUnit = 'ms'
+# RCTime = 50
+# voltage = 100 * np.exp(-timeArray / RCTime)
+# current = -100 * np.exp(-timeArray / RCTime)
+# interferometer = np.sin(4 * np.pi / 300 * timeArray)
+# diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
+# diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
+#
+# dischargeLines = {'Voltage': voltage, 'Current': current}
+# interferometerLines = {'Central': interferometer}
+# diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
+#
+# resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
+#     'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
+#     'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
+#     }
 
 
 

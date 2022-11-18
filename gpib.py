@@ -13,9 +13,9 @@ class PulseGenerator():
         instrumentName = f'GPIB0::{pulseGeneratorGPIBAddress}::INSTR'
         self.inst = self.rm.open_resource(instrumentName, timeout=5000, chunk_size=1024000) # bigger timeout for long mem
 
-    def triggerIgnitron(self):
+    def triggerStart(self):
         self.inst.write('SS')
-        print('Ignitron has been fired!')
+        print('Pulse generator has been triggered!')
 
     def reset(self):
         return 0

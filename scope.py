@@ -155,14 +155,17 @@ class Oscilloscope():
         timeBlocks = 5 # number of blocks on screen on time axis
         self.time = np.linspace(self.timeOffset - timeBlocks * self.timeScale, self.timeOffset + timeBlocks * self.timeScale, num=self.data_size)
 
-        # See if we should use a different time axis
-        if (self.time[-1] < 1e-3):
-            self.time = self.time * 1e6
-            self.tUnit = 'us'
-        elif (self.time[-1] < 1):
-            self.time = self.time * 1e3
-            self.tUnit = 'ms'
-        else:
+        try:
+            # See if we should use a different time axis
+            if (self.time[-1] < 1e-3):
+                self.time = self.time * 1e6
+                self.tUnit = 'us'
+            elif (self.time[-1] < 1):
+                self.time = self.time * 1e3
+                self.tUnit = 'ms'
+            else:
+                self.tUnit = 's'
+        except:
             self.tUnit = 's'
 
         return (self.time, self.tUnit)

@@ -29,7 +29,9 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         # set theme
-        sv_ttk.set_theme('light')
+        # sv_ttk.set_theme('light')
+        self.tk.call('source', 'Sun-Valley-ttk-theme/sun-valley.tcl')
+        self.tk.call('set_theme', 'light')
 
         # Change style
         style = ttk.Style(self)
@@ -585,17 +587,17 @@ class MainApp(tk.Tk):
     def triggerShot(self):
         # Set up a task to trigger the gating of the camera based off the pulse generator signal
         with nidaqmx.Task() as task:
-            freq = 20
-            duty_cycle = 0.001
+            freq = 10000
+            duty_cycle = 0.5
             task.co_channels.add_co_pulse_chan_freq(f'{output_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
             task.channels.co_pulse_term = f'/{output_name}/PFI0'
 
-            n_pulses = 10
+            n_pulses = 1
             task.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)
             task.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{output_name}/PFI1', trigger_edge=nidaqmx.constants.Edge.RISING)
 
             task.start()
-            self.pulseGenerator.triggerIgnitron()
+            self.pulseGenerator.triggerStart()
             task.wait_until_done(timeout=np.inf)
 
     def charge(self):
@@ -931,7 +933,7 @@ class MainApp(tk.Tk):
             else:
                 voltages = self.getChargingTestVoltages()
             voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
+            currentPSPoint = (voltages[1]) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
             # voltagePSPoint = voltages[]
 
             # Only record the voltage when the switch is closed
