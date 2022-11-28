@@ -81,67 +81,80 @@ class Oscilloscope():
     # pull waveform from screen
     def get_data(self, channel):
         try:
-            # check if channel is on
-            active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
-
             # Setup scope to read
             self.inst.write(f':WAV:SOUR CHAN{channel}')
-            self.inst.write(':WAV:MODE RAW')
-            self.inst.write(':WAV:FORM BYTE')
+            self.inst.write(':WAV:MODE NORM')
+            self.inst.write(':WAV:FORM ACSii')
+            rawdata = self.inst.query(':WAV:DATA?')
+            
+            # Format string
+            # begins with either a positive or negative number
+            beginIndex = min(rawdata.find('+'), rawdata.find('-'))
+            rawdata = rawdata[beginIndex:]
+            rawdata = rawdata.strip() # remove endline
+            self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
 
-            ### Read data in packets ###
-            start = 1 # starting index
-            stop = int(float(self.inst.query(':ACQ:MDEP?').strip())) # stopping index is length of internal memory
-            loopcount = 1 # initialize the loopcount
-            startNum = start # initialize the start of the packet
-            packetLength = 1000000 # number of samples per packet
+        #     # check if channel is on
+        #     active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
 
-            # Determine the number of packets to grab
-            if stop - start > packetLength:
-                stopnum = start + packetLength - 1
-                loopcount = int(np.ceil((stop - start + 1) / packetLength))
-            else:
-                stopnum = stop
+        #     # Setup scope to read
+        #     self.inst.write(f':WAV:SOUR CHAN{channel}')
+        #     self.inst.write(':WAV:MODE RAW')
+        #     self.inst.write(':WAV:FORM BYTE')
 
-            # Initialize the start and stop position for the first read
-            self.inst.write(f':WAV:START {startNum}')
-            self.inst.write(f':WAV:STOP {stopnum}')
+        #     ### Read data in packets ###
+        #     start = 1 # starting index
+        #     stop = int(float(self.inst.query(':ACQ:MDEP?').strip())) # stopping index is length of internal memory
+        #     loopcount = 1 # initialize the loopcount
+        #     startNum = start # initialize the start of the packet
+        #     packetLength = 1000000 # number of samples per packet
 
-            # Initialize array to hold read data
-            values = np.zeros(stop)
-            print('Loading data from oscilloscope')
-            if active:
-                # loop through all the packets
-                for i in range(0, loopcount):
-                    values[i * packetLength:(i + 1) * packetLength] = self.inst.query_binary_values(':WAV:DATA?', datatype='B')
-                    # set the next loop to jump a packet length
-                    if i < loopcount - 2:
-                        startnum = stopnum + 1
-                        stopnum = stopnum + packetLength
-                    # start and stop positions for last loop if packet is not a full size
-                    else:
-                        startnum = stopnum + 1
-                        stopnum = stop
-                    self.inst.write(f':WAV:START {startnum}')
-                    self.inst.write(f':WAV:STOP {stopnum}')
+        #     # Determine the number of packets to grab
+        #     if stop - start > packetLength:
+        #         stopnum = start + packetLength - 1
+        #         loopcount = int(np.ceil((stop - start + 1) / packetLength))
+        #     else:
+        #         stopnum = stop
 
-                    # Progress bar
-                    j = (i + 1) / loopcount
-                    print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
-                print()
+        #     # Initialize the start and stop position for the first read
+        #     self.inst.write(f':WAV:START {startNum}')
+        #     self.inst.write(f':WAV:STOP {stopnum}')
 
-            # Convert from binary to actual voltages
-            wav_pre_str = self.inst.query(':WAV:PRE?')
-            wav_pre_list = wav_pre_str.split(',')
-            yinc = float(wav_pre_list[7])
-            yorigin = int(wav_pre_list[8])
-            yref = int(wav_pre_list[9])
-            dataarray = ((values - float(yref) - float(yorigin)) * float(yinc))
+        #     # Initialize array to hold read data
+        #     values = np.zeros(stop)
+        #     print('Loading data from oscilloscope')
+        #     if active:
+        #         # loop through all the packets
+        #         for i in range(0, loopcount):
+        #             values[i * packetLength:(i + 1) * packetLength] = self.inst.query_binary_values(':WAV:DATA?', datatype='B')
+        #             # set the next loop to jump a packet length
+        #             if i < loopcount - 2:
+        #                 startnum = stopnum + 1
+        #                 stopnum = stopnum + packetLength
+        #             # start and stop positions for last loop if packet is not a full size
+        #             else:
+        #                 startnum = stopnum + 1
+        #                 stopnum = stop
+        #             self.inst.write(f':WAV:START {startnum}')
+        #             self.inst.write(f':WAV:STOP {stopnum}')
 
-            # Determine how often to subsample so that the saved file is a reasonable size
-            nSkip = int(np.round(stop / self.nPoints))
+        #             # Progress bar
+        #             j = (i + 1) / loopcount
+        #             print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
+        #         print()
 
-            self.data[channel] = dataarray[::nSkip]
+        #     # Convert from binary to actual voltages
+        #     wav_pre_str = self.inst.query(':WAV:PRE?')
+        #     wav_pre_list = wav_pre_str.split(',')
+        #     yinc = float(wav_pre_list[7])
+        #     yorigin = int(wav_pre_list[8])
+        #     yref = int(wav_pre_list[9])
+        #     dataarray = ((values - float(yref) - float(yorigin)) * float(yinc))
+
+        #     # Determine how often to subsample so that the saved file is a reasonable size
+        #     nSkip = int(np.round(stop / self.nPoints))
+
+        #     self.data[channel] = dataarray[::nSkip]
 
         except Exception as e:
             print(e)
