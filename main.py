@@ -619,8 +619,9 @@ class MainApp(tk.Tk):
             self.operateSwitch('Load Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
-            self.operateSwitch('Voltage Divider Switch', True)
-            self.voltageDividerClosed = True
+            # LASER TEST
+            # self.operateSwitch('Voltage Divider Switch', True)
+            # self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
             # Actually begin charging power supply
@@ -659,8 +660,9 @@ class MainApp(tk.Tk):
 
         def saveDischarge():
             # Close voltage divider and stop repeating timer
-            self.operateSwitch('Voltage Divider Switch', True)
-            self.voltageDividerClosed = True
+            # LASER TEST
+            # self.operateSwitch('Voltage Divider Switch', True)
+            # self.voltageDividerClosed = True
             if hasattr(self, 'switchTimer'):
                 self.switchTimer.stop()
 
@@ -713,6 +715,10 @@ class MainApp(tk.Tk):
                 popup()
                 saveDischarge()
             else:
+                # LASER TEST
+                # self.triggerShot()
+                self.operateSwitch('Voltage Divider Switch', True)
+                time.sleep(0.5)
                 self.triggerShot()
                 time.sleep(hardCloseWaitTime)
                 self.operateSwitch('Load Switch', False)
@@ -938,7 +944,9 @@ class MainApp(tk.Tk):
 
             # Only record the voltage when the switch is closed
             # This occurs during all of charging and intermittently when the capacitor is isolated
-            if self.voltageDividerClosed:
+            # LASER TEST
+            # if self.voltageDividerClosed:
+            if True:
                 self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
                 self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {np.abs(self.capacitorVoltagePoint) / 1000:.2f} kV')
 
@@ -946,11 +954,14 @@ class MainApp(tk.Tk):
         self.currentPSText.set(f'I{PSSuperscript}: {np.abs(currentPSPoint) * 1000:.2f} mA')
 
         # Once the DAQ has made a measurement, open up the switch again
-        if self.voltageDividerClosed and self.countdownStarted:
-            self.operateSwitch('Voltage Divider Switch', False)
-            self.voltageDividerClosed = False
+        # LASER TEST
+        # if self.voltageDividerClosed and self.countdownStarted:
+        #     self.operateSwitch('Voltage Divider Switch', False)
+        #     self.voltageDividerClosed = False
 
-        if not self.idleMode and self.voltageDividerClosed:
+        # LASER TEST
+        # if not self.idleMode and self.voltageDividerClosed:
+        if not self.idleMode:
             self.progress['value'] = 100 * self.capacitorVoltagePoint / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
@@ -992,7 +1003,9 @@ class MainApp(tk.Tk):
 
                     if not DEBUG_MODE:
                         # Start repeated timer to measure capacitor at regular intervals
-                        self.switchTimer = RepeatedTimer(measureInterval, self.intermittentVoltageDivider)
+                        # self.switchTimer = RepeatedTimer(measureInterval, self.intermittentVoltageDivider)
+                        # LASER TEST
+                        print('intermittent voltage divider place holder')
 
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
@@ -1120,8 +1133,9 @@ class MainApp(tk.Tk):
         self.checklist_Checkbuttons = {}
 
         # Close voltage divider
-        self.operateSwitch('Voltage Divider Switch', True)
-        self.voltageDividerClosed = True
+        # LASER TEST
+        # self.operateSwitch('Voltage Divider Switch', True)
+        # self.voltageDividerClosed = True
 
         # Reset plots
         self.resetChargePlot()
