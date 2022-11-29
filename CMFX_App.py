@@ -1,5 +1,7 @@
 from TestingApp import *
 
+# SAVE RESULTS EVEN WHEN THERE'S NO DISCHARGE
+
 class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
@@ -117,13 +119,14 @@ class CMFX_App(TestingApp):
         # Add lines to charging plot blit animation
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
         self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
+        self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
         self.chargePlot.ax.set_xlim(0, plotTimeLimit)
         self.chargeVoltageAxis.set_ylim(0, voltageYLim)
         self.chargeCurrentAxis.set_ylim(0, currentYLim)
 
-        # Add two lines and x and y axis for now
+        # Add actors to blit manager
         # Blit manager speeds up plotting by redrawing only necessary items
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
@@ -227,12 +230,42 @@ class CMFX_App(TestingApp):
 
 
     def init_ui(self):
+        self.chargeStateText.set('Idle')
+        self.countdownText.set('Coundtown: Idle')
+        self.voltagePSText.set('Power Supply Voltage')
+        self.currentPSText.set('Power Supply Current')
+        self.capacitorVoltageText.set('CapacitorVoltage')
+
         print('init_ui')
         # Begin the operation of the program
         # center the app
         self.eval('tk::PlaceWindow . center')
 
+        # Reset all fields on startup
+        self.loggedIn = False
         self.reset()
+
+        if ADMIN_MODE:
+            self.loggedIn = True
+            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
+            self.saveFolderSet = True
+            self.scopePins = scopeChannelDefaults
+            self.ao_Pins = ao_Defaults
+            self.ai_Pins = ai_Defaults
+            self.do_Pins = do_Defaults
+
+        else:
+            # Prompt for login, save location, and pin selector automatically
+            self.validateLogin()
+            self.setSaveLocation()
+            self.pinSelector()
+
+        # If the user closes out of the application during a wait_window, no extra windows pop up
+        self.update()
+
+        self.updateChargeValues()
+
+        self.safetyLights()
 
     def readResults(self):
         print('read results')
@@ -241,15 +274,34 @@ class CMFX_App(TestingApp):
         print('discharge')
 
     def reset(self):
-        print('reset')
-        self.chargeStateText.set('Idle')
-        self.countdownText.set('Coundtown: Idle')
-        self.voltagePSText.set('Power Supply Voltage')
-        self.currentPSText.set('Power Supply Current')
-        self.capacitorVoltageText.set('CapacitorVoltage')
+        print('Reset')
+        # Clear user inputs
+        self.chargeVoltageEntry.delete(0, 'end')
+
+        # Reset all boolean variables, time, and checklist
+        self.charged = False
+        self.charging = False
+        self.chargePress = False
+        self.discharged = False
+        self.userInputsSet = False
+        self.countdownStarted = False
+        self.idleMode = True
+
+        # Reset plots
+        self.resetPlot(self.chargePlot)
+        self.resetPlot(self.resultsPlot)
+
+        # Disable all buttons if logged in
+        self.disableButtons()
 
     def setUserInputs(self):
         print('set user inputs')
+
+    def resetPlot(self, canvas):
+        for line in canvas.ax.get_lines():
+            line.set_data([],[])
+
+        canvas.updatePlot()
 
     def changeResultsPlot(self, event):
         # Get value of combobox and associated checkbuttons
@@ -298,3 +350,5 @@ class CMFX_App(TestingApp):
 
         # Update plot
         self.resultsPlot.updatePlot()
+
+    

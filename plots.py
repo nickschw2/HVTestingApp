@@ -3,8 +3,11 @@ import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
-import ttkbootstrap as ttk
+# import ttkbootstrap as ttk
 from constants import *
+
+import tkinter as tk
+from tkinter import ttk
 
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
@@ -14,7 +17,7 @@ class CanvasPlot(ttk.Frame):
         self.master = master
         self.fig, self.ax = plt.subplots(constrained_layout=True, **kwargs)
         # self.fig.patch.set_facecolor(defaultbg)
-        self.line, = self.ax.plot([],[]) #Create line object on plot
+        # self.line, = self.ax.plot([],[]) #Create line object on plot
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=True, fill='both')

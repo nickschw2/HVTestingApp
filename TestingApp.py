@@ -20,6 +20,8 @@ from console import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
+# change the after call to prevent freezing https://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing/16747734#16747734
+
 # Tkinter has quite a high learning curve. If attempting to edit this source code without experience, I highly
 # recommend going through some tutorials. The documentation on tkinter is also quite poor, but
 # this website has the best I can find (http://www.tcl.tk/man/tcl8.5/TkCmd/contents.htm). At times you may
@@ -37,7 +39,7 @@ class TestingApp(ttk.Window):
         style.configure('TNotebook.Tab', **text_opts)
         style.configure('TCheckbutton', **text_opts)
         self.option_add('*TCombobox*Listbox.font', text_opts)
-
+        
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
@@ -243,6 +245,23 @@ class TestingApp(ttk.Window):
             # self.updateCharge()
             self.updateChargeValues()
             self.chargePress = True
+
+    def replotCharge(self):
+        self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
+        self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
+
+        nanIndices = np.isnan(self.capacitorVoltage)
+        self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+
+        if self.timePoint > plotTimeLimit:
+            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
+        else:
+            self.chargePlot.ax.set_xlim(0, plotTimeLimit)
+
+        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
+            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
+
+        self.bm.update()
 
     # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):

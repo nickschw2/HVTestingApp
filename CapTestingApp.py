@@ -162,13 +162,13 @@ class CapTestingApp(TestingApp):
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
         self.chargeCurrentLine, = self.chargeCurrentAxis.plot([],[], color=currentColor) #Create line object on plot
         self.capacitorVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor, linestyle='--') #Create line object on plot
-        self.fitVoltageLine, = self.chargeVoltageAxis.plot([],[], color=fitColor, linestyle='-') #Create line object on plot
+        # self.fitVoltageLine, = self.chargeVoltageAxis.plot([],[], color=fitColor, linestyle='-') #Create line object on plot
         self.chargePlot.ax.set_xlim(0, plotTimeLimit)
         self.chargeVoltageAxis.set_ylim(0, voltageYLim)
         self.chargeCurrentAxis.set_ylim(0, currentYLim)
 
-        # Add two lines and x axis for now
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.fitVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
+        # Add actors to blitmanager for charging plot
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
@@ -195,9 +195,6 @@ class CapTestingApp(TestingApp):
         # Reset all fields on startup, including making a connection to NI DAQ
         self.loggedIn = False
         self.reset()
-
-        # On startup, disable buttons until login is correct
-        self.disableButtons()
 
         if ADMIN_MODE:
             self.loggedIn = True
@@ -595,32 +592,6 @@ class CapTestingApp(TestingApp):
 
         self.after(int(1000 / refreshRate), self.updateChargeValues)
 
-    def replotCharge(self):
-        self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
-        self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
-
-        nanIndices = np.isnan(self.capacitorVoltage)
-        self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
-
-        if self.timePoint > plotTimeLimit:
-            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
-        else:
-            self.chargePlot.ax.set_xlim(0, plotTimeLimit)
-
-        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
-            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
-
-        self.bm.update()
-
-
-        # # Remove lines every time the figure is plotted
-        # self.clearFigLines(self.chargePlot.fig)
-        #
-        # # Add plots
-        # self.chargeVoltageAxis.plot(self.chargeTime, self.chargeVoltagePS / 1000, color=voltageColor, linestyle='--')
-        # self.chargeCurrentAxis.plot(self.chargeTime, self.chargeCurrentPS, color=currentColor, linestyle='--')
-        # self.chargePlot.updatePlot()
-
     def replotDischarge(self):
         # Remove lines every time the figure is plotted
         self.clearFigLines(self.dischargePlot.fig)
@@ -679,7 +650,6 @@ class CapTestingApp(TestingApp):
         self.userInputsSet = False
         self.countdownStarted = False
         self.idleMode = True
-        self.checklist_Checkbuttons = {}
 
         # Close voltage divider
         self.operateSwitch('Voltage Divider Switch', True)
