@@ -55,13 +55,19 @@ class Oscilloscope():
 
         self.inst.write(f':CHAN1:SCAL {voltageScale}')
         self.inst.write(f':CHAN1:OFFS {-1 * voltageScale}')
-        self.inst.write(f':TRIG:EDGE:LEV {2 * voltageScale}')
         self.inst.write(f':CHAN2:SCAL {currentScale}')
         self.inst.write(f':CHAN2:OFFS {-0 * currentScale}')
         self.inst.write(f':CHAN3:SCAL {interferometerScale}')
         self.inst.write(f':CHAN3:OFFS {0}')
         self.inst.write(f':CHAN4:SCAL {diamagneticScale}')
         self.inst.write(f':CHAN3:OFFS {0}')
+
+        # Set up triggering
+        self.inst.write(':TRIG:MODE:EDGE')
+        self.inst.write(':TRIG:EDGE:SOUR CHAN1')
+        self.inst.write(':TRIG:EDGE:SLOP POS')
+        self.inst.write(f':TRIG:EDGE:LEV {2 * voltageScale}')
+
 
         # Get the time scales and offsets
         self.timeScale = float(self.inst.query(':TIM:SCAL?'))
