@@ -93,44 +93,44 @@ columns = ['Serial Number',
     'Interferometer (V)',
     'Diamagnetic (V)']
 
-# import numpy as np
-# timeArray = np.linspace(0, 300, 10000)
-# timeUnit = 'ms'
-# RCTime = 50
-# voltage = 100 * np.exp(-timeArray / RCTime)
-# current = -100 * np.exp(-timeArray / RCTime)
-# interferometer = np.sin(4 * np.pi / 300 * timeArray)
-# diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
-# diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
+import numpy as np
+timeArray = np.linspace(0, 300, 10000)
+timeUnit = 'ms'
+RCTime = 50
+voltage = 100 * np.exp(-timeArray / RCTime)
+current = -100 * np.exp(-timeArray / RCTime)
+interferometer = np.sin(4 * np.pi / 300 * timeArray)
+diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
+diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
 #
-# dischargeLines = {'Voltage': voltage, 'Current': current}
-# interferometerLines = {'Central': interferometer}
-# diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
-#
-# resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
-#     'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
-#     'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
-#     }
+dischargeLines = {'Voltage': voltage, 'Current': current}
+interferometerLines = {'Central': interferometer}
+diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
+
+resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
+    'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
+    'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
+    }
 
 
 
 
-# columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
-#     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
-#     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
-#     'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
-#     'polarizationIndex': {'name': 'PI', 'type': 'scalar'},
-#     'internalResistance': {'name': 'Internal Resistance (Ohms)', 'type': 'scalar'},
-#     'waterResistance': {'name': 'Water Resistance (Ohms)', 'type': 'scalar'},
-#     'chargeVoltage': {'name': 'Charged Voltage (kV)', 'type': 'scalar'},
-#     'holdChargeTime': {'name': 'Hold Charge Time (s)', 'type': 'scalar'},
-#     'chargeTime': {'name': 'Charge Time (s)', 'type': 'array'},
-#     'chargeVoltagePS': {'name': 'Charge Voltage PS (V)', 'type': 'array'},
-#     'chargeCurrentPS': {'name': 'Charge Current PS (A)', 'type': 'array'},
-#     'capacitorVoltage': {'name': 'Capacitor Voltage (V)', 'type': 'array'},
-#     'dischargeTime': {'name': 'Discharge Time', 'type': 'array'},
-#     'dischargeTimeUnit': {'name': 'Discharge Time Unit', 'type': 'scalar'},
-#     'dischargeVoltageLoad': {'name': 'Discharge Voltage (V)', 'type': 'array'},
-#     'dischargeCurrentLoad': {'name': 'Discharge Current (A)', 'type': 'array'},
-#     'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
-#     'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'}}
+columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
+    'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
+    'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
+    'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
+    'polarizationIndex': {'name': 'PI', 'type': 'scalar'},
+    'internalResistance': {'name': 'Internal Resistance (Ohms)', 'type': 'scalar'},
+    'waterResistance': {'name': 'Water Resistance (Ohms)', 'type': 'scalar'},
+    'chargeVoltage': {'name': 'Charged Voltage (kV)', 'type': 'scalar'},
+    'holdChargeTime': {'name': 'Hold Charge Time (s)', 'type': 'scalar'},
+    'chargeTime': {'name': 'Charge Time (s)', 'type': 'array'},
+    'chargeVoltagePS': {'name': 'Charge Voltage PS (V)', 'type': 'array'},
+    'chargeCurrentPS': {'name': 'Charge Current PS (A)', 'type': 'array'},
+    'capacitorVoltage': {'name': 'Capacitor Voltage (V)', 'type': 'array'},
+    'dischargeTime': {'name': 'Discharge Time', 'type': 'array'},
+    'dischargeTimeUnit': {'name': 'Discharge Time Unit', 'type': 'scalar'},
+    'dischargeVoltageLoad': {'name': 'Discharge Voltage (V)', 'type': 'array'},
+    'dischargeCurrentLoad': {'name': 'Discharge Current (A)', 'type': 'array'},
+    'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
+    'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'}}

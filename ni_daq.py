@@ -21,21 +21,23 @@ from nidaqmx.stream_writers import (
 import numpy as np
 
 class NI_DAQ():
-    def __init__(self, input_name, output_name, sample_rate, ai_channels={}, ao_channels={}, autoconnect=True):
+    def __init__(self, input_name, output_name, sample_rate, ai_channels={}, ao_channels={}, diagnostics={}, autostart=True):
         self.input_name = input_name
         self.output_name = output_name
         self.ai_channels = ai_channels
         self.ao_channels = ao_channels
+        self.diagnostics = diagnostics
         self.sample_rate = sample_rate
 
         self.data = {name: np.array([]) for name in self.ai_channels} # analog input will be stored in this data array
 
         self.tasks = []
+        self.closed = False
 
-        if autoconnect:
-            self.set_up_tasks()
-            print('NI DAQ has been successfully initialized')
+        self.set_up_tasks()
+        print('NI DAQ has been successfully initialized')
 
+        if autostart:
             self.start_acquisition()
 
     def set_up_tasks(self):
@@ -62,6 +64,9 @@ class NI_DAQ():
 
         for name, ao_chan in self.ao_channels.items():
             self.h_task_ao.ao_channels.add_ao_voltage_chan(f'{self.output_name}/{ao_chan}', min_val=0.0, max_val=10.0)
+
+        for name, ai_chan in self.diagnostics.items():
+            self.h_task_ai.ai_channels.add_ai_voltage_chan(f'{self.input_name}/{ai_chan}', min_val=-10.0, max_val=10.0)
 
         '''
         SET UP ANALOG INPUT
@@ -109,6 +114,9 @@ class NI_DAQ():
             else:
                 task.stop()
 
+    def reset_data(self):
+        self.data = {name: np.array([]) for name in self.ai_channels} # analog input will be stored in this data array
+
     # House-keeping methods follow
     def _task_created(self, task):
         '''
@@ -122,9 +130,11 @@ class NI_DAQ():
             return False
 
     def close(self):
-        self.stop_acquisition()
-        for task in self.tasks:
-            task.close()
+        if not self.closed:
+            self.stop_acquisition()
+            for task in self.tasks:
+                task.close()
+            self.closed = True
 
 # class NI_DAQ():
 #     def __init__(self, dev_name, ai_channels, ao_channels, sample_rate, autoconnect=True):

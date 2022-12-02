@@ -9,6 +9,8 @@ import os
 import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
+from scipy.ndimage import uniform_filter1d
+from threading import Thread
 from constants import *
 from plots import *
 from messages import *
@@ -266,6 +268,8 @@ class MainApp(tk.Tk):
     def init_DAQ(self):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(input_name, output_name, sample_rate, ai_channels=self.ai_Pins, ao_channels=self.ao_Pins)
+
+        self.powerSupplyRamp(action='discharge')
 
         # Initialize the scope over ethernet
         try:
@@ -574,9 +578,8 @@ class MainApp(tk.Tk):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge'):
-        mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
-
         if action == 'charge':
+            mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
             value = mapVoltage
         else:
             value = 0
@@ -613,6 +616,7 @@ class MainApp(tk.Tk):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
+            self.NI_DAQ.reset_data()
             self.idleMode = False
 
             # Operate switches
@@ -633,7 +637,6 @@ class MainApp(tk.Tk):
 
             # Reset the charge plot and begin continuously plotting
             self.resetChargePlot()
-            # self.updateCharge()
             self.updateChargeValues()
             self.chargePress = True
 
@@ -659,6 +662,8 @@ class MainApp(tk.Tk):
                 self.powerSupplyRamp(action='discharge')
 
         def saveDischarge():
+            # self.scope.inst.write(':STOP')
+            # time.sleep(2)
             # Close voltage divider and stop repeating timer
             # LASER TEST
             # self.operateSwitch('Voltage Divider Switch', True)
@@ -674,8 +679,10 @@ class MainApp(tk.Tk):
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
                     self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
                     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
-                except visa.errors.VisaIOError:
-                    self.scope.connectInstrument()
+                except Exception as e:
+                    print(e)
+                    # self.scope.connectInstrument()
+                    # time.sleep(10)
                     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
                     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
                     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
@@ -688,6 +695,7 @@ class MainApp(tk.Tk):
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
             if len(self.dischargeTime) != 0:
+            # if self.scope.inst.query('TRIG:STAT?').strip() == 'STOP':
                 # get resistance of water resistor
                 try:
                     self.internalResistance, chargeFitTime, chargeFitVoltage = self.getResistance(self.chargeTime, self.capacitorVoltage)
@@ -710,7 +718,7 @@ class MainApp(tk.Tk):
             else:
                 print('Oscilloscope was not triggered successfully')
 
-        if self.charging:
+        if not self.idleMode:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
                 popup()
                 saveDischarge()
@@ -718,11 +726,24 @@ class MainApp(tk.Tk):
                 # LASER TEST
                 # self.triggerShot()
                 self.operateSwitch('Voltage Divider Switch', True)
+                # self.scope.inst.write(':SING')
                 time.sleep(0.5)
-                self.triggerShot()
+                # self.triggerShot()
+                self.pulseGenerator.triggerStart()
                 time.sleep(hardCloseWaitTime)
+                # time.sleep(10)
                 self.operateSwitch('Load Switch', False)
+                
+
+                # self.scope.connectInstrument()
                 saveDischarge()
+
+                # Save discharge on a separate thread
+                print('running save')
+                # thread = Thread(target=saveDischarge)
+                # thread.start()
+
+                
         else:
             popup()
 
@@ -730,9 +751,6 @@ class MainApp(tk.Tk):
         self.disableButtons()
         if self.loggedIn:
             self.resetButton.configure(state='normal')
-
-        self.discharged = True
-        self.charging = False
 
     def getResistance(self, time, voltage):
         # Exponential decay function that decays to 0
@@ -832,6 +850,8 @@ class MainApp(tk.Tk):
 
     # Special function for closing the window and program
     def on_closing(self):
+        self.powerSupplyRamp(action='discharge')
+
         # Open power supply and voltage divider switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
@@ -932,26 +952,36 @@ class MainApp(tk.Tk):
         # not applicable on startup
         if hasattr(self, 'NI_DAQ'):
             if not DEBUG_MODE:
-                voltages = self.NI_DAQ.h_task_ai.read()
-                # voltages = self.NI_DAQ.read()
+                # voltages = self.NI_DAQ.h_task_ai.read()
                 # Retrieve charging data
-                # voltages = self.NI_DAQ.data
+                voltages = self.NI_DAQ.data
             else:
                 voltages = self.getChargingTestVoltages()
-            voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            currentPSPoint = (voltages[1]) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
-            # voltagePSPoint = voltages[]
+            # voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
+            # currentPSPoint = (voltages[1]) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
+            self.chargeVoltagePS = voltages['Power Supply Voltage'] * maxVoltagePowerSupply / maxVoltageInput
+            self.chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
+            self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider * attenuator
+            
+            # Capacitor signal is very noisy, so apply moving average filter over a period of 2 seconds
+            # Also don't want to filter over nan's
+            nanIndices = np.isnan(self.capacitorVoltage)
+            self.capacitorVoltageFiltered = uniform_filter1d(self.capacitorVoltage[~nanIndices], size=sample_rate * 2)
+
+            voltagePSPoint = self.chargeVoltagePS[-1]
+            currentPSPoint = self.chargeCurrentPS[-1]
 
             # Only record the voltage when the switch is closed
             # This occurs during all of charging and intermittently when the capacitor is isolated
             # LASER TEST
             # if self.voltageDividerClosed:
             if True:
-                self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
-                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {np.abs(self.capacitorVoltagePoint) / 1000:.2f} kV')
+                # self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
+                self.capacitorVoltagePoint = self.capacitorVoltageFiltered[-1]
+                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')
 
-        self.voltagePSText.set(f'V{PSSuperscript}: {np.abs(voltagePSPoint) / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {np.abs(currentPSPoint) * 1000:.2f} mA')
+        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
+        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
 
         # Once the DAQ has made a measurement, open up the switch again
         # LASER TEST
@@ -976,12 +1006,15 @@ class MainApp(tk.Tk):
             self.countdownText.set('Countdown: N/A')
 
         if self.charging:
-            self.timePoint = time.time() - self.beginChargeTime
+            # self.timePoint = time.time() - self.beginChargeTime
 
-            self.chargeTime = np.append(self.chargeTime, self.timePoint)
-            self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
-            self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
-            self.capacitorVoltage = np.append(self.capacitorVoltage, self.capacitorVoltagePoint)
+            # self.chargeTime = np.append(self.chargeTime, self.timePoint)
+            # self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
+            # self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
+            # self.capacitorVoltage = np.append(self.capacitorVoltage, self.capacitorVoltagePoint)
+            N = len(self.chargeVoltagePS)
+            self.chargeTime = np.linspace(0, N / sample_rate, N)
+            self.timePoint = (N - 1) / sample_rate
 
             # Plot the new data
             self.replotCharge()
@@ -1011,10 +1044,15 @@ class MainApp(tk.Tk):
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
                 # Set countdown time to 0 seconds once discharged
-                if self.countdownTime <= 0.0:
+                if self.countdownTime <= 0.0 and not self.discharged:
                     self.countdownTime = 0.0
                     self.countdownStarted = False
-                    self.discharge()
+                    self.discharged = True
+                    self.charging = False
+                    print('start thread')
+                    thread = Thread(target=self.discharge)
+                    thread.start()
+                    
 
             # # Discharge if the voltage is not increasing
             # # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
@@ -1036,7 +1074,8 @@ class MainApp(tk.Tk):
             #     self.discharge()
             #     print('Steady state reached without charging to desired voltage')
 
-        self.after(int(1000 / refreshRate), self.updateChargeValues)
+        # self.after(int(1000 / refreshRate), self.updateChargeValues)
+        self.after(100, self.updateChargeValues)
 
     # Removes all lines from a figure
     def clearFigLines(self, fig):
@@ -1050,8 +1089,15 @@ class MainApp(tk.Tk):
         self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 
-        nanIndices = np.isnan(self.capacitorVoltage)
-        self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+        # If the capacitor is only being read every so often, only plot non nan values
+        try:
+            nanIndices = np.isnan(self.capacitorVoltage)
+            if hasattr(self, 'capacitorVoltageFiltered'):
+                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltageFiltered / 1000)
+            else:
+                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+        except IndexError:
+            print('Mismatch in shape')
 
         if self.timePoint > plotTimeLimit:
             self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
@@ -1061,7 +1107,10 @@ class MainApp(tk.Tk):
         if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
             self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
 
-        self.bm.update()
+        try:
+            self.bm.update()
+        except ValueError:
+            print('Mismatch in shape')
 
 
         # # Remove lines every time the figure is plotted
@@ -1117,6 +1166,12 @@ class MainApp(tk.Tk):
         self.replotDischarge()
 
     def reset(self):
+        # Open power supply and voltage divider switch and close load switch
+        self.operateSwitch('Power Supply Switch', False)
+        time.sleep(switchWaitTime)
+        self.operateSwitch('Load Switch', False)
+        self.operateSwitch('Voltage Divider Switch', False)
+
         # Clear all user inputs
         self.serialNumberEntry.delete(0, 'end')
         self.chargeVoltageEntry.delete(0, 'end')

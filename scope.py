@@ -1,14 +1,17 @@
 import numpy
 import pyvisa as visa
 import numpy as np
+import time
+import sys
 from config import *
 from messages import *
 
 # At  some point, make the change that we dont need to pass the brand name, and get it from IDN
 
 class Oscilloscope():
-    def __init__(self, nPoints=100000):
+    def __init__(self, nPoints=10000, memoryDepth='1M', auto_reset=True):
         self.nPoints = nPoints
+        self.memoryDepth = memoryDepth
         self.data = {}
 
         self.rm = visa.ResourceManager()
@@ -20,7 +23,8 @@ class Oscilloscope():
         self.inst.write(':LAN:DHCP OFF')
         self.inst.write(':LAN:APPL')
 
-        self.reset()
+        if auto_reset:
+            self.reset()
 
         # Get the time scales and offsets
         self.timeScale = float(self.inst.query(':TIM:SCAL?'))
@@ -30,7 +34,7 @@ class Oscilloscope():
 
     def connectInstrument(self):
         instrumentName = self.findIPAddress()
-        self.inst = self.rm.open_resource(instrumentName, timeout=5000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
+        self.inst = self.rm.open_resource(instrumentName, timeout=1000, chunk_size=1024000, encoding='latin-1') # bigger timeout for long mem
 
     def findIPAddress(self):
         resources = self.rm.list_resources()
@@ -38,7 +42,7 @@ class Oscilloscope():
 
     def setScale(self, chargeVoltage, capacitance):
         RCTime = waterResistor * capacitance
-        timeScale = RCTime *2
+        timeScale = RCTime * 2 * 10
         voltageScale = chargeVoltage / 5
         currentScale = 20e3 / 500 * 0.01 / 2
         interferometerScale = 0.02 # Volts
@@ -60,13 +64,13 @@ class Oscilloscope():
         self.inst.write(f':CHAN3:SCAL {interferometerScale}')
         self.inst.write(f':CHAN3:OFFS {0}')
         self.inst.write(f':CHAN4:SCAL {diamagneticScale}')
-        self.inst.write(f':CHAN3:OFFS {0}')
+        self.inst.write(f':CHAN4:OFFS {0}')
 
         # Set up triggering
         self.inst.write(':TRIG:MODE:EDGE')
-        self.inst.write(':TRIG:EDGE:SOUR CHAN1')
+        self.inst.write(':TRIG:EDGE:SOUR CHAN4')
         self.inst.write(':TRIG:EDGE:SLOP POS')
-        self.inst.write(f':TRIG:EDGE:LEV {2 * voltageScale}')
+        self.inst.write(f':TRIG:EDGE:LEV {diamagneticScale}')
 
 
         # Get the time scales and offsets
@@ -87,86 +91,102 @@ class Oscilloscope():
     # pull waveform from screen
     def get_data(self, channel):
         try:
+            # active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
+            # print(active)
+            # # Setup scope to read
+            # self.inst.write(f':WAV:SOUR CHAN{channel}')
+            # self.inst.write(':WAV:MODE NORM')
+            # self.inst.write(':WAV:FORM ACSii')
+            # rawdata = self.inst.query(':WAV:DATA?')
+            
+            # # Format string
+            # # begins with either a positive or negative number
+            # beginIndex = min(rawdata.find('+'), rawdata.find('-'))
+            # rawdata = rawdata[beginIndex:]
+            # rawdata = rawdata.strip() # remove endline
+            # self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
+
+            # Make sure oscilloscope is stopped first, if not stop it
+            # OPC command is short for "Operation Complete" and ensures the scope is stopped before proceeding
+            # self.inst.write('TFOR;*OPC?')
+            time.sleep(0.5)
+            # while not bool(self.inst.query('*OPC?').strip()):
+            #     print('not complete')
+            #     pass
+            # print('complete')
+
+            # check if channel is on
+            active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
+
             # Setup scope to read
             self.inst.write(f':WAV:SOUR CHAN{channel}')
-            self.inst.write(':WAV:MODE NORM')
-            self.inst.write(':WAV:FORM ACSii')
-            rawdata = self.inst.query(':WAV:DATA?')
-            
-            # Format string
-            # begins with either a positive or negative number
-            beginIndex = min(rawdata.find('+'), rawdata.find('-'))
-            rawdata = rawdata[beginIndex:]
-            rawdata = rawdata.strip() # remove endline
-            self.data[channel] = np.fromstring(rawdata, dtype=float, sep=',')
+            self.inst.write(':WAV:MODE RAW')
+            self.inst.write(':WAV:FORM BYTE')
 
-        #     # check if channel is on
-        #     active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
+            ### Read data in packets ###
+            start = 1 # starting index
+            stop = int(float(self.inst.query(':ACQ:MDEP?').strip())) # stopping index is length of internal memory
+            loopcount = 1 # initialize the loopcount
+            startNum = start # initialize the start of the packet
+            packetLength = 1000000 # number of samples per packet
 
-        #     # Setup scope to read
-        #     self.inst.write(f':WAV:SOUR CHAN{channel}')
-        #     self.inst.write(':WAV:MODE RAW')
-        #     self.inst.write(':WAV:FORM BYTE')
+            # Determine the number of packets to grab
+            if stop - start > packetLength:
+                stopnum = start + packetLength - 1
+                loopcount = int(np.ceil((stop - start + 1) / packetLength))
+            else:
+                stopnum = stop
 
-        #     ### Read data in packets ###
-        #     start = 1 # starting index
-        #     stop = int(float(self.inst.query(':ACQ:MDEP?').strip())) # stopping index is length of internal memory
-        #     loopcount = 1 # initialize the loopcount
-        #     startNum = start # initialize the start of the packet
-        #     packetLength = 1000000 # number of samples per packet
+            # Initialize the start and stop position for the first read
+            self.inst.write(f':WAV:START {startNum}')
+            self.inst.write(f':WAV:STOP {stopnum}')
 
-        #     # Determine the number of packets to grab
-        #     if stop - start > packetLength:
-        #         stopnum = start + packetLength - 1
-        #         loopcount = int(np.ceil((stop - start + 1) / packetLength))
-        #     else:
-        #         stopnum = stop
+            # Initialize array to hold read data
+            values = np.zeros(stop)
+            print('Loading data from oscilloscope')
+            if active:
+                # loop through all the packets
+                for i in range(0, loopcount):
+                    values[i * packetLength:(i + 1) * packetLength] = self.inst.query_binary_values(':WAV:DATA?', datatype='B')
+                    # set the next loop to jump a packet length
+                    if i < loopcount - 2:
+                        startnum = stopnum + 1
+                        stopnum = stopnum + packetLength
+                    # start and stop positions for last loop if packet is not a full size
+                    else:
+                        startnum = stopnum + 1
+                        stopnum = stop
+                    self.inst.write(f':WAV:START {startnum}')
+                    self.inst.write(f':WAV:STOP {stopnum}')
 
-        #     # Initialize the start and stop position for the first read
-        #     self.inst.write(f':WAV:START {startNum}')
-        #     self.inst.write(f':WAV:STOP {stopnum}')
+                    # Progress bar
+                    j = (i + 1) / loopcount
+                    print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
+                print()
 
-        #     # Initialize array to hold read data
-        #     values = np.zeros(stop)
-        #     print('Loading data from oscilloscope')
-        #     if active:
-        #         # loop through all the packets
-        #         for i in range(0, loopcount):
-        #             values[i * packetLength:(i + 1) * packetLength] = self.inst.query_binary_values(':WAV:DATA?', datatype='B')
-        #             # set the next loop to jump a packet length
-        #             if i < loopcount - 2:
-        #                 startnum = stopnum + 1
-        #                 stopnum = stopnum + packetLength
-        #             # start and stop positions for last loop if packet is not a full size
-        #             else:
-        #                 startnum = stopnum + 1
-        #                 stopnum = stop
-        #             self.inst.write(f':WAV:START {startnum}')
-        #             self.inst.write(f':WAV:STOP {stopnum}')
+            # Convert from binary to actual voltages
+            wav_pre_str = self.inst.query(':WAV:PRE?')
+            wav_pre_list = wav_pre_str.split(',')
+            yinc = float(wav_pre_list[7])
+            yorigin = int(wav_pre_list[8])
+            yref = int(wav_pre_list[9])
+            dataarray = ((values - float(yref) - float(yorigin)) * float(yinc))
 
-        #             # Progress bar
-        #             j = (i + 1) / loopcount
-        #             print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
-        #         print()
+            # Determine how often to subsample so that the saved file is a reasonable size
+            nSkip = int(np.round(stop / self.nPoints))
 
-        #     # Convert from binary to actual voltages
-        #     wav_pre_str = self.inst.query(':WAV:PRE?')
-        #     wav_pre_list = wav_pre_str.split(',')
-        #     yinc = float(wav_pre_list[7])
-        #     yorigin = int(wav_pre_list[8])
-        #     yref = int(wav_pre_list[9])
-        #     dataarray = ((values - float(yref) - float(yorigin)) * float(yinc))
-
-        #     # Determine how often to subsample so that the saved file is a reasonable size
-        #     nSkip = int(np.round(stop / self.nPoints))
-
-        #     self.data[channel] = dataarray[::nSkip]
+            self.data[channel] = dataarray[::nSkip]
 
         except Exception as e:
+            type, value, traceback = sys.exc_info()
+            print(traceback.msg)
             print(e)
             self.data[channel] = np.zeros(0) # return empty array
 
+
         self.data_size = len(self.data[channel])
+        
+        print(f'testing {channel}, size: {self.data_size}')
         return self.data[channel]
 
     def get_time(self):

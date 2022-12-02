@@ -263,7 +263,7 @@ class CMFX_App(TestingApp):
         # If the user closes out of the application during a wait_window, no extra windows pop up
         self.update()
 
-        self.updateChargeValues()
+        # self.updateChargeValues()
 
         self.safetyLights()
 

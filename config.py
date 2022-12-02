@@ -1,17 +1,17 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
-ADMIN_MODE = False
-SHOT_MODE = False
+ADMIN_MODE = True
+SHOT_MODE = True
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
 maxCurrentPowerSupply = 15e-3 # A
 maxVoltageInput = 10 # V
-sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
+sample_rate = 1000 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
 TCPIPAddress = '169.254.55.65'
-scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
+scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '3', 'Interferometer': '2', 'Diamagnetic': '4'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -25,7 +25,9 @@ ao_Defaults = {'Power Supply Output': 'ao0'} # analog outputs
 ai_Defaults = {'Power Supply Voltage': 'ai0',
     'Power Supply Current': 'ai1',
     'Capacitor Voltage': 'ai2'} # analog inputs
-do_Defaults = {'Load Switch': 'line0', 'Power Supply Switch': 'line1', 'Voltage Divider Switch': 'line2'}
+do_Defaults = {'Load Switch': 'line0',
+    'Power Supply Switch': 'line1',
+    'Voltage Divider Switch': 'line2'}
 ao_Options = ['ao0', 'ao1']
 ai_Options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_Options = ['line0', 'line1', 'line2', 'line3']
