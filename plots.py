@@ -3,11 +3,11 @@ import matplotlib
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
-# import ttkbootstrap as ttk
+import ttkbootstrap as ttk
 from constants import *
 
-import tkinter as tk
-from tkinter import ttk
+# import tkinter as tk
+# from tkinter import ttk
 
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):

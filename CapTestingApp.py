@@ -196,6 +196,9 @@ class CapTestingApp(TestingApp):
         self.loggedIn = False
         self.reset()
 
+        # On startup, disable buttons until login is correct	
+        self.disableButtons()
+
         if ADMIN_MODE:
             self.loggedIn = True
             self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
@@ -370,29 +373,22 @@ class CapTestingApp(TestingApp):
 
         def saveDischarge():
             # Close voltage divider and stop repeating timer
-            self.operateSwitch('Voltage Divider Switch', True)
-            self.voltageDividerClosed = True
+            # LASER TEST	
+            # self.operateSwitch('Voltage Divider Switch', True)	
+            # self.voltageDividerClosed = True
             if hasattr(self, 'switchTimer'):
                 self.switchTimer.stop()
 
             # Read from the load
             if not DEBUG_MODE:
-                try:
-                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
-                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
-                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
-                except visa.errors.VisaIOError:
-                    self.scope.connectInstrument()
-                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
-                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
-                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
-                    # self.dischargeVoltageLoad = np.array([])
-                    # self.dischargeTime = np.array([])
-                    # self.dischargeTimeUnit = 's'
+                print('Sleeping for 5 seconds to give scope its "me time"')	
+                time.sleep(5)
+                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
+                self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
+                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+                
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
@@ -404,7 +400,7 @@ class CapTestingApp(TestingApp):
                 except:
                     self.internalResistance, chargeFitTime, chargeFitVoltage = (0, 0, 0)
                     self.waterResistance, self.dischargeFitTime, self.dischargeFitVoltage = (0, 0, 0)
-                self.fitVoltageLine.set_data(chargeFitTime, chargeFitVoltage / 1000)
+                # self.fitVoltageLine.set_data(chargeFitTime, chargeFitVoltage / 1000)
                 self.waterResistance /= 1000
 
                 # Plot results on the discharge graph and save them
@@ -419,15 +415,23 @@ class CapTestingApp(TestingApp):
             else:
                 print('Oscilloscope was not triggered successfully')
 
-        if self.charging:
+        if not self.idleMode:
             if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
                 popup()
                 saveDischarge()
             else:
-                self.triggerShot()
-                time.sleep(hardCloseWaitTime)
-                self.operateSwitch('Load Switch', False)
-                saveDischarge()
+                # LASER TEST	
+                # self.triggerShot()	
+                self.operateSwitch('Voltage Divider Switch', True)	
+                time.sleep(0.5)	
+                # self.triggerShot()	
+                self.pulseGenerator.triggerStart()	
+                time.sleep(hardCloseWaitTime)	
+                self.operateSwitch('Load Switch', False)	
+                # Save discharge on a separate thread	
+                print('Saving discharge')	
+                thread = Thread(target=saveDischarge)	
+                thread.start()
         else:
             popup()
 
@@ -435,9 +439,6 @@ class CapTestingApp(TestingApp):
         self.disableButtons()
         if self.loggedIn:
             self.resetButton.configure(state='normal')
-
-        self.discharged = True
-        self.charging = False
 
     def getResistance(self, time, voltage):
         # Exponential decay function that decays to 0
@@ -482,42 +483,72 @@ class CapTestingApp(TestingApp):
         time.sleep(switchWaitTime)
         self.voltageDividerClosed = True
 
-    def updateChargeValues(self):
-        voltagePSPoint = np.nan
-        currentPSPoint = np.nan
-        self.capacitorVoltagePoint = np.nan
+    def updateChargeValues(self):	
+        voltagePSPoint = np.nan	
+        currentPSPoint = np.nan	
+        self.capacitorVoltagePoint = np.nan	
+        # not applicable on startup	
+        if hasattr(self, 'NI_DAQ'):	
+            if not DEBUG_MODE:	
+                # voltages = self.NI_DAQ.h_task_ai.read()	
+                # Retrieve charging data	
+                voltages = self.NI_DAQ.data	
+            else:	
+                voltages = self.getChargingTestVoltages()	
+            # voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput	
+            # currentPSPoint = (voltages[1]) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason	
 
-        # not applicable on startup
-        if hasattr(self, 'NI_DAQ'):
-            if not DEBUG_MODE:
-                # voltages = self.NI_DAQ.h_task_ai.read()
-                # Retrieve charging data
-                self.chargeVoltagePS = self.NI_DAQ.data['Power Supply Voltage']
-                self.chargeCurrentPS = self.NI_DAQ.data['Power Supply Current']
-                self.capacitorVoltage = self.NI_DAQ.data['Capacitor Voltage']
+            # Update charging values in object while not discharged
+            if self.charging:
+                self.chargeVoltagePS = voltages['Power Supply Voltage'] * maxVoltagePowerSupply / maxVoltageInput	
+                self.chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason	
+                self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider * attenuator	
+            	
+                # Capacitor signal is very noisy, so apply moving average filter over a period of 2 seconds	
+                # Also don't want to filter over nan's
+                nanIndices = np.isnan(self.capacitorVoltage)	
+                self.capacitorVoltageFiltered = uniform_filter1d(self.capacitorVoltage[~nanIndices], size=sample_rate * 2)	
+                voltagePSPoint = self.chargeVoltagePS[-1]
+                currentPSPoint = self.chargeCurrentPS[-1]
+                # Only record the voltage when the switch is closed	
+                # This occurs during all of charging and intermittently when the capacitor is isolated	
+                # LASER TEST	
+                # if self.voltageDividerClosed:	
+                if True:	
+                    # self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator	
+                    self.capacitorVoltagePoint = self.capacitorVoltageFiltered[-1]	
+                    self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')	
+            
             else:
-                voltages = self.getChargingTestVoltages()
-            # voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput
-            # currentPSPoint = (voltages[1] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason
-            voltagePSPoint = self.chargeVoltagePS[-1]
-            currentPSPoint = self.chargeCurrentPS[-1]
+                chargeVoltagePS = voltages['Power Supply Voltage'] * maxVoltagePowerSupply / maxVoltageInput	
+                chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason	
+                capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider * attenuator	
+            	
+                # Capacitor signal is very noisy, so apply moving average filter over a period of 2 seconds	
+                # Also don't want to filter over nan's
+                nanIndices = np.isnan(capacitorVoltage)	
+                capacitorVoltageFiltered = uniform_filter1d(capacitorVoltage[~nanIndices], size=sample_rate * 2)	
+                voltagePSPoint = chargeVoltagePS[-1]
+                currentPSPoint = chargeCurrentPS[-1]
+                # Only record the voltage when the switch is closed	
+                # This occurs during all of charging and intermittently when the capacitor is isolated	
+                # LASER TEST	
+                # if self.voltageDividerClosed:	
+                if True:	
+                    # self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator	
+                    self.capacitorVoltagePoint = capacitorVoltageFiltered[-1]	
+                    self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')	
 
-            # Only record the voltage when the switch is closed
-            # This occurs during all of charging and intermittently when the capacitor is isolated
-            # ADD NEW STYLE OF GETTING VOLTAGE FOR CAPACITOR VOLTAGE POINT
-            if self.voltageDividerClosed:
-                self.capacitorVoltagePoint = voltages[2] * voltageDivider * attenuator
-                self.capacitorVoltageText.set(f'V{CapacitorSuperscript}: {self.capacitorVoltagePoint / 1000:.2f} kV')
-
-        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')
-        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')
-
-        # Once the DAQ has made a measurement, open up the switch again
-        if self.voltageDividerClosed and self.countdownStarted:
-            self.operateSwitch('Voltage Divider Switch', False)
-            self.voltageDividerClosed = False
-
-        if not self.idleMode and self.voltageDividerClosed:
+        self.voltagePSText.set(f'V{PSSuperscript}: {voltagePSPoint / 1000:.2f} kV')	
+        self.currentPSText.set(f'I{PSSuperscript}: {currentPSPoint * 1000:.2f} mA')	
+        # Once the DAQ has made a measurement, open up the switch again	
+        # LASER TEST	
+        # if self.voltageDividerClosed and self.countdownStarted:	
+        #     self.operateSwitch('Voltage Divider Switch', False)	
+        #     self.voltageDividerClosed = False	
+        # LASER TEST	
+        # if not self.idleMode and self.voltageDividerClosed:	
+        if not self.idleMode:	
             self.progress['value'] = 100 * self.capacitorVoltagePoint / 1000 / self.chargeVoltage
 
         # Logic heirarchy for charge state and countdown text
@@ -532,12 +563,22 @@ class CapTestingApp(TestingApp):
             self.countdownText.set('Countdown: N/A')
 
         if self.charging:
-            self.timePoint = time.time() - self.beginChargeTime
+            # self.timePoint = time.time() - self.beginChargeTime	
+            # self.chargeTime = np.append(self.chargeTime, self.timePoint)	
+            # self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)	
+            # self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)	
+            # self.capacitorVoltage = np.append(self.capacitorVoltage, self.capacitorVoltagePoint)	
+            N = len(self.chargeVoltagePS)	
+            self.chargeTime = np.linspace(0, N / sample_rate, N)	
+            self.timePoint = (N - 1) / sample_rate
 
-            self.chargeTime = np.append(self.chargeTime, self.timePoint)
-            self.chargeVoltagePS = np.append(self.chargeVoltagePS, voltagePSPoint)
-            self.chargeCurrentPS = np.append(self.chargeCurrentPS, currentPSPoint)
-            self.capacitorVoltage = np.append(self.capacitorVoltage, self.capacitorVoltagePoint)
+            # Sometimes there's a mismatch in length of voltages read from daq
+            if len(self.chargeVoltagePS) != len(self.chargeCurrentPS):
+                print('Length mismatch in NI DAQ read')
+                self.chargeCurrentPS = self.chargeCurrentPS[:len(self.chargeVoltagePS)]
+            if len(self.chargeVoltagePS) != len(self.capacitorVoltage):
+                print('Length mismatch in NI DAQ read')
+                self.capacitorVoltage = self.capacitorVoltage[:len(self.chargeVoltagePS)]
 
             # Plot the new data
             self.replotCharge()
@@ -550,25 +591,30 @@ class CapTestingApp(TestingApp):
                     self.charged = True
                     self.countdownStarted = True
 
+                    # Actually begin discharging power supply before opening power supply switch so it doesnt overshoot
+                    self.powerSupplyRamp(action='discharge')
+
                     # Open power supply switch
                     self.operateSwitch('Power Supply Switch', False)
 
-                    # Actually begin discharging power supply
-                    time.sleep(0.5) # allow some time for power supply switch to open
-                    self.powerSupplyRamp(action='discharge')
-
-                    if not DEBUG_MODE:
-                        # Start repeated timer to measure capacitor at regular intervals
-                        self.switchTimer = RepeatedTimer(measureInterval, self.intermittentVoltageDivider)
+                    # LASER TEST
+                    # if not DEBUG_MODE:
+                    #     # Start repeated timer to measure capacitor at regular intervals
+                    #     self.switchTimer = RepeatedTimer(measureInterval, self.intermittentVoltageDivider)
 
                 # Time left before discharge
                 self.countdownTime = self.holdChargeTime - (time.time() - self.countdownTimeStart)
 
                 # Set countdown time to 0 seconds once discharged
-                if self.countdownTime <= 0.0:
-                    self.countdownTime = 0.0
+                if self.countdownTime <= 0.0 and not self.discharged:	
+                    self.countdownTime = 0.0	
                     self.countdownStarted = False
-                    self.discharge()
+
+                    # Have to set discharged to True and charging to False before starting discharge thread	
+                    self.discharged = True	
+                    self.charging = False	
+                    thread = Thread(target=self.discharge)	
+                    thread.start()
 
             # # Discharge if the voltage is not increasing
             # # This is determined if the charge does not exceed a small percentage of the desired charge voltage within a given period of time
@@ -612,7 +658,7 @@ class CapTestingApp(TestingApp):
         self.chargeFitTime = np.array([])
         self.chargeFitVoltage = np.array([])
 
-        self.fitVoltageLine.set_data(self.chargeFitTime, self.chargeFitVoltage / 1000)
+        # self.fitVoltageLine.set_data(self.chargeFitTime, self.chargeFitVoltage / 1000)
 
         # Also need to reset the twinx axis
         # self.chargeCurrentAxis.relim()
@@ -637,6 +683,12 @@ class CapTestingApp(TestingApp):
         self.replotDischarge()
 
     def reset(self):
+        # Open power supply and voltage divider switch and close load switch	
+        self.operateSwitch('Power Supply Switch', False)	
+        time.sleep(switchWaitTime)	
+        self.operateSwitch('Load Switch', False)	
+        self.operateSwitch('Voltage Divider Switch', False)
+
         # Clear all user inputs
         self.serialNumberEntry.delete(0, 'end')
         self.chargeVoltageEntry.delete(0, 'end')
@@ -652,8 +704,9 @@ class CapTestingApp(TestingApp):
         self.idleMode = True
 
         # Close voltage divider
-        self.operateSwitch('Voltage Divider Switch', True)
-        self.voltageDividerClosed = True
+        # LASER TEST	
+        # self.operateSwitch('Voltage Divider Switch', True)	
+        # self.voltageDividerClosed = True
 
         # Reset plots
         self.resetChargePlot()

@@ -1,11 +1,11 @@
-# import ttkbootstrap as ttk
+import ttkbootstrap as ttk
 from constants import *
 
-import tkinter as tk
-from tkinter import ttk
+# import tkinter as tk
+# from tkinter import ttk
 
 # Class for generating popup windows
-class MessageWindow(tk.Toplevel):
+class MessageWindow(ttk.Toplevel):
     def __init__(self, master, name, text):
         super().__init__(master)
         # Bring pop up to the center and top

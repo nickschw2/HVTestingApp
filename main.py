@@ -1009,12 +1009,11 @@ class MainApp(tk.Tk):
                     self.charged = True
                     self.countdownStarted = True
 
+                    # Actually begin discharging power supply before opening power supply switch so it doesnt overshoot
+                    self.powerSupplyRamp(action='discharge')
+
                     # Open power supply switch
                     self.operateSwitch('Power Supply Switch', False)
-
-                    # Actually begin discharging power supply
-                    time.sleep(0.5) # allow some time for power supply switch to open
-                    self.powerSupplyRamp(action='discharge')
 
                     if not DEBUG_MODE:
                         # Start repeated timer to measure capacitor at regular intervals

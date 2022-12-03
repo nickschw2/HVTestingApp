@@ -8,6 +8,8 @@ import os
 import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
+from scipy.ndimage import uniform_filter1d	
+from threading import Thread
 from constants import *
 from plots import *
 from messages import *
@@ -19,8 +21,6 @@ from gpib import *
 from console import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
-
-# change the after call to prevent freezing https://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing/16747734#16747734
 
 # Tkinter has quite a high learning curve. If attempting to edit this source code without experience, I highly
 # recommend going through some tutorials. The documentation on tkinter is also quite poor, but
@@ -46,6 +46,9 @@ class TestingApp(ttk.Window):
     def init_DAQ(self):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(input_name, output_name, sample_rate, ai_channels=self.ai_Pins, ao_channels=self.ao_Pins)
+
+        # Discharge the power supply on startup
+        self.powerSupplyRamp(action='discharge')
 
         # Initialize the scope over ethernet
         try:
@@ -184,10 +187,8 @@ class TestingApp(ttk.Window):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge'):
-        mapVoltage = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
-
         if action == 'charge':
-            value = mapVoltage
+            value = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
         else:
             value = 0
 
@@ -223,14 +224,17 @@ class TestingApp(ttk.Window):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
+            self.NI_DAQ.reset_data() # Only start gathering data when beginning to charge
+
             self.idleMode = False
 
             # Operate switches
             self.operateSwitch('Load Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
-            self.operateSwitch('Voltage Divider Switch', True)
-            self.voltageDividerClosed = True
+            # LASER TEST	
+            # self.operateSwitch('Voltage Divider Switch', True)	
+            # self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
             # Actually begin charging power supply
@@ -250,8 +254,15 @@ class TestingApp(ttk.Window):
         self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 
-        nanIndices = np.isnan(self.capacitorVoltage)
-        self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+        # If the capacitor is only being read every so often, only plot non nan values
+        try:
+            nanIndices = np.isnan(self.capacitorVoltage)
+            if hasattr(self, 'capacitorVoltageFiltered'):
+                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltageFiltered / 1000)
+            else:
+                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+        except IndexError:
+            print('Mismatch in shape')
 
         if self.timePoint > plotTimeLimit:
             self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
@@ -261,7 +272,10 @@ class TestingApp(ttk.Window):
         if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
             self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
 
-        self.bm.update()
+        try:
+            self.bm.update()
+        except ValueError:
+            print('Mismatch in shape')
 
     # Turn on safety lights inside the control room and outside the lab
     def safetyLights(self):
@@ -323,6 +337,8 @@ class TestingApp(ttk.Window):
 
     # Special function for closing the window and program
     def on_closing(self):
+        self.powerSupplyRamp(action='discharge')
+
         # Open power supply and voltage divider switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)

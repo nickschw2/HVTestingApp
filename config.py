@@ -1,16 +1,15 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
 ADMIN_MODE = True
-SHOT_MODE = True
+SHOT_MODE = False
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
 maxCurrentPowerSupply = 15e-3 # A
 maxVoltageInput = 10 # V
-sample_rate = 1000 # Hz, rate at which the NI hardware updates the voltage
+sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-TCPIPAddress = '169.254.55.65'
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
 scopeChannelOptions = ['1', '2', '3', '4']
 

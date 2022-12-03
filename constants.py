@@ -73,25 +73,25 @@ chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
 dischargeHandles = [voltageLine, currentLine, fitLine]
 
 # Saving results
-columns = ['Serial Number',
-    'Capacitance (uF)',
-    'ESR (Ohms)',
-    'DAR',
-    'PI',
-    'Internal Resistance (Ohms)',
-    'Water Resistance (Ohms)',
-    'Charged Voltage (kV)',
-    'Hold Charge Time (s)',
-    'Charge Time (s)',
-    'Charge Voltage PS (V)',
-    'Charge Current PS (A)',
-    'Capacitor Voltage (V)',
-    'Discharge Time',
-    'Discharge Time Unit',
-    'Discharge Voltage (V)',
-    'Discharge Current (A)',
-    'Interferometer (V)',
-    'Diamagnetic (V)']
+# columns = ['Serial Number',
+#     'Capacitance (uF)',
+#     'ESR (Ohms)',
+#     'DAR',
+#     'PI',
+#     'Internal Resistance (Ohms)',
+#     'Water Resistance (Ohms)',
+#     'Charged Voltage (kV)',
+#     'Hold Charge Time (s)',
+#     'Charge Time (s)',
+#     'Charge Voltage PS (V)',
+#     'Charge Current PS (A)',
+#     'Capacitor Voltage (V)',
+#     'Discharge Time',
+#     'Discharge Time Unit',
+#     'Discharge Voltage (V)',
+#     'Discharge Current (A)',
+#     'Interferometer (V)',
+#     'Diamagnetic (V)']
 
 import numpy as np
 timeArray = np.linspace(0, 300, 10000)
@@ -102,7 +102,7 @@ current = -100 * np.exp(-timeArray / RCTime)
 interferometer = np.sin(4 * np.pi / 300 * timeArray)
 diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
 diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
-#
+
 dischargeLines = {'Voltage': voltage, 'Current': current}
 interferometerLines = {'Central': interferometer}
 diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
