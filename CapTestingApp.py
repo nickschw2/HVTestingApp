@@ -225,55 +225,6 @@ class CapTestingApp(TestingApp):
         self.internalResistance = np.nan
         self.internalResistanceText.set(f'R{CapacitorSuperscript}: {self.internalResistance / 1e6:.2f} M\u03A9')
 
-    def saveResults(self):
-        # Create a unique identifier for the filename in the save folder
-        # Format: date_serialNumber_runNumber.csv
-        date = today.strftime('%Y%m%d')
-        run = 1
-        filename = f'{today}_{self.serialNumber}_{run}.csv'
-        while filename in os.listdir(self.saveFolder):
-            run += 1
-            filename = f'{today}_{self.serialNumber}_{run}.csv'
-
-        # These results are listed in accordance with the 'columns' variable in constants.py
-        # If the user would like to add or remove fields please make those changes in constant.py
-        results = [getattr(self, variable) for variable in columns if hasattr(self, variable)]
-
-        # Creates a data frame which is easier to save to csv formats
-        results_df = pd.DataFrame([pd.Series(val) for val in results]).T
-        results_df.columns = columns
-        results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
-
-    # Read in a csv file and plot those results
-    def readResults(self):
-        readFile = filedialog.askopenfilename(filetypes=[('Comma separated values', '.csv')])
-        if readFile != '':
-            results_df = pd.read_csv(readFile)
-
-            # Reset program and allow user to reset
-            self.reset()
-            self.resetButton.configure(state='normal')
-
-            for key, value in columns.items():
-                if value['type'] == 'scalar':
-                    if value['name'] in results_df:
-                        self.__dict__.update({key: results_df[value['name']].values[0]})
-                    else:
-                        self.__dict__.update({key: np.nan})
-                else:
-                    if value['name'] in results_df:
-                        self.__dict__.update({key: results_df[value['name']].dropna().values})
-                    else:
-                        self.__dict__.update({key: np.zeros(0)})
-
-            # Place values for all user inputs and plots
-            self.serialNumberEntry.insert(0, self.serialNumber)
-            self.chargeVoltageEntry.insert(0, self.chargeVoltage)
-            self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
-
-            self.replotCharge()
-            self.replotDischarge()
-
     def getCapacitorData(self, serialNumber):
         capacitorSpecifications = pd.read_csv(capacitorSpecificationsName)
         index = capacitorSpecifications['Serial Number'] == serialNumber
