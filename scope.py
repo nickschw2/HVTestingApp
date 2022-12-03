@@ -1,8 +1,8 @@
-import numpy
 import pyvisa as visa
 import numpy as np
 import time
 import sys
+import traceback as tb
 from config import *
 from messages import *
 
@@ -109,11 +109,11 @@ class Oscilloscope():
             # Make sure oscilloscope is stopped first, if not stop it
             # OPC command is short for "Operation Complete" and ensures the scope is stopped before proceeding
             # self.inst.write('TFOR;*OPC?')
-            time.sleep(0.5)
             # while not bool(self.inst.query('*OPC?').strip()):
             #     print('not complete')
             #     pass
             # print('complete')
+            self.inst.write('*WAI')
 
             # check if channel is on
             active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
@@ -143,7 +143,7 @@ class Oscilloscope():
 
             # Initialize array to hold read data
             values = np.zeros(stop)
-            print('Loading data from oscilloscope')
+            print(f'Loading data from scope channel {channel}')
             if active:
                 # loop through all the packets
                 for i in range(0, loopcount):
@@ -178,15 +178,13 @@ class Oscilloscope():
             self.data[channel] = dataarray[::nSkip]
 
         except Exception as e:
-            type, value, traceback = sys.exc_info()
-            print(traceback.msg)
+            tb.print_tb(sys.exc_info()[2])
             print(e)
             self.data[channel] = np.zeros(0) # return empty array
 
 
         self.data_size = len(self.data[channel])
         
-        print(f'testing {channel}, size: {self.data_size}')
         return self.data[channel]
 
     def get_time(self):

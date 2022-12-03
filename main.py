@@ -673,29 +673,17 @@ class MainApp(tk.Tk):
 
             # Read from the load
             if not DEBUG_MODE:
-                try:
-                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
-                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
-                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
-                except Exception as e:
-                    print(e)
-                    # self.scope.connectInstrument()
-                    # time.sleep(10)
-                    self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                    self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
-                    self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                    self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
-                    self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
-                    # self.dischargeVoltageLoad = np.array([])
-                    # self.dischargeTime = np.array([])
-                    # self.dischargeTimeUnit = 's'
+                print('Sleeping for 5 seconds to give scope its "me time"')
+                time.sleep(5)
+                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
+                self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
+                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
             else:
                 self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
             if len(self.dischargeTime) != 0:
-            # if self.scope.inst.query('TRIG:STAT?').strip() == 'STOP':
                 # get resistance of water resistor
                 try:
                     self.internalResistance, chargeFitTime, chargeFitVoltage = self.getResistance(self.chargeTime, self.capacitorVoltage)
@@ -726,22 +714,16 @@ class MainApp(tk.Tk):
                 # LASER TEST
                 # self.triggerShot()
                 self.operateSwitch('Voltage Divider Switch', True)
-                # self.scope.inst.write(':SING')
                 time.sleep(0.5)
                 # self.triggerShot()
                 self.pulseGenerator.triggerStart()
                 time.sleep(hardCloseWaitTime)
-                # time.sleep(10)
                 self.operateSwitch('Load Switch', False)
-                
-
-                # self.scope.connectInstrument()
-                saveDischarge()
 
                 # Save discharge on a separate thread
-                print('running save')
-                # thread = Thread(target=saveDischarge)
-                # thread.start()
+                print('Saving discharge')
+                thread = Thread(target=saveDischarge)
+                thread.start()
 
                 
         else:
@@ -1047,9 +1029,10 @@ class MainApp(tk.Tk):
                 if self.countdownTime <= 0.0 and not self.discharged:
                     self.countdownTime = 0.0
                     self.countdownStarted = False
+
+                    # Have to set discharged to True and charging to False before starting discharge thread
                     self.discharged = True
                     self.charging = False
-                    print('start thread')
                     thread = Thread(target=self.discharge)
                     thread.start()
                     
@@ -1074,8 +1057,7 @@ class MainApp(tk.Tk):
             #     self.discharge()
             #     print('Steady state reached without charging to desired voltage')
 
-        # self.after(int(1000 / refreshRate), self.updateChargeValues)
-        self.after(100, self.updateChargeValues)
+        self.after(int(1000 / refreshRate), self.updateChargeValues)
 
     # Removes all lines from a figure
     def clearFigLines(self, fig):

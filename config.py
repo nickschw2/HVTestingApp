@@ -11,7 +11,7 @@ sample_rate = 1000 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
 TCPIPAddress = '169.254.55.65'
-scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '3', 'Interferometer': '2', 'Diamagnetic': '4'}
+scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
