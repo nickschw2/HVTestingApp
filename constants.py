@@ -36,7 +36,8 @@ sv_bg = '#a0a0a0'
 userInputWidth = 8
 userInputPadding = 50 #pixels
 loginPadding = 20 #pixels
-setPinsPadding = 15 #pixels
+setPinsPaddingX = 15 #pixels
+setPinsPaddingY = 3 #pixels
 labelPadding = 10 #pixels
 buttonPadding = 50 #pixels
 framePadding = 20 #pixels
@@ -72,27 +73,6 @@ fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$'
 chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
 dischargeHandles = [voltageLine, currentLine, fitLine]
 
-# Saving results
-# columns = ['Serial Number',
-#     'Capacitance (uF)',
-#     'ESR (Ohms)',
-#     'DAR',
-#     'PI',
-#     'Internal Resistance (Ohms)',
-#     'Water Resistance (Ohms)',
-#     'Charged Voltage (kV)',
-#     'Hold Charge Time (s)',
-#     'Charge Time (s)',
-#     'Charge Voltage PS (V)',
-#     'Charge Current PS (A)',
-#     'Capacitor Voltage (V)',
-#     'Discharge Time',
-#     'Discharge Time Unit',
-#     'Discharge Voltage (V)',
-#     'Discharge Current (A)',
-#     'Interferometer (V)',
-#     'Diamagnetic (V)']
-
 import numpy as np
 timeArray = np.linspace(0, 300, 10000)
 timeUnit = 'ms'
@@ -102,19 +82,13 @@ current = -100 * np.exp(-timeArray / RCTime)
 interferometer = np.sin(4 * np.pi / 300 * timeArray)
 diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
 diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
-
 dischargeLines = {'Voltage': voltage, 'Current': current}
 interferometerLines = {'Central': interferometer}
 diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
-
 resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
     'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
     'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
     }
-
-
-
-
 columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
@@ -133,4 +107,6 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'dischargeVoltageLoad': {'name': 'Discharge Voltage (V)', 'type': 'array'},
     'dischargeCurrentLoad': {'name': 'Discharge Current (A)', 'type': 'array'},
     'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
-    'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'}}
+    'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'},
+    'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
+    'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}

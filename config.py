@@ -1,7 +1,7 @@
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
 ADMIN_MODE = True
-SHOT_MODE = False
+SHOT_MODE = True
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -17,19 +17,24 @@ scopeChannelOptions = ['1', '2', '3', '4']
 pulseGeneratorGPIBAddress = 2
 
 # NI DAQ parameters
-output_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
-input_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
+discharge_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
+systemStatus_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
-ao_Defaults = {'Power Supply Output': 'ao0'} # analog outputs
-ai_Defaults = {'Power Supply Voltage': 'ai0',
+charge_ao_defaults = {'Power Supply Output': 'ao0'} # analog outputs
+systemStatus_defaults = {'Power Supply Voltage': 'ai0',
     'Power Supply Current': 'ai1',
     'Capacitor Voltage': 'ai2'} # analog inputs
-do_Defaults = {'Load Switch': 'line0',
+do_defaults = {'Load Switch': 'line0',
     'Power Supply Switch': 'line1',
     'Voltage Divider Switch': 'line2'}
-ao_Options = ['ao0', 'ao1']
-ai_Options = ['ai0', 'ai1', 'ai2', 'ai3']
-do_Options = ['line0', 'line1', 'line2', 'line3']
+diagnostics_defaults = {'Current': 'ai0',
+    'Intereferometer': 'ai1',
+    'Diamagnetic Axial': 'ai2',
+    'Diamagnetic Radial': 'ai3'}
+charge_ao_options = ['ao0', 'ao1']
+systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
+do_options = ['line0', 'line1', 'line2', 'line3']
+diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3']
 
 # Diagnostic hardware
 voltageDivider = 1000 # voltage ratio in:out
@@ -62,5 +67,10 @@ hardCloseWaitTime = 4
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 ignitronInstalled = True
 
-# Charging constants
+# Capacitor constants
 maxVoltage = {'LBL': 5, 'BLU': 50, 'GRA': 10, '': 'N/A'}
+capacitance = 72 # uF
+
+# User input validation
+maximumValidVoltage = max([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV
+maximumValidGasPuff = 100 # ms

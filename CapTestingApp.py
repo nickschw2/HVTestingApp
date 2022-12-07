@@ -18,11 +18,6 @@ class CapTestingApp(TestingApp):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         self.saveFolderSet = False
-        # Initialize pins to default values
-        self.scopePins = scopeChannelDefaults
-        self.ao_Pins = ao_Defaults
-        self.ai_Pins = ai_Defaults
-        self.do_Pins = do_Defaults
 
         self.dischargeTimeUnit = 's' # arbritrarily
 
@@ -203,10 +198,6 @@ class CapTestingApp(TestingApp):
             self.loggedIn = True
             self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
             self.saveFolderSet = True
-            self.scopePins = scopeChannelDefaults
-            self.ao_Pins = ao_Defaults
-            self.ai_Pins = ai_Defaults
-            self.do_Pins = do_Defaults
 
         else:
             # Prompt for login, save location, and pin selector automatically
@@ -260,7 +251,7 @@ class CapTestingApp(TestingApp):
             self.polarizationIndex = float(self.capacitorData['PI'])
 
             # Initialize the countdown time to the hold charge time until the countdown begins
-            self.countdownTime = self.holdChargeTime
+            self.countdownTime = np.inf
 
             self.userInputsSet = True
 
@@ -301,28 +292,7 @@ class CapTestingApp(TestingApp):
                 incorrectUserInputText = 'Either the serial number does not exist or the format is invalid. Please reenter a valid serial number.'
                 incorrectUserInput(incorrectUserInputText)
 
-    def discharge(self):
-        def popup():
-            # Popup window to confirm discharge
-            dischargeConfirmName = 'Discharge'
-            dischargeConfirmText = 'Are you sure you want to discharge?'
-            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
-
-            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
-            cancelButton.pack(side='left')
-
-            dischargeConfirmWindow.wait_window()
-
-            if dischargeConfirmWindow.OKPress:
-                # Operate switches
-                self.operateSwitch('Power Supply Switch', False)
-                time.sleep(switchWaitTime)
-                self.operateSwitch('Load Switch', False)
-
-                # Force discharge to occur
-                self.powerSupplyRamp(action='discharge')
-
-        def saveDischarge():
+    def saveDischarge(self):
             # Close voltage divider and stop repeating timer
             # LASER TEST	
             # self.operateSwitch('Voltage Divider Switch', True)	
@@ -365,31 +335,6 @@ class CapTestingApp(TestingApp):
 
             else:
                 print('Oscilloscope was not triggered successfully')
-
-        if not self.idleMode:
-            if not hasattr(self, 'countdownTime') or self.countdownTime > 0.0:
-                popup()
-                saveDischarge()
-            else:
-                # LASER TEST	
-                # self.triggerShot()	
-                self.operateSwitch('Voltage Divider Switch', True)	
-                time.sleep(0.5)	
-                # self.triggerShot()	
-                self.pulseGenerator.triggerStart()	
-                time.sleep(hardCloseWaitTime)	
-                self.operateSwitch('Load Switch', False)	
-                # Save discharge on a separate thread	
-                print('Saving discharge')	
-                thread = Thread(target=saveDischarge)	
-                thread.start()
-        else:
-            popup()
-
-        # Disable all buttons except for save and help, if logged in
-        self.disableButtons()
-        if self.loggedIn:
-            self.resetButton.configure(state='normal')
 
     def getResistance(self, time, voltage):
         # Exponential decay function that decays to 0
@@ -600,39 +545,6 @@ class CapTestingApp(TestingApp):
         self.dischargeVoltageAxis.plot(self.dischargeFitTime, self.dischargeFitVoltage / 1000, color=fitColor, label='V$_{fit}$')
         self.dischargePlot.updatePlot()
 
-    def resetChargePlot(self):
-        # Set time and voltage to empty array
-        self.chargeTime = np.array([])
-        self.chargeVoltagePS = np.array([])
-        self.chargeCurrentPS = np.array([])
-        self.capacitorVoltage = np.array([])
-        self.chargeFitTime = np.array([])
-        self.chargeFitVoltage = np.array([])
-
-        # self.fitVoltageLine.set_data(self.chargeFitTime, self.chargeFitVoltage / 1000)
-
-        # Also need to reset the twinx axis
-        # self.chargeCurrentAxis.relim()
-        # self.chargeCurrentAxis.autoscale_view()
-
-        self.timePoint = 0
-        self.capacitorVoltagePoint = 0
-        self.replotCharge()
-
-    def resetDischargePlot(self):
-        # Set time and voltage to empty array
-        self.dischargeTime = np.array([])
-        self.dischargeFitTime = np.array([])
-        self.dischargeVoltageLoad = np.array([])
-        self.dischargeCurrentLoad = np.array([])
-        self.dischargeFitVoltage = np.array([])
-
-        # Also need to reset the twinx axis
-        self.dischargeCurrentAxis.relim()
-        self.dischargeCurrentAxis.autoscale_view()
-
-        self.replotDischarge()
-
     def reset(self):
         # Open power supply and voltage divider switch and close load switch	
         self.operateSwitch('Power Supply Switch', False)	
@@ -660,10 +572,13 @@ class CapTestingApp(TestingApp):
         # self.voltageDividerClosed = True
 
         # Reset plots
-        self.resetChargePlot()
-        self.resetDischargePlot()
+        self.resetPlot(self.chargePlot)
+        self.resetPlot(self.dischargePlot)
 
-        # Disable all buttons if logged in
+        # Reset progress bar
+        self.progress['value'] = 0.0
+
+        # Disable all buttons
         self.disableButtons()
 
         if hasattr(self, 'scope'):

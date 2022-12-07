@@ -24,8 +24,10 @@ class CanvasPlot(ttk.Frame):
 
     def updatePlot(self):
         #update graph
-        self.ax.relim()
-        self.ax.autoscale_view()
+        # reset all axes in figure
+        for ax in self.fig.axes:
+            ax.relim()
+            ax.autoscale_view()
         self.canvas.draw()
 
 

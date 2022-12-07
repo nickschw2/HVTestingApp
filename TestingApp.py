@@ -1,4 +1,5 @@
 import ttkbootstrap as ttk
+from ttkbootstrap import validation, scrolled, window
 from tkinter import filedialog
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,13 +40,23 @@ class TestingApp(ttk.Window):
         style.configure('TNotebook.Tab', **text_opts)
         style.configure('TCheckbutton', **text_opts)
         self.option_add('*TCombobox*Listbox.font', text_opts)
+
+        # Initialize pins to default values
+        self.scopePins = scopeChannelDefaults
+        self.charge_ao_Pins = charge_ao_defaults
+        self.systemStatus_Pins = systemStatus_defaults
+        self.do_Pins = do_defaults
+        self.diagnostics_Pins = diagnostics_defaults
         
     # There are two pieces of hardware important for communication with the test cart
     # The NI panel extender provides an analog output and two analog inputs to read/write to the power supply during charging
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
     def init_DAQ(self):
         # We need both an analog input and output
-        self.NI_DAQ = NI_DAQ(input_name, output_name, sample_rate, ai_channels=self.ai_Pins, ao_channels=self.ao_Pins)
+        self.NI_DAQ = NI_DAQ(systemStatus_name, discharge_name, sample_rate,
+                             systemStatus_channels=self.systemStatus_Pins,
+                             charge_ao_channels=self.charge_ao_Pins,
+                             diagnostics=self.diagnostics_Pins)
 
         # Discharge the power supply on startup
         self.powerSupplyRamp(action='discharge')
@@ -83,7 +94,7 @@ class TestingApp(ttk.Window):
 
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in results]).T
-        results_df.columns = columns
+        results_df.columns = [columns[variable]['name'] for variable in columns if hasattr(self, variable)]
         results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
 
     # Read in a csv file and plot those results
@@ -97,10 +108,8 @@ class TestingApp(ttk.Window):
             self.resetButton.configure(state='normal')
 
             for key, value in columns.items():
-                breakpoint()
                 if value['type'] == 'scalar':
                     if value['name'] in results_df:
-                        print(results_df[value['name']].values)
                         self.__dict__.update({key: results_df[value['name']].values[0]})
                     else:
                         self.__dict__.update({key: np.nan})
@@ -133,7 +142,7 @@ class TestingApp(ttk.Window):
 
     def pinSelector(self):
         # Create popup window with fields for username and password
-        self.setPinWindow = ttk.Toplevel(padx=setPinsPadding, pady=setPinsPadding)
+        self.setPinWindow = window.Toplevel(padx=setPinsPaddingX, pady=setPinsPaddingY)
         self.setPinWindow.title('Set Pins')
         # Bring pop up to the center and top
         self.eval(f'tk::PlaceWindow {str(self.setPinWindow)} center')
@@ -149,41 +158,44 @@ class TestingApp(ttk.Window):
                 label = ttk.Label(self.setPinWindow, text=channel, **text_opts)
                 drop = ttk.OptionMenu(self.setPinWindow, channelVariable, channelDefaults[channel], *options)
 
-                label.grid(row=nRows + i, column=0, sticky='w', padx=(0, setPinsPadding))
-                drop.grid(row=nRows + i, column=1, sticky='w', padx=(setPinsPadding, 0))
+                label.grid(row=nRows + i, column=0, sticky='w', padx=(0, setPinsPaddingX), pady=(0, setPinsPaddingY))
+                drop.grid(row=nRows + i, column=1, sticky='w', padx=(setPinsPaddingX, 0), pady=(0, setPinsPaddingY))
 
                 pins[channel] = channelVariable
 
             return pins
 
         scopePinsOptions = selectPins(scopeChannelDefaults, scopeChannelOptions)
-        ao_PinsOptions = selectPins(ao_Defaults, ao_Options)
-        ai_PinsOptions = selectPins(ai_Defaults, ai_Options)
-        do_PinsOptions = selectPins(do_Defaults, do_Options)
+        charge_ao_PinsOptions = selectPins(charge_ao_defaults, charge_ao_options)
+        systemStatus_PinsOptions = selectPins(systemStatus_defaults, systemStatus_options)
+        do_PinsOptions = selectPins(do_defaults, do_options)
+        diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
         buttonFrame = ttk.Frame(self.setPinWindow)
         buttonFrame.grid(row=nRows + 1, columnspan=2)
-
         # Once the okay button is pressed, assign the pins
         def assignPins():
             for channel in scopePinsOptions:
                 self.scopePins[channel] = scopePinsOptions[channel].get()
 
-            for channel in ao_PinsOptions:
-                self.ao_Pins[channel] = ao_PinsOptions[channel].get()
+            for channel in charge_ao_PinsOptions:
+                self.charge_ao_Pins[channel] = charge_ao_PinsOptions[channel].get()
 
-            for channel in ai_PinsOptions:
-                self.ai_Pins[channel] = ai_PinsOptions[channel].get()
-
+            for channel in systemStatus_PinsOptions:
+                self.systemStatus_Pins[channel] = systemStatus_PinsOptions[channel].get()
             for channel in do_PinsOptions:
                 self.do_Pins[channel] = do_PinsOptions[channel].get()
 
+            for channel in diagnostics_PinsOptions:
+                self.diagnostics_Pins[channel] = diagnostics_PinsOptions[channel].get()
+
             print(self.scopePins)
-            print(self.ao_Pins)
-            print(self.ai_Pins)
+            print(self.charge_ao_Pins)
+            print(self.systemStatus_Pins)
             print(self.do_Pins)
+            print(self.diagnostics_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, style='Accent.TButton')
@@ -228,8 +240,8 @@ class TestingApp(ttk.Window):
         if not DEBUG_MODE:
             try:
                 with nidaqmx.Task() as task:
-                    task.do_channels.add_do_chan(f'{output_name}/{digitalOutName}/{self.do_Pins[switchName]}')
-                    value = task.write(state)
+                    task.do_channels.add_do_chan(f'{discharge_name}/{digitalOutName}/{self.do_Pins[switchName]}')
+                    task.write(state)
                     print(f'{switchName} in {state} state')
 
             except Exception as e:
@@ -245,22 +257,6 @@ class TestingApp(ttk.Window):
 
         if not DEBUG_MODE:
             self.NI_DAQ.write_value(value)
-
-    def triggerShot(self):
-        # Set up a task to trigger the gating of the camera based off the pulse generator signal
-        with nidaqmx.Task() as task:
-            freq = 10000
-            duty_cycle = 0.5
-            task.co_channels.add_co_pulse_chan_freq(f'{output_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
-            task.channels.co_pulse_term = f'/{output_name}/PFI0'
-
-            n_pulses = 1
-            task.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)
-            task.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{output_name}/PFI1', trigger_edge=nidaqmx.constants.Edge.RISING)
-
-            task.start()
-            self.pulseGenerator.triggerStart()
-            task.wait_until_done(timeout=np.inf)
 
     def charge(self):
         # Popup window appears to confirm charging
@@ -295,11 +291,56 @@ class TestingApp(ttk.Window):
             self.beginChargeTime = time.time()
             self.charging = True
 
-            # Reset the charge plot and begin continuously plotting
-            self.resetChargePlot()
-            # self.updateCharge()
-            self.updateChargeValues()
             self.chargePress = True
+
+    def discharge(self):
+        def popup():
+            # Popup window to confirm discharge
+            dischargeConfirmName = 'Discharge'
+            dischargeConfirmText = 'Are you sure you want to discharge?'
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
+            cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
+
+            if dischargeConfirmWindow.OKPress:
+                # Force power supply to discharge
+                self.powerSupplyRamp(action='discharge')
+
+                # Operate switches
+                self.operateSwitch('Power Supply Switch', False)
+                time.sleep(switchWaitTime)
+                self.operateSwitch('Load Switch', False)
+
+                self.charging = False
+                self.discharged = True
+
+        if not self.idleMode:
+            if not self.charged:
+                popup()
+
+            else:
+                self.operateSwitch('Voltage Divider Switch', True)	
+                time.sleep(0.5)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
+                self.pulseGenerator.triggerStart()
+
+                # Wait a while before closing the mechanical dump switch
+                time.sleep(hardCloseWaitTime)	
+                self.operateSwitch('Load Switch', False)
+
+            # Save discharge on a separate thread	
+            print('Saving discharge')	
+            thread = Thread(target=self.saveDischarge)	
+            thread.start()
+        else:
+            popup()
+
+        # Disable all buttons except for reset, if logged in
+        self.disableButtons()
+        if self.loggedIn:
+            self.resetButton.configure(state='normal')
 
     def replotCharge(self):
         self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
@@ -358,7 +399,7 @@ class TestingApp(ttk.Window):
                 self.passwordEntry.delete(0, 'end')
 
         # Create popup window with fields for username and password
-        self.loginWindow = ttk.Toplevel(padx=loginPadding, pady=loginPadding)
+        self.loginWindow = window.Toplevel(padx=loginPadding, pady=loginPadding)
         self.loginWindow.title('Login Window')
 
         # Center and bring popup to the top
@@ -484,6 +525,12 @@ class TestingApp(ttk.Window):
             if len(axis.lines) != 0:
                 for i in range(len(axis.lines)):
                     axis.lines[0].remove()
+
+    def resetPlot(self, canvas):
+        for ax in canvas.fig.axes:
+         for line in ax.get_lines():
+            line.set_data([],[])
+        canvas.updatePlot()
 
     # Popup window for help
     def help(self):
