@@ -1,5 +1,5 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = False
+DEBUG_MODE = True
 ADMIN_MODE = True
 SHOT_MODE = True
 

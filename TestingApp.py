@@ -41,6 +41,8 @@ class TestingApp(ttk.Window):
         style.configure('TCheckbutton', **text_opts)
         self.option_add('*TCombobox*Listbox.font', text_opts)
 
+        self.colors = style.colors
+
         # Initialize pins to default values
         self.scopePins = scopeChannelDefaults
         self.charge_ao_Pins = charge_ao_defaults
@@ -83,7 +85,10 @@ class TestingApp(ttk.Window):
         # Format: date_serialNumber_runNumber.csv
         date = today.strftime('%Y%m%d')
         run = 1
-        filename = f'{today}_{self.serialNumber}_{run}.csv'
+        if SHOT_MODE:
+            filename = f'{today}_CMFX_{run}.csv'
+        else:
+            filename = f'{today}_{self.serialNumber}_{run}.csv'
         while filename in os.listdir(self.saveFolder):
             run += 1
             filename = f'{today}_{self.serialNumber}_{run}.csv'
@@ -198,7 +203,7 @@ class TestingApp(ttk.Window):
             print(self.diagnostics_Pins)
             self.setPinWindow.destroy()
 
-        okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, style='Accent.TButton')
+        okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
         okayButton.pack()
 
         self.setPinWindow.wait_window()
@@ -226,7 +231,7 @@ class TestingApp(ttk.Window):
         checklistWindow = MessageWindow(self, checklistName, checklistText)
 
         checklistWindow.OKButton['text'] = 'Yes'
-        cancelButton = ttk.Button(checklistWindow.bottomFrame, text='Cancel', command=checklistWindow.destroy, style='Accent.TButton')
+        cancelButton = ttk.Button(checklistWindow.bottomFrame, text='Cancel', command=checklistWindow.destroy, bootstyle='danger')
         cancelButton.pack(side='left')
 
         checklistWindow.wait_window()
@@ -264,7 +269,7 @@ class TestingApp(ttk.Window):
         chargeConfirmText = 'Are you sure you want to begin charging?'
         chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
 
-        cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, style='Accent.TButton')
+        cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, bootstyle='danger')
         cancelButton.pack(side='left')
 
         chargeConfirmWindow.wait_window()
@@ -300,7 +305,7 @@ class TestingApp(ttk.Window):
             dischargeConfirmText = 'Are you sure you want to discharge?'
             dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
 
-            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, style='Accent.TButton')
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, bootstyle='danger')
             cancelButton.pack(side='left')
 
             dischargeConfirmWindow.wait_window()
@@ -416,7 +421,7 @@ class TestingApp(ttk.Window):
         self.usernameEntry = ttk.Entry(self.loginWindow, **entry_opts)
         self.passwordLabel = ttk.Label(self.loginWindow, text=password_text, **text_opts)
         self.passwordEntry = ttk.Entry(self.loginWindow, show='*', **entry_opts)
-        self.loginButton = ttk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), style='Accent.TButton')
+        self.loginButton = ttk.Button(self.loginWindow, text=button_text, command=lambda event='Okay Press': checkLogin(event), bootstyle='success')
 
         # User can press 'Return' key to login instead of loginButton
         self.loginWindow.bind('<Return>', checkLogin)

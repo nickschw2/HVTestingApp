@@ -16,21 +16,9 @@ PSSuperscript = '\u1D56\u02E2'
 CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
 
 # Colors
-green = '#2ecc71'
-yellow = '#f1c40f'
 orange = '#e67e22'
-red = '#e74c3c'
 blue = '#3498db'
-white = '#ecf0f1'
-black = '#000000'
-grey = '#636262'
-lightGrey = '#a9a1a1'
-defaultbg = '#f0f0f0'
-UMDRed = '#e03a3d'
-
-sv_blue = '#005fb8'
-sv_selfg = '#fafafa'
-sv_bg = '#a0a0a0'
+red = '#e03a3d'
 
 # Widget display constants
 userInputWidth = 8
@@ -53,9 +41,9 @@ currentYLim = 15 # mA
 # Styles
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
-entry_opts = {'font':('Helvetica', 12), 'background': lightGrey}
+entry_opts = {'font':('Helvetica', 12)}
 # frame_opts = {'font':('Helvetica', 12), 'borderwidth': 3, 'relief': 'raised', 'padding': 12}
-frame_opts = {'borderwidth': 3, 'relief': 'raised', 'padding': 12}
+frame_opts = {'borderwidth': 3, 'relief': 'flat', 'padding': 12}
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
@@ -63,15 +51,15 @@ format = re.compile('.{3}\d{3}')
 
 # Plotting constants
 voltageColor = blue
-currentColor = UMDRed
+currentColor = red
 fitColor = orange
 
 voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{PS}$')
 capacitorLine = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{cap}$')
 fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$')
-chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
-dischargeHandles = [voltageLine, currentLine, fitLine]
+chargeHandles = [voltageLine, capacitorLine, currentLine]
+dischargeHandles = [voltageLine, currentLine]
 
 columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},

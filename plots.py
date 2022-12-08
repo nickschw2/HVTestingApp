@@ -16,8 +16,15 @@ class CanvasPlot(ttk.Frame):
         super().__init__(master)
         self.master = master
         self.fig, self.ax = plt.subplots(constrained_layout=True, **kwargs)
-        # self.fig.patch.set_facecolor(defaultbg)
-        # self.line, = self.ax.plot([],[]) #Create line object on plot
+
+        # Adjust colors
+        bg_color = ttk.Style().colors.bg
+        fg_color = ttk.Style().colors.fg
+        self.fig.patch.set_facecolor(bg_color)
+        self.ax.patch.set_facecolor(bg_color)
+        for spine in self.ax.spines:
+            self.ax.spines[spine].set_color(fg_color)
+
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=True, fill='both')
