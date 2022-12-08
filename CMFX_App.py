@@ -1,6 +1,5 @@
 from TestingApp import *
 
-
 # SAVE RESULTS EVEN WHEN THERE'S NO DISCHARGE
 # CHANGE GUI TO LOOK MORE LIKE THAT IN TOKAMAK ENERGY PICTURE
 
@@ -192,6 +191,12 @@ class CMFX_App(TestingApp):
         self.resetButton.pack(side='left', expand=True, padx=buttonPadding)
 
         #### RESULTS SECTION ####
+        # Initialize the data structure to hold results plot
+        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
+            'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
+            'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
+            }
+
         # Frame for displaying the results plots
         self.resultsPlotFrame = ttk.Frame(self.notebookFrames['Results'])
         self.resultsPlotFrame.pack(side='right', expand=True)
@@ -209,7 +214,7 @@ class CMFX_App(TestingApp):
         self.selectorFrame.pack(side='left', expand=True, anchor='n')
 
         # Selector for showing a certain plot
-        plotOptions = list(resultsPlots.keys())
+        plotOptions = list(self.resultsPlotData.keys())
         self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', **text_opts)
         self.resultsPlotCombobox.current(0) # Initializes the current value to first option
         self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot)
@@ -217,7 +222,7 @@ class CMFX_App(TestingApp):
 
         # Initialize checkbuttons
         self.resultsCheckbuttons = {}
-        for plotOption, plotProperties in resultsPlots.items():
+        for plotOption, plotProperties in self.resultsPlotData.items():
             # Need to create a dictionary for each checkbutton corresponding to its label
             self.resultsCheckbuttons[plotOption] = {}
             for label in plotProperties['lines']:
@@ -225,9 +230,6 @@ class CMFX_App(TestingApp):
                 checkbutton.invoke() # Initialize it to be turned on
                 checkbutton.bind('<Button>', self.changeResultsPlot)
                 self.resultsCheckbuttons[plotOption][label] = checkbutton
-
-        # Set initial state, have to pass a dummy variable
-        self.changeResultsPlot(None)
 
         #### CONSOLE SECTION ####
         # Create frame to hold console and scroll bar
@@ -262,7 +264,6 @@ class CMFX_App(TestingApp):
 
         self.config(menu=self.menubar)
 
-
     def init_ui(self):
         print('init_ui')
         # Begin the operation of the program
@@ -288,7 +289,7 @@ class CMFX_App(TestingApp):
         self.update()
 
         self.updateSystemStatus()
-
+        
         self.safetyLights()
 
     def recordPreShotNotes(self):
@@ -340,7 +341,7 @@ class CMFX_App(TestingApp):
             # not applicable on startup	
             if hasattr(self, 'NI_DAQ'):	
                 if not DEBUG_MODE:	
-                    voltages = self.NI_DAQ.data	
+                    voltages = self.NI_DAQ.systemStatusData	
                 else:	
                     voltages = self.getChargingTestVoltages()
 
@@ -353,7 +354,7 @@ class CMFX_App(TestingApp):
                     # Capacitor signal is very noisy, so apply moving average filter over a period of 2 seconds	
                     # Also don't want to filter over nan's
                     nanIndices = np.isnan(self.capacitorVoltage)	
-                    self.capacitorVoltageFiltered = uniform_filter1d(self.capacitorVoltage[~nanIndices], size=sample_rate * 2)	
+                    self.capacitorVoltageFiltered = uniform_filter1d(self.capacitorVoltage[~nanIndices], size=systemStatus_sample_rate * 2)	
                     voltagePSPoint = self.chargeVoltagePS[-1]
                     currentPSPoint = self.chargeCurrentPS[-1]
                     self.capacitorVoltagePoint = self.capacitorVoltageFiltered[-1]
@@ -367,7 +368,7 @@ class CMFX_App(TestingApp):
                     # Capacitor signal is very noisy, so apply moving average filter over a period of 2 seconds	
                     # Also don't want to filter over nan's
                     nanIndices = np.isnan(capacitorVoltage)	
-                    capacitorVoltageFiltered = uniform_filter1d(capacitorVoltage[~nanIndices], size=sample_rate * 2)	
+                    capacitorVoltageFiltered = uniform_filter1d(capacitorVoltage[~nanIndices], size=systemStatus_sample_rate * 2)	
                     voltagePSPoint = chargeVoltagePS[-1]
                     currentPSPoint = chargeCurrentPS[-1]
                     self.capacitorVoltagePoint = capacitorVoltageFiltered[-1]
@@ -389,8 +390,8 @@ class CMFX_App(TestingApp):
 
             if self.charging:
                 N = len(self.chargeVoltagePS)	
-                self.chargeTime = np.linspace(0, N / sample_rate, N)	
-                self.timePoint = (N - 1) / sample_rate
+                self.chargeTime = np.linspace(0, N / systemStatus_sample_rate, N)	
+                self.timePoint = (N - 1) / systemStatus_sample_rate
 
                 # Sometimes there's a mismatch in length of voltages read from daq
                 if len(self.chargeVoltagePS) != len(self.chargeCurrentPS):
@@ -430,37 +431,49 @@ class CMFX_App(TestingApp):
 
     def saveDischarge(self):
             # Read from the load
-            if not DEBUG_MODE:
-                print('Sleeping for 5 seconds to give scope its "me time"')	
-                time.sleep(5)
-                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
-                self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
-                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+            # if not DEBUG_MODE:
+            #     print('Sleeping for 5 seconds to give scope its "me time"')	
+            #     time.sleep(5)
+            #     self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+            #     self.dischargeCurrentLoad = self.scope.get_data(self.scopePins['Load Current']) / pearsonCoil
+            #     self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+            #     self.diamagnetic = self.scope.get_data(self.scopePins['Diamagnetic'])
+            #     self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
                 
-            else:
-                self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
+            # else:
+            #     self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
 
-            if len(self.dischargeTime) != 0:
-                # Plot results on the discharge graph and save them
-                # The only time results are saved is when there is a discharge that is preceded by charge
-                self.replotCharge()
-                self.replotDischarge()
+            # if len(self.dischargeTime) != 0:
+            #     # Plot results on the discharge graph and save them
+            #     # The only time results are saved is when there is a discharge that is preceded by charge
+            #     self.replotCharge()
+            #     self.replotDischarge()
 
-                self.saveResults()
+            #     self.saveResults()
 
-            else:
-                print('Oscilloscope was not triggered successfully')
+            # else:
+            #     print('Oscilloscope was not triggered successfully')
 
-    def replotDischarge(self):
-        # Remove lines every time the figure is plotted
-        self.clearFigLines(self.dischargePlot.fig)
-        self.dischargeVoltageAxis.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+            self.current = self.NI_DAQ.dischargeData[0,:]
+            self.interferometer = self.NI_DAQ.dischargeData[1,:]
+            self.diamagneticAxial = self.NI_DAQ.dischargeData[2,:]
+            self.diamagneticRadial = self.NI_DAQ.dischargeData[3,:]
 
-        # Add plots NEED TO FINISH
-        self.dischargeLines['voltage'] = voltage
-        self.dischargeLines['current'] = current
+            self.resultsPlotData['Discharge']['lines']['Current'] = self.current
+            self.resultsPlotData['Interferometer']['lines']['Central'] = self.interferometer
+            self.resultsPlotData['Diamagnetic']['lines']['Axial'] = self.diamagneticAxial
+            self.resultsPlotData['Diamagnetic']['lines']['Radial'] = self.diamagneticRadial
+
+            self.changeResultsPlot(None)
+
+    # def replotDischarge(self):
+    #     # Remove lines every time the figure is plotted
+    #     self.clearFigLines(self.dischargePlot.fig)
+    #     self.dischargeVoltageAxis.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+
+    #     # Add plots NEED TO FINISH
+    #     self.dischargeLines['voltage'] = voltage
+    #     self.dischargeLines['current'] = current
 
     def readResults(self):
         print('read results')
@@ -472,7 +485,7 @@ class CMFX_App(TestingApp):
 
         # Need to tell if event came from the combobox or a checkbutton
         # event==None is for dummy variable instantiation
-        if event==None or isinstance(event.widget, ttk.Combobox):
+        if event == None or isinstance(event.widget, ttk.Combobox):
             # Remove current checkbuttons
             for widget in self.selectorFrame.winfo_children():
                 if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
@@ -486,9 +499,9 @@ class CMFX_App(TestingApp):
                 checkbutton.pack(expand=True, anchor='w')
 
             # Change plot to new selection
-            plotProperties = resultsPlots[plotSelection]
+            plotProperties = self.resultsPlotData[plotSelection]
             axis = self.resultsPlot.ax
-            axis.set_xlabel(f'Time ({timeUnit})')
+            axis.set_xlabel(f'Time ({self.NI_DAQ.tUnit})')
             axis.set_ylabel(plotProperties['ylabel'])
             axis.set_prop_cycle(None) # Reset the color cycle
 
@@ -496,7 +509,7 @@ class CMFX_App(TestingApp):
             self.currentLines = {}
             for label, data in plotProperties['lines'].items():
                 visible = checkbuttons[label].instate(['selected'])
-                line = axis.plot(timeArray, data, label=label, visible=visible)
+                line = axis.plot(self.NI_DAQ.dischargeTime, data, label=label, visible=visible)
                 self.currentLines[label] = line[0]
 
             axis.legend()

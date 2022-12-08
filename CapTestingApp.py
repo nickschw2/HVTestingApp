@@ -388,7 +388,7 @@ class CapTestingApp(TestingApp):
             if not DEBUG_MODE:	
                 # voltages = self.NI_DAQ.h_task_ai.read()	
                 # Retrieve charging data	
-                voltages = self.NI_DAQ.data	
+                voltages = self.NI_DAQ.systemStatusData	
             else:	
                 voltages = self.getChargingTestVoltages()	
             # voltagePSPoint = voltages[0] * maxVoltagePowerSupply / maxVoltageInput	

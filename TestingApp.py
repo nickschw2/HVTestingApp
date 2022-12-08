@@ -53,7 +53,7 @@ class TestingApp(ttk.Window):
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
     def init_DAQ(self):
         # We need both an analog input and output
-        self.NI_DAQ = NI_DAQ(systemStatus_name, discharge_name, sample_rate,
+        self.NI_DAQ = NI_DAQ(systemStatus_name, discharge_name, systemStatus_sample_rate,
                              systemStatus_channels=self.systemStatus_Pins,
                              charge_ao_channels=self.charge_ao_Pins,
                              diagnostics=self.diagnostics_Pins)
@@ -271,7 +271,7 @@ class TestingApp(ttk.Window):
 
         # If the user presses the Okay button, charging begins
         if chargeConfirmWindow.OKPress:
-            self.NI_DAQ.reset_data() # Only start gathering data when beginning to charge
+            self.NI_DAQ.reset_systemStatus() # Only start gathering data when beginning to charge
 
             self.idleMode = False
 
@@ -316,6 +316,8 @@ class TestingApp(ttk.Window):
 
                 self.charging = False
                 self.discharged = True
+
+                self.pulseGenerator.triggerStart()
 
         if not self.idleMode:
             if not self.charged:

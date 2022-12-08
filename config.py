@@ -7,7 +7,7 @@ SHOT_MODE = True
 maxVoltagePowerSupply = 20e3 # V
 maxCurrentPowerSupply = 15e-3 # A
 maxVoltageInput = 10 # V
-sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
+systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
 scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
@@ -35,6 +35,12 @@ charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
 diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3']
+maxDischargeFreq = int(250000 / len(diagnostics_defaults)) # Hz
+
+# Results plot
+dischargeLines = {'Current': []}
+interferometerLines = {'Central': []}
+diamagneticLines = {'Axial': [], 'Radial': []}
 
 # Diagnostic hardware
 voltageDivider = 1000 # voltage ratio in:out

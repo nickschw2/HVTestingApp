@@ -13,28 +13,25 @@
 '''
 
 import nidaqmx
-from nidaqmx.constants import (AcquisitionType,RegenerationMode)
-from nidaqmx.stream_readers import (
-    AnalogSingleChannelReader, AnalogMultiChannelReader)
-from nidaqmx.stream_writers import (
-    AnalogSingleChannelWriter, AnalogMultiChannelWriter)
+from nidaqmx.constants import (AcquisitionType, Signal, Edge)
+from nidaqmx.stream_readers import (AnalogMultiChannelReader)
 import numpy as np
 from config import *
 
 class NI_DAQ():
-    def __init__(self, systemStatus_name, discharge_name, sample_rate, systemStatus_channels={}, charge_ao_channels={}, diagnostics={}, autostart=True):
+    def __init__(self, systemStatus_name, discharge_name, systemStatus_sample_rate, systemStatus_channels={}, charge_ao_channels={}, diagnostics={}, autostart=True):
         self.systemStatus_name = systemStatus_name
         self.discharge_name = discharge_name
         self.systemStatus_channels = systemStatus_channels
         self.charge_ao_channels = charge_ao_channels
         self.diagnostics = diagnostics
-        self.sample_rate = sample_rate
+        self.systemStatus_sample_rate = systemStatus_sample_rate
 
-        self.data = {name: np.array([]) for name in self.systemStatus_channels} # analog input will be stored in this data array
+        self.systemStatusData = {name: np.array([]) for name in self.systemStatus_channels} # analog input will be stored in this data array
 
         self.tasks = []
         self.closed = False
-
+        
         self.set_up_tasks()
         print('NI DAQ has been successfully initialized')
 
@@ -54,7 +51,7 @@ class NI_DAQ():
         self.task_systemStatus = nidaqmx.Task()
         self.task_charge_ao = nidaqmx.Task()
         self.task_diagnostics = nidaqmx.Task()
-        
+
         self.tasks.append(self.task_systemStatus)
         self.tasks.append(self.task_charge_ao)
         self.tasks.append(self.task_diagnostics)
@@ -63,21 +60,27 @@ class NI_DAQ():
         #   C equivalent - DAQmxCreateAOVoltageChan
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcreateaovoltagechan/
         # https://nidaqmx-python.readthedocs.io/en/latest/ao_channel_collection.html
-        for ai_chan in self.systemStatus_channels.values():
-            self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{self.systemStatus_name}/{ai_chan}', min_val=0.0, max_val=10.0)
+        for name, ai_chan in self.systemStatus_channels.items():
+            self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{self.systemStatus_name}/{ai_chan}', 
+                                                                   min_val=0.0, max_val=10.0,
+                                                                   name_to_assign_to_channel=name)
 
-        for ao_chan in self.charge_ao_channels.values():
-            self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{self.discharge_name}/{ao_chan}', min_val=0.0, max_val=10.0)
+        for name, ao_chan in self.charge_ao_channels.items():
+            self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{self.discharge_name}/{ao_chan}',
+                                                                min_val=0.0, max_val=10.0,
+                                                                name_to_assign_to_channel=name)
 
-        for diagnostic in self.diagnostics.values():
-            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}', min_val=-10.0, max_val=10.0)
+        for name, diagnostic in self.diagnostics.items():
+            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}',
+                                                                  min_val=-10.0, max_val=10.0,
+                                                                  name_to_assign_to_channel=name)
 
         '''
         SET UP ANALOG INPUT
         '''
         if len(self.systemStatus_channels) != 0:
-            self._points_to_plot = int(self.sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
-            self.task_systemStatus.timing.cfg_samp_clk_timing(self.sample_rate,
+            self._points_to_plot = int(self.systemStatus_sample_rate * 0.1) # somewhat arbritrarily, the number of points to read at once from the buffer
+            self.task_systemStatus.timing.cfg_samp_clk_timing(self.systemStatus_sample_rate,
                                     sample_mode=AcquisitionType.CONTINUOUS,
                                     samps_per_chan=self._points_to_plot)
 
@@ -85,20 +88,43 @@ class NI_DAQ():
             self.task_systemStatus.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
 
         '''
-        SET UP COUNTER OUTPUT
+        SET UP DISCHARGE AND COUNTER TASKS
         '''
-        if SHOT_MODE:
-            self.h_task_co = nidaqmx.Task()
-            self.tasks.append(self.h_task_co)
+        self.task_co = nidaqmx.Task()
+        self.tasks.append(self.task_co)
 
-            freq = 10000
-            duty_cycle = 0.5
-            self.h_task_co.co_channels.add_co_pulse_chan_freq(f'{self.discharge_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
-            self.h_task_co.channels.co_pulse_term = f'/{self.discharge_name}/PFI0'
+        freq = 1000
+        duty_cycle = 0.5
+        n_pulses = 10
+        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.discharge_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
+        self.task_co.channels.co_pulse_term = f'/{self.discharge_name}/PFI0'
+        self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)        
+        self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.discharge_name}/PFI1', trigger_edge=Edge.RISING)
 
-            n_pulses = 1
-            self.h_task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)
-            self.h_task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.discharge_name}/PFI1', trigger_edge=nidaqmx.constants.Edge.RISING)
+        # Create time array for discharge
+        duration = n_pulses / freq # seconds
+        n_channels = len(self.diagnostics)
+        discharge_samps_per_chan = int(maxDischargeFreq * duration)
+        self.dischargeTime = np.linspace(0, duration, discharge_samps_per_chan)
+        if duration < 1e-3:
+                self.dischargeTime = self.dischargeTime * 1e6
+                self.tUnit = 'us'
+        elif duration < 1:
+            self.tidischargeTimeme = self.dischargeTime * 1e3
+            self.tUnit = 'ms'
+        else:
+            self.tUnit = 's'
+
+
+        self.dischargeData = np.zeros((n_channels, discharge_samps_per_chan))
+
+        self.task_diagnostics.timing.cfg_samp_clk_timing(maxDischargeFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
+        self.task_diagnostics.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.discharge_name}/PFI1', trigger_edge=Edge.RISING)
+        self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
+
+        self.discharge_reader = AnalogMultiChannelReader(self.task_diagnostics.in_stream)
+
+        self.dischargeTriggered = False
 
     def write_value(self, value):
         self.task_charge_ao.write(value, timeout=2)
@@ -107,13 +133,22 @@ class NI_DAQ():
         points = self.task_systemStatus.read(number_of_samples_per_channel=self._points_to_plot)
         values = {}
         for i, name in enumerate(self.systemStatus_channels):
-            self.data[name] = np.append(self.data[name], points[i])
+            self.systemStatusData[name] = np.append(self.systemStatusData[name], points[i])
             values[name] = np.mean(points[i])
 
         return values
 
     def read_callback(self, tTask, event_type, num_samples, callback_data):
         self.read()
+        return 0
+
+    def read_discharge(self, task_handle, signal_type, callback_data):
+        if not self.dischargeTriggered:
+            print('DAQ has been triggered')
+            # Read all discharge data and wait for acquisition to finish
+            self.discharge_reader.read_many_sample(self.dischargeData)
+            self.dischargeTriggered = True
+
         return 0
 
     def start_acquisition(self):
@@ -130,8 +165,8 @@ class NI_DAQ():
             else:
                 task.stop()
 
-    def reset_data(self):
-        self.data = {name: np.array([]) for name in self.systemStatus_channels} # analog input will be stored in this data array
+    def reset_systemStatus(self):
+        self.systemStatusData = {name: np.array([]) for name in self.systemStatus_channels} # analog input will be stored in this data array
 
     # House-keeping methods follow
     def _task_created(self, task):

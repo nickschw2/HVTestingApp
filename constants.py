@@ -73,22 +73,6 @@ fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$'
 chargeHandles = [voltageLine, currentLine, capacitorLine, fitLine]
 dischargeHandles = [voltageLine, currentLine, fitLine]
 
-import numpy as np
-timeArray = np.linspace(0, 300, 10000)
-timeUnit = 'ms'
-RCTime = 50
-voltage = 100 * np.exp(-timeArray / RCTime)
-current = -100 * np.exp(-timeArray / RCTime)
-interferometer = np.sin(4 * np.pi / 300 * timeArray)
-diamagneticAxial = np.sin(4 * np.pi / 300 * timeArray)
-diamagneticRadial = np.cos(4 * np.pi / 300 * timeArray)
-dischargeLines = {'Voltage': voltage, 'Current': current}
-interferometerLines = {'Central': interferometer}
-diamagneticLines = {'Axial': diamagneticAxial, 'Radial': diamagneticRadial}
-resultsPlots = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
-    'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
-    'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
-    }
 columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
