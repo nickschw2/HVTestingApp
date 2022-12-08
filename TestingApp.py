@@ -83,15 +83,15 @@ class TestingApp(ttk.Window):
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
         # Format: date_serialNumber_runNumber.csv
-        date = today.strftime('%Y%m%d')
         run = 1
         if SHOT_MODE:
-            filename = f'{today}_CMFX_{run}.csv'
+            self.filename = f'{today}_CMFX_{run}.csv'
         else:
-            filename = f'{today}_{self.serialNumber}_{run}.csv'
-        while filename in os.listdir(self.saveFolder):
+            self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+
+        while self.filename in os.listdir(self.saveFolder):
             run += 1
-            filename = f'{today}_{self.serialNumber}_{run}.csv'
+            self.filename = f'{today}_{self.serialNumber}_{run}.csv'
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py
@@ -100,7 +100,7 @@ class TestingApp(ttk.Window):
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in results]).T
         results_df.columns = [columns[variable]['name'] for variable in columns if hasattr(self, variable)]
-        results_df.to_csv(f'{self.saveFolder}/{filename}', index=False)
+        results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
 
     # Read in a csv file and plot those results
     def readResults(self):

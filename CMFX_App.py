@@ -311,10 +311,20 @@ class CMFX_App(TestingApp):
 
     def recordPreShotNotes(self):
         self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
+        if self.discharged:
+            results_df = pd.read_csv(f'{self.saveFolder}/{self.filename}')
+            columnName = columns['preShotNotes']['name']
+            results_df.loc[0, columnName] = self.preShotNotes
+            results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
         print('Pre-shot notes recorded')
 
     def recordPostShotNotes(self):
         self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
+        if self.discharged:
+            results_df = pd.read_csv(f'{self.saveFolder}/{self.filename}')
+            columnName = columns['postShotNotes']['name']
+            results_df.loc[0, columnName] = self.postShotNotes
+            results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
         print('Post-shot notes recorded')
 
     def setUserInputs(self):
@@ -481,7 +491,12 @@ class CMFX_App(TestingApp):
             self.resultsPlotData['Diamagnetic']['lines']['Axial'] = self.diamagneticAxial
             self.resultsPlotData['Diamagnetic']['lines']['Radial'] = self.diamagneticRadial
 
+            self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
+            self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
+
             self.changeResultsPlot(None)
+
+            self.saveResults()
 
     def readResults(self):
         print('read results')
