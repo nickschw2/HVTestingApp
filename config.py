@@ -1,5 +1,5 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = True
+DEBUG_MODE = False
 ADMIN_MODE = True
 SHOT_MODE = True
 
@@ -80,3 +80,8 @@ capacitance = 72 # uF
 # User input validation
 maximumValidVoltage = max([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV
 maximumValidGasPuff = 100 # ms
+
+# Discharge timing
+duration = 0.5 # s
+pulse_period = 0.1 # s
+pulse_width = 0.01 # s

@@ -38,15 +38,19 @@ class CMFX_App(TestingApp):
         #### SYSTEM STATUS SECTION ####
         # Add frames for text labels
         self.textStatusFrame = ttk.Frame(self.notebookFrames['System Status'])
-        self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', bootstyle='primary')
-        self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', bootstyle='primary')
-        self.miscStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Misc. Status', bootstyle='primary')
+        self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', width=systemStatusFrameWidth, height=150, bootstyle='info')
+        self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', width=systemStatusFrameWidth, height=110, bootstyle='info')
+        self.miscStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Misc. Status', width=systemStatusFrameWidth, height=60, bootstyle='info')
 
-        # self.textStatusFrame.place(relx=0.5, rely=0.5, anchor='center')
         self.textStatusFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
         self.HVStatusFrame.pack(side='top', expand=True)
         self.pressureStatusFrame.pack(side='top', expand=True)
         self.miscStatusFrame.pack(side='top', expand=True)
+
+        # Force width of label frames
+        self.HVStatusFrame.pack_propagate(0)
+        self.pressureStatusFrame.pack_propagate(0)
+        self.miscStatusFrame.pack_propagate(0)
 
         # Create text variables for status indicators, associate with labels, and place
         self.voltagePSText = ttk.StringVar()
@@ -71,8 +75,8 @@ class CMFX_App(TestingApp):
 
         # Add textboxes for adding notes about a given shot
         self.userNotesFrame = ttk.Frame(self.notebookFrames['System Status'])
-        self.preShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Pre-Shot Notes', bootstyle='primary')
-        self.postShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Post-Shot Notes', bootstyle='primary')
+        self.preShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Pre-Shot Notes', bootstyle='info')
+        self.postShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Post-Shot Notes', bootstyle='info')
 
         # self.userNotesFrame.place(relx=0.5, rely=0.5, anchor='center')
         self.userNotesFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
@@ -92,14 +96,14 @@ class CMFX_App(TestingApp):
 
         #### CHARGING SECTION ####
         # Add charging input to notebook
-        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', bootstyle='primary')
+        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', bootstyle='info')
         self.userInputs.pack(side='top', expand=True, pady=(framePadding, 0))
 
         self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):')
         self.gasPuffLabel = ttk.Label(self.userInputs, text='Gas Puff time (ms):')
 
-        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth)
-        self.gasPuffEntry = ttk.Entry(self.userInputs, width=userInputWidth)
+        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
+        self.gasPuffEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
 
         self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, bootstyle='primary')
 
@@ -177,7 +181,7 @@ class CMFX_App(TestingApp):
         self.chargePlot.pack(side='right', expand=True, padx=plotPadding)
 
         # Row for buttons on the bottom
-        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', bootstyle='primary')
+        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', bootstyle='info')
         self.buttons.pack(side='top', expand=True, pady=(0, framePadding))
 
         # Button definitions and placement
@@ -220,7 +224,7 @@ class CMFX_App(TestingApp):
         self.resultsPlot.pack(side='right', expand=True)
 
         # Frame for selecting which plots to show
-        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='primary')
+        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='info')
         self.selectorFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
         # Selector for showing a certain plot
@@ -245,13 +249,11 @@ class CMFX_App(TestingApp):
 
         #### CONSOLE SECTION ####
         # Create frame to hold console and scroll bar
-        self.consoleFrame = ttk.LabelFrame(self, text='Console', bootstyle='primary')
+        self.consoleFrame = ttk.LabelFrame(self, text='Console', bootstyle='info')
         self.consoleFrame.pack(fill='x', side='bottom', expand=True, padx=framePadding, pady=(0, framePadding))
 
         # Height is number of lines to be displayed
-        # Link the textbox to scrollbar as well so that the length of bar corresponds
         self.console = Console(self.consoleFrame, height=10)
-        # self.scrollbar.config(command=self.console.yview)
         self.console.pack(side='left', fill='x', expand=True, padx=labelPadding, pady=labelPadding)
 
         # Menubar at the top
@@ -293,7 +295,7 @@ class CMFX_App(TestingApp):
 
         if ADMIN_MODE:
             self.loggedIn = True
-            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
+            self.saveFolder = 'C:/Users/Control Room/programs/HVTestingApp/CMFX'
             self.saveFolderSet = True
 
         else:
@@ -568,6 +570,7 @@ class CMFX_App(TestingApp):
 
         # Clear user inputs
         self.chargeVoltageEntry.delete(0, 'end')
+        self.gasPuffEntry.delete(0, 'end')
 
         # Reset all boolean variables, time, and checklist
         self.charged = False

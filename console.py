@@ -18,6 +18,7 @@ class Console(ScrolledText):
         self.config(state="normal")
         self.insert("end", content)
         self.config(state="disabled")
+        self.see('end')
 
     def reset(self, event):
         sys.stdout = self.old_stdout

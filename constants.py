@@ -3,7 +3,7 @@ import matplotlib.lines as mlines
 import datetime
 
 # github website
-githubSite = 'https://github.com/nickschw2/HVCapTestingApp'
+githubSite = 'https://github.com/nickschw2/HVTestingApp'
 
 # Capacitor Specs doc
 capacitorSpecificationsName = 'Capacitor_Specifications.csv'
@@ -16,9 +16,9 @@ PSSuperscript = '\u1D56\u02E2'
 CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
 
 # Colors
-orange = '#e67e22'
-blue = '#3498db'
-red = '#e03a3d'
+orange = '#ffa300'
+blue = '#0bb4ff'
+red = '#e60049'
 
 # Widget display constants
 userInputWidth = 8
@@ -33,6 +33,7 @@ plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
 topLevelWidth = 30
 topLevelWrapLength = 275
+systemStatusFrameWidth = 250
 progressBarLength = 300
 plotTimeLimit = 20 # s
 voltageYLim = 1.2 # kV

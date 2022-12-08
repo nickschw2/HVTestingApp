@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import ttkbootstrap as ttk
 from constants import *
 
+# Change color cycler for dark mode
+# Taken from https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data
+matplotlib.rcParams['axes.prop_cycle'] = matplotlib.cycler(color=["#e60049", "#0bb4ff", "#50e991", "#e6d800", "#9b19f5", "#ffa300", "#dc0ab4", "#b3d4ff", "#00bfa0"]) 
+
 # import tkinter as tk
 # from tkinter import ttk
 

@@ -30,7 +30,7 @@ from console import *
 
 class TestingApp(ttk.Window):
     def __init__(self):
-        super().__init__(themename='superhero')
+        super().__init__(themename='darkly')
         style = ttk.Style()
         style.configure('TButton', **button_opts)
         style.configure('TFrame', **frame_opts)
@@ -82,16 +82,19 @@ class TestingApp(ttk.Window):
 
     def saveResults(self):
         # Create a unique identifier for the filename in the save folder
+        def set_filename():
+            if SHOT_MODE:
+                self.filename = f'{today}_CMFX_{run}.csv'
+            else:
+                self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+
         # Format: date_serialNumber_runNumber.csv
         run = 1
-        if SHOT_MODE:
-            self.filename = f'{today}_CMFX_{run}.csv'
-        else:
-            self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+        set_filename()
 
         while self.filename in os.listdir(self.saveFolder):
             run += 1
-            self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+            set_filename()
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py

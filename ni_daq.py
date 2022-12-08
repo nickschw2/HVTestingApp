@@ -93,16 +93,15 @@ class NI_DAQ():
         self.task_co = nidaqmx.Task()
         self.tasks.append(self.task_co)
 
-        freq = 1000
-        duty_cycle = 0.5
-        n_pulses = 10
+        freq = int(1 / pulse_period)
+        duty_cycle = pulse_width / pulse_period
+        n_pulses = int(duration / pulse_period)
         self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.discharge_name}/ctr0', freq=freq, duty_cycle=duty_cycle)
         self.task_co.channels.co_pulse_term = f'/{self.discharge_name}/PFI0'
         self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=n_pulses)        
         self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.discharge_name}/PFI1', trigger_edge=Edge.RISING)
 
         # Create time array for discharge
-        duration = n_pulses / freq # seconds
         n_channels = len(self.diagnostics)
         discharge_samps_per_chan = int(maxDischargeFreq * duration)
         self.dischargeTime = np.linspace(0, duration, discharge_samps_per_chan)
@@ -146,8 +145,8 @@ class NI_DAQ():
         if not self.dischargeTriggered:
             print('DAQ has been triggered')
             # Read all discharge data and wait for acquisition to finish
-            self.discharge_reader.read_many_sample(self.dischargeData)
             self.dischargeTriggered = True
+            self.discharge_reader.read_many_sample(self.dischargeData)
 
         return 0
 

@@ -38,4 +38,4 @@ class MessageWindow(Toplevel):
         self.OKButton = ttk.Button(self.bottomFrame, text='Okay', command=OKPress, style='Accent.TButton')
 
         self.message.pack(fill='both')
-        self.OKButton.pack(side='left')
+        self.OKButton.pack(side='left', padx=(0, labelPadding))
