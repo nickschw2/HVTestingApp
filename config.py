@@ -1,6 +1,6 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = False
-ADMIN_MODE = True
+DEBUG_MODE = True
+ADMIN_MODE = False
 SHOT_MODE = True
 
 # Power supply constants
@@ -10,7 +10,7 @@ maxVoltageInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'Load Voltage': '1', 'Load Current': '2', 'Interferometer': '3', 'Diamagnetic': '4'}
+scopeChannelDefaults = {'Load Voltage': '1', 'Interferometer': '2', 'Trigger': '4'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -73,13 +73,16 @@ hardCloseWaitTime = 4
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 ignitronInstalled = True
 
-# Capacitor constants
+# Circuit constants
 maxVoltage = {'LBL': 5, 'BLU': 50, 'GRA': 10, '': 'N/A'}
 capacitance = 72 # uF
+ballastResistance = 500 # Ohms
+dumpResistance = 0.29 / 7 # Ohms
 
 # User input validation
-maximumValidVoltage = max([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV
-maximumValidGasPuff = 100 # ms
+maxValidVoltage = min([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV
+maxValidGasPuff = 100 # ms
+maxValidDumpDelay = 1000 # ms
 
 # Discharge timing
 duration = 0.5 # s

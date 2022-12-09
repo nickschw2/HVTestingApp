@@ -36,9 +36,8 @@ class Oscilloscope():
         resources = self.rm.list_resources()
         return resources[0]
 
-    def setScale(self, chargeVoltage, capacitance):
-        RCTime = waterResistor * capacitance
-        timeScale = RCTime * 2 * 8  
+    def setScale(self, chargeVoltage):
+        timeScale = duration / 10 
         voltageScale = chargeVoltage / 5
         currentScale = chargeVoltage * 1000 / 500 * 0.01 / 20
         interferometerScale = 0.005 # Volts
@@ -46,7 +45,7 @@ class Oscilloscope():
 
         # Initialize the scope view
         self.inst.write(f':TIM:SCAL {timeScale}')
-        self.inst.write(f':TIM:OFFS {4 * timeScale}')
+        self.inst.write(f':TIM:OFFS {5 * timeScale}')
 
         self.inst.write(':CHAN1:DISP 1')
         self.inst.write(':CHAN2:DISP 1')

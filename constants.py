@@ -5,15 +5,18 @@ import matplotlib.lines as mlines
 githubSite = 'https://github.com/nickschw2/HVTestingApp'
 
 # Saving results
-saveFolderDefault = 'C:/Users/Control Room/programs/HVTestingApp/results'
+saveFolderShotDefault = 'C:/Users/Control Room/programs/HVTestingApp/results'
+saveFolderCapDefault = 'C:/Users/Control Room/programs/HVTestingApp/capacitor_results'
 resultsMasterName = 'results_master.csv'
 
 # Capacitor Specs doc
 capacitorSpecificationsName = 'Capacitor_Specifications.csv'
 
+# Special characters
 loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
 PSSuperscript = '\u1D56\u02E2'
 CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
+Omega = '\u03A9'
 
 # Colors
 orange = '#ffa300'
@@ -67,6 +70,9 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'runDate': {'name': 'Run Date', 'type': 'scalar'},
     'runTime': {'name': 'Run Time', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
+    'ballastResistance': {'name': 'Ballast Resistance (Ohms)', 'type': 'scalar'},
+    'dumpResistance': {'name': 'Dump Resistance (Ohms)', 'type': 'scalar'},
+    'dumpDelay': {'name': 'Dump Delay (ms)', 'type': 'scalar'},
     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
     'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
     'polarizationIndex': {'name': 'PI', 'type': 'scalar'},
@@ -90,6 +96,10 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
 master_columns = {'runNumber': 'Run Number',
     'runDate': 'Run Date',
     'runTime': 'Run Time',
+    'capacitance': 'Capacitance (uF)',
+    'ballastResistance': 'Ballast Resistance (Ohms)',
+    'dumpResistance': 'Dump Resistance (Ohms)',
+    'dumpDelay': 'Dump Delay (ms)',
     'chargeVoltage': 'Charged Voltage (kV)',
     'gasPuffTime': 'Gas Puff Time (ms)',
     'preShotNotes': 'Pre-Shot Notes',

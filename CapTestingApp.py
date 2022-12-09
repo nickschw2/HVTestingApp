@@ -196,7 +196,7 @@ class CapTestingApp(TestingApp):
 
         if ADMIN_MODE:
             self.loggedIn = True
-            self.saveFolder = 'C:/Users/Control Room/programs/HVCapTestingApp/CMFX'
+            self.saveFolder = saveFolderCapDefault
             self.saveFolderSet = True
 
         else:

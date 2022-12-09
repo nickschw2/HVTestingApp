@@ -86,6 +86,7 @@ class TestingApp(ttk.Window):
         self.pulseGenerator = PulseGenerator()
 
     def saveResults(self):
+        '''MASTER FILE SAVE'''
         # Create master file if it does not already exist
         self.runNumber = f'{0:05d}'
         if resultsMasterName not in os.listdir(self.saveFolder):
@@ -105,29 +106,17 @@ class TestingApp(ttk.Window):
         self.runTime = now.time().strftime('%H:%M:%S')
 
         # Save master results
-        resultMaster_df = pd.DataFrame([getattr(self, variable) for variable in master_columns if hasattr(self, variable)])
+        resultMaster = [getattr(self, variable) for variable in master_columns if hasattr(self, variable)]
+        resultMaster_df = pd.DataFrame([pd.Series(val) for val in resultMaster]).T
         resultsMaster_df = resultsMaster_df.concat([resultsMaster_df, resultMaster_df])
         resultsMaster_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
 
+        '''RUN FILE SAVE'''
         # Create a folder for today's date if it doesn't already exist
         if self.runDate not in os.listdir(self.saveFolder):
             os.mkdir(self.runDate)
 
         self.filename = f'CMFX_{self.runNumber}.csv'
-
-        # def set_filename():
-        #     if SHOT_MODE:
-        #         self.filename = f'CMFX_{self.runNumber}.csv'
-        #     else:
-        #         self.filename = f'{today}_{self.serialNumber}_{run}.csv'
-
-        # # Format: date_serialNumber_runNumber.csv
-        # run = 1
-        # set_filename()
-
-        # while self.filename in os.listdir(self.saveFolder):
-        #     run += 1
-        #     set_filename()
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py
