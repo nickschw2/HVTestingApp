@@ -103,8 +103,12 @@ class NI_DAQ():
 
         # Create time array for discharge
         n_channels = len(self.diagnostics)
-        discharge_samps_per_chan = int(maxDischargeFreq * duration)
-        self.dischargeTime = np.linspace(0, duration, discharge_samps_per_chan)
+        pretrigger_fraction = 0.1
+        posttrigger_samples = int(maxDischargeFreq * duration) + 1 # Add one to include t=0
+        pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
+        pretrigger_duration = int(duration * pretrigger_fraction)
+        discharge_samps_per_chan = pretrigger_samples + posttrigger_samples
+        self.dischargeTime = np.linspace(-pretrigger_duration, duration, discharge_samps_per_chan)
         if duration < 1e-3:
                 self.dischargeTime = self.dischargeTime * 1e6
                 self.tUnit = 'us'
@@ -118,7 +122,7 @@ class NI_DAQ():
         self.dischargeData = np.zeros((n_channels, discharge_samps_per_chan))
 
         self.task_diagnostics.timing.cfg_samp_clk_timing(maxDischargeFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
-        self.task_diagnostics.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.discharge_name}/PFI1', trigger_edge=Edge.RISING)
+        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.discharge_name}/PFI1', pretrigger_samples=pretrigger_samples, trigger_edge=Edge.RISING)
         self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
 
         self.discharge_reader = AnalogMultiChannelReader(self.task_diagnostics.in_stream)
