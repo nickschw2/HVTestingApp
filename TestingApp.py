@@ -321,7 +321,9 @@ class TestingApp(ttk.Window):
             self.beginChargeTime = time.time()
             self.charging = True
 
-            self.chargePress = True
+            if SHOT_MODE:
+                # Record base pressures when charging begins
+                self.recordPressure()
 
     def discharge(self):
         def popup():

@@ -61,14 +61,14 @@ class CMFX_App(TestingApp):
         self.voltagePSText = ttk.StringVar()
         self.currentPSText = ttk.StringVar()
         self.capacitorVoltageText = ttk.StringVar()
-        self.pressureChamberText = ttk.StringVar()
-        self.pressurePumpText = ttk.StringVar()
+        self.chamberPressureText = ttk.StringVar()
+        self.pumpPressureText = ttk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.HVStatusFrame, textvariable=self.voltagePSText)
         self.currentPSLabel = ttk.Label(self.HVStatusFrame, textvariable=self.currentPSText)
         self.capacitorVoltageLabel = ttk.Label(self.HVStatusFrame, textvariable=self.capacitorVoltageText)
-        self.pressureChamberLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pressureChamberText)
-        self.pressurePumpLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pressurePumpText)
+        self.chamberPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.chamberPressureText)
+        self.pumpPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pumpPressureText)
         self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {self.capacitance} uF')
         self.ballastResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Ballast Resistance: {self.ballastResistance} {Omega}')
         self.dumpResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Dump Resistance: {self.dumpResistance:.2f} {Omega}')
@@ -76,8 +76,8 @@ class CMFX_App(TestingApp):
         self.voltagePSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.capacitorVoltageLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
-        self.pressureChamberLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
-        self.pressurePumpLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+        self.chamberPressureLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+        self.pumpPressureLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.bankCapacitanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.ballastResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.dumpResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
@@ -485,13 +485,19 @@ class CMFX_App(TestingApp):
                     thread.start()
 
         def updatePressureStatus():
-            self.pressureChamberText.set('Pressure @ Chamber:')
-            self.pressurePumpText.set('Pressure @ Pump:')
+            chamberPressure = 8e-4
+            pumpPressure = 2e-4
+            self.chamberPressureText.set(f'Chamber Press.: {chamberPressure:.1e} Torr')
+            self.pumpPressureText.set(f'Pump Press.: {pumpPressure:.1e} Torr')
         
         updateHVStatus()
         updatePressureStatus()
 
         self.after(int(1000 / refreshRate), self.updateSystemStatus)
+
+    def recordPressure(self):
+        self.chamberPressure = 8e-4
+        self.pumpPressure = 2e-4
 
     def saveDischarge(self):
             # Read from the load
@@ -533,9 +539,6 @@ class CMFX_App(TestingApp):
             self.changeResultsPlot(None)
 
             self.saveResults()
-
-    def readResults(self):
-        print('read results')
 
     def changeResultsPlot(self, event):
         if hasattr(self, 'NI_DAQ'):
@@ -609,7 +612,6 @@ class CMFX_App(TestingApp):
         # Reset all boolean variables, time, and checklist
         self.charged = False
         self.charging = False
-        self.chargePress = False
         self.discharged = False
         self.userInputsSet = False
         self.idleMode = True
