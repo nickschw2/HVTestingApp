@@ -9,7 +9,8 @@ import os
 import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
-from scipy.ndimage import uniform_filter1d	
+from scipy.ndimage import uniform_filter1d
+import datetime
 from threading import Thread
 from constants import *
 from plots import *
@@ -30,8 +31,10 @@ from console import *
 
 class TestingApp(ttk.Window):
     def __init__(self):
-        super().__init__(themename='darkly')
+        super().__init__(themename='cyborg')
         style = ttk.Style()
+        self.colors = style.colors
+
         style.configure('TButton', **button_opts)
         style.configure('TFrame', **frame_opts)
         style.configure('TLabelframe.Label', **text_opts)
@@ -40,8 +43,10 @@ class TestingApp(ttk.Window):
         style.configure('TNotebook.Tab', **text_opts)
         style.configure('TCheckbutton', **text_opts)
         self.option_add('*TCombobox*Listbox.font', text_opts)
-
-        self.colors = style.colors
+        
+        # Special code for styling big red button
+        style.configure('big.TButton', font=(None, 24,), justify='center', background=self.colors.danger)
+        style.map('big.TButton', background=[('active', '#bc0303')])
 
         # Initialize pins to default values
         self.scopePins = scopeChannelDefaults
@@ -81,20 +86,48 @@ class TestingApp(ttk.Window):
         self.pulseGenerator = PulseGenerator()
 
     def saveResults(self):
+        # Create master file if it does not already exist
+        self.runNumber = f'{0:05d}'
+        if resultsMasterName not in os.listdir(self.saveFolder):
+            resultsMaster_df = pd.DataFrame()
+            resultsMaster_df.columns = [master_columns[variable] for variable in master_columns]
+            resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
+        else:
+            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+            runNumbers = resultsMaster_df[master_columns['runNumber']]
+            runNumber = max(runNumbers.astype(int)) + 1
+            self.runNumber = f'{runNumber:05d}'
+            
         # Create a unique identifier for the filename in the save folder
-        def set_filename():
-            if SHOT_MODE:
-                self.filename = f'{today}_CMFX_{run}.csv'
-            else:
-                self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+        # Date
+        now = datetime.datetime.now()
+        self.runDate = now.date().strftime('%Y_%m_%d')
+        self.runTime = now.time().strftime('%H:%M:%S')
 
-        # Format: date_serialNumber_runNumber.csv
-        run = 1
-        set_filename()
+        # Save master results
+        resultMaster_df = pd.DataFrame([getattr(self, variable) for variable in master_columns if hasattr(self, variable)])
+        resultsMaster_df = resultsMaster_df.concat([resultsMaster_df, resultMaster_df])
+        resultsMaster_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
 
-        while self.filename in os.listdir(self.saveFolder):
-            run += 1
-            set_filename()
+        # Create a folder for today's date if it doesn't already exist
+        if self.runDate not in os.listdir(self.saveFolder):
+            os.mkdir(self.runDate)
+
+        self.filename = f'CMFX_{self.runNumber}.csv'
+
+        # def set_filename():
+        #     if SHOT_MODE:
+        #         self.filename = f'CMFX_{self.runNumber}.csv'
+        #     else:
+        #         self.filename = f'{today}_{self.serialNumber}_{run}.csv'
+
+        # # Format: date_serialNumber_runNumber.csv
+        # run = 1
+        # set_filename()
+
+        # while self.filename in os.listdir(self.saveFolder):
+        #     run += 1
+        #     set_filename()
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py
@@ -103,7 +136,7 @@ class TestingApp(ttk.Window):
         # Creates a data frame which is easier to save to csv formats
         results_df = pd.DataFrame([pd.Series(val) for val in results]).T
         results_df.columns = [columns[variable]['name'] for variable in columns if hasattr(self, variable)]
-        results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
+        results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
     # Read in a csv file and plot those results
     def readResults(self):
@@ -385,6 +418,17 @@ class TestingApp(ttk.Window):
 
     def emergency_off(self):
         print('Emergency Off')
+        # Force power supply to discharge
+        self.powerSupplyRamp(action='discharge')
+
+        # Operate switches
+        self.operateSwitch('Power Supply Switch', False)
+        time.sleep(switchWaitTime)
+        self.operateSwitch('Load Switch', False)
+        self.operateSwitch('Voltage Divider Switch', False)
+
+        self.charging = False
+        self.discharged = True
 
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated

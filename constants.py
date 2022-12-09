@@ -1,15 +1,15 @@
 import re
 import matplotlib.lines as mlines
-import datetime
 
 # github website
 githubSite = 'https://github.com/nickschw2/HVTestingApp'
 
+# Saving results
+saveFolderDefault = 'C:/Users/Control Room/programs/HVTestingApp/results'
+resultsMasterName = 'results_master.csv'
+
 # Capacitor Specs doc
 capacitorSpecificationsName = 'Capacitor_Specifications.csv'
-
-# Date
-today = datetime.date.today()
 
 loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
 PSSuperscript = '\u1D56\u02E2'
@@ -63,6 +63,9 @@ chargeHandles = [voltageLine, capacitorLine, currentLine]
 dischargeHandles = [voltageLine, currentLine]
 
 columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
+    'runNumber': {'name': 'Run Number', 'type': 'scalar'},
+    'runDate': {'name': 'Run Date', 'type': 'scalar'},
+    'runTime': {'name': 'Run Time', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
     'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
@@ -83,3 +86,11 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'},
     'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
     'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}
+
+master_columns = {'runNumber': 'Run Number',
+    'runDate': 'Run Date',
+    'runTime': 'Run Time',
+    'chargeVoltage': 'Charged Voltage (kV)',
+    'gasPuffTime': 'Gas Puff Time (ms)',
+    'preShotNotes': 'Pre-Shot Notes',
+    'postShotNotes': 'Post-Shot Notes'}

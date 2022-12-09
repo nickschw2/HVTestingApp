@@ -28,7 +28,7 @@ do_defaults = {'Load Switch': 'line0',
     'Power Supply Switch': 'line1',
     'Voltage Divider Switch': 'line2'}
 diagnostics_defaults = {'Current': 'ai0',
-    'Intereferometer': 'ai1',
+    'Intereferometer': 'ai5',
     'Diamagnetic Axial': 'ai2',
     'Diamagnetic Radial': 'ai3'}
 charge_ao_options = ['ao0', 'ao1']

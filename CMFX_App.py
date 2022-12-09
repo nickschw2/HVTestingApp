@@ -16,6 +16,9 @@ class CMFX_App(TestingApp):
             self.init_DAQ()
             self.init_PulseGenerator()
 
+        # Change capacitance in config.py    
+        self.capacitance = capacitance
+
     def configure_ui(self):
         # set title
         self.title('CMFX App')
@@ -24,7 +27,7 @@ class CMFX_App(TestingApp):
         self.protocol('WM_DELETE_WINDOW', self.on_closing)
 
         # Notebook creates tabs at the top
-        self.notebook = ttk.Notebook(self, takefocus=False)
+        self.notebook = ttk.Notebook(self, takefocus=False, bootstyle='primary')
         self.notebook.pack(expand=True, side='top', padx=framePadding, pady=framePadding)
 
         tabNames = ['System Status', 'Charging', 'Results']
@@ -38,9 +41,9 @@ class CMFX_App(TestingApp):
         #### SYSTEM STATUS SECTION ####
         # Add frames for text labels
         self.textStatusFrame = ttk.Frame(self.notebookFrames['System Status'])
-        self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', width=systemStatusFrameWidth, height=150, bootstyle='info')
-        self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', width=systemStatusFrameWidth, height=110, bootstyle='info')
-        self.miscStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Misc. Status', width=systemStatusFrameWidth, height=60, bootstyle='info')
+        self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', width=systemStatusFrameWidth, height=150, bootstyle='primary')
+        self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', width=systemStatusFrameWidth, height=110, bootstyle='primary')
+        self.miscStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Misc. Status', width=systemStatusFrameWidth, height=60, bootstyle='primary')
 
         self.textStatusFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
         self.HVStatusFrame.pack(side='top', expand=True)
@@ -75,8 +78,8 @@ class CMFX_App(TestingApp):
 
         # Add textboxes for adding notes about a given shot
         self.userNotesFrame = ttk.Frame(self.notebookFrames['System Status'])
-        self.preShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Pre-Shot Notes', bootstyle='info')
-        self.postShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Post-Shot Notes', bootstyle='info')
+        self.preShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Pre-Shot Notes', bootstyle='primary')
+        self.postShotNotesFrame = ttk.LabelFrame(self.userNotesFrame, text='Post-Shot Notes', bootstyle='primary')
 
         # self.userNotesFrame.place(relx=0.5, rely=0.5, anchor='center')
         self.userNotesFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
@@ -96,11 +99,11 @@ class CMFX_App(TestingApp):
 
         #### CHARGING SECTION ####
         # Add charging input to notebook
-        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', bootstyle='info')
+        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', bootstyle='primary')
         self.userInputs.pack(side='top', expand=True, pady=(framePadding, 0))
 
         self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):')
-        self.gasPuffLabel = ttk.Label(self.userInputs, text='Gas Puff time (ms):')
+        self.gasPuffLabel = ttk.Label(self.userInputs, text='Gas Puff Time (ms):')
 
         self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
         self.gasPuffEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
@@ -124,6 +127,10 @@ class CMFX_App(TestingApp):
         # Frame for indicators
         self.chargingIndicatorsFrame = ttk.Frame(self.chargingStatusFrame)
         self.chargingIndicatorsFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+
+        # Add large emergency off button
+        self.emergencyOffButton = ttk.Button(self.chargingIndicatorsFrame, text='Emergency\nOff', command=self.emergency_off, style='big.TButton')
+        self.emergencyOffButton.pack(side='top', expand=True, pady=(0, buttonPadding))
 
         # Add progress bar to notebook
         self.progressBar = ttk.widgets.Meter(master=self.chargingIndicatorsFrame,
@@ -181,7 +188,7 @@ class CMFX_App(TestingApp):
         self.chargePlot.pack(side='right', expand=True, padx=plotPadding)
 
         # Row for buttons on the bottom
-        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', bootstyle='info')
+        self.buttons = ttk.LabelFrame(self.notebookFrames['Charging'], text='Operate Capacitor', bootstyle='primary')
         self.buttons.pack(side='top', expand=True, pady=(0, framePadding))
 
         # Button definitions and placement
@@ -224,12 +231,12 @@ class CMFX_App(TestingApp):
         self.resultsPlot.pack(side='right', expand=True)
 
         # Frame for selecting which plots to show
-        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='info')
+        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='primary')
         self.selectorFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
         # Selector for showing a certain plot
         plotOptions = list(self.resultsPlotData.keys())
-        self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', bootstyle='info', **text_opts)
+        self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', bootstyle='primary', **text_opts)
         self.resultsPlotCombobox.current(0) # Initializes the current value to first option
         self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot)
         self.resultsPlotCombobox.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
@@ -249,7 +256,7 @@ class CMFX_App(TestingApp):
 
         #### CONSOLE SECTION ####
         # Create frame to hold console and scroll bar
-        self.consoleFrame = ttk.LabelFrame(self, text='Console', bootstyle='info')
+        self.consoleFrame = ttk.LabelFrame(self, text='Console', bootstyle='primary')
         self.consoleFrame.pack(fill='x', side='bottom', expand=True, padx=framePadding, pady=(0, framePadding))
 
         # Height is number of lines to be displayed
@@ -295,7 +302,7 @@ class CMFX_App(TestingApp):
 
         if ADMIN_MODE:
             self.loggedIn = True
-            self.saveFolder = 'C:/Users/Control Room/programs/HVTestingApp/CMFX'
+            self.saveFolder = saveFolderDefault
             self.saveFolderSet = True
 
         else:
@@ -314,33 +321,40 @@ class CMFX_App(TestingApp):
     def recordPreShotNotes(self):
         self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
         if self.discharged:
-            results_df = pd.read_csv(f'{self.saveFolder}/{self.filename}')
+            results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
             columnName = columns['preShotNotes']['name']
             results_df.loc[0, columnName] = self.preShotNotes
-            results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
+            results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
         print('Pre-shot notes recorded')
 
     def recordPostShotNotes(self):
         self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
         if self.discharged:
-            results_df = pd.read_csv(f'{self.saveFolder}/{self.filename}')
+            results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
             columnName = columns['postShotNotes']['name']
             results_df.loc[0, columnName] = self.postShotNotes
-            results_df.to_csv(f'{self.saveFolder}/{self.filename}', index=False)
+            results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
         print('Post-shot notes recorded')
 
     def setUserInputs(self):
         def incorrectUserInput(text):
                 incorrectUserInputName = 'Invalid Input'
-                incorrectUserInputWindow = MessageWindow(self, incorrectUserInputName, text)
+                MessageWindow(self, incorrectUserInputName, text)
 
         if not self.chargeVoltageEntry.validate():
             self.chargeVoltageEntry.delete(0, 'end')
 
             self.checklistButton.configure(state='disabled')
 
-            # CHANGE: NEED TO EVENTUALLY CHANGE THE MAX VALUE OF CHARGE IN VALIDATE AND MESSAGE
-            incorrectUserInputText = f'Please reenter a valid number for the charge voltage. The maximum voltage for this capacitor is 100 kV.'
+            incorrectUserInputText = f'Please reenter a valid number for the charge voltage. The maximum voltage for this capacitor is {maximumValidVoltage} kV.'
+            incorrectUserInput(incorrectUserInputText)
+
+        elif not self.gasPuffEntry.validate():
+            self.gasPuffEntry.delete(0, 'end')
+
+            self.checklistButton.configure(state='disabled')
+
+            incorrectUserInputText = f'Please reenter a valid number for the gas puff time. The maximum time for the gas puff is {maximumValidGasPuff} s.'
             incorrectUserInput(incorrectUserInputText)
             
         else:
@@ -358,7 +372,7 @@ class CMFX_App(TestingApp):
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
-            setUserInputWindow = MessageWindow(self, setUserInputName, setUserInputText)
+            MessageWindow(self, setUserInputName, setUserInputText)
 
     def updateSystemStatus(self):
         # Updates HV Status Frame
