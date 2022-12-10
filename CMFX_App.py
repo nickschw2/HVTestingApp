@@ -236,9 +236,26 @@ class CMFX_App(TestingApp):
         self.resultsPlot.pack(side='top', expand=True)
         self.resultsPlotSubplots.pack(side='top', expand=True)
 
+        # Frame for adjusting all aspects of the results plot view
+        self.reusltsViewFrame = ttk.Frame(self.notebookFrames['Results'])
+        self.reusltsViewFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+
         # Frame for selecting which plots to show
-        self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='primary')
-        self.selectorFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+        self.resultsRadioFrame = ttk.LabelFrame(self.reusltsViewFrame, text='View Style', bootstyle='primary')
+        self.resultsRadioFrame.pack(side='top', expand=True, pady=(0, framePadding))
+
+        # Radio buttons for choosing which display style to show
+        self.resultsPlotView = ttk.IntVar()
+        self.resultsPlotView.set(0) # initialize view
+        singleRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Single', variable=self.resultsPlotView, value=0, command=lambda: self.changeResultsPlot(singleRadiobutton))
+        subplotsRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Subplots', variable=self.resultsPlotView, value=1, command=lambda: self.changeResultsPlot(subplotsRadiobutton))
+
+        singleRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
+        subplotsRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
+
+        # Frame for selecting which plots to show
+        self.selectorFrame = ttk.LabelFrame(self.reusltsViewFrame, text='Plot Selector', bootstyle='primary')
+        self.selectorFrame.pack(side='top', expand=True)
 
         # Selector for showing a certain plot
         plotOptions = list(self.resultsPlotData.keys())
@@ -290,17 +307,7 @@ class CMFX_App(TestingApp):
         # Begin the operation of the program
 
         # center the app
-        self.update_idletasks()
-        width = self.winfo_width()
-        frm_width = self.winfo_rootx() - self.winfo_x()
-        win_width = width + 2 * frm_width
-        height = self.winfo_height()
-        titlebar_height = self.winfo_rooty() - self.winfo_y()
-        win_height = height + titlebar_height + frm_width
-        x = self.winfo_screenwidth() // 2 - win_width // 2
-        y = self.winfo_screenheight() // 2 - win_height // 2
-        self.geometry(f'+{x}+{0}')
-        self.deiconify()        
+        self.center_app()      
 
         # Reset all fields on startup
         self.loggedIn = False
@@ -548,20 +555,41 @@ class CMFX_App(TestingApp):
             self.dischargeTime = []
             self.dischargeTimeUnit = 's'
 
-        if resultsPlotView == 'SINGLE':
+        # Have to do some weird logic because tkinter doesn't have virtual events
+        # for Radiobuttons, but does for comboboxes
+        if event == None:
+            eventType = None
+        elif isinstance(event, ttk.Radiobutton):
+            eventType = ttk.Radiobutton
+        elif isinstance(event.widget, ttk.Combobox):
+            eventType = ttk.Combobox
+        elif isinstance(event.widget, ttk.Checkbutton):
+            eventType = ttk.Checkbutton
+        else:
+            eventType = None
+
+
+        if self.resultsPlotView.get() == 0:
             # Remove subplots and add single view
             self.resultsPlotSubplots.pack_forget()
             self.resultsPlotSubplotsToolbar.pack_forget()
             self.resultsPlot.pack(side='top', expand=True)
-            self.resultsPlotToolbar.pack()
+            self.resultsPlotToolbar.pack(side='bottom', fill='x')
+
+            # Enable combobox
+            self.resultsPlotCombobox.configure(state='readonly')
 
             # Get value of combobox and associated checkbuttons
             plotSelection = self.resultsPlotCombobox.get()
             checkbuttons = self.resultsCheckbuttons[plotSelection]
 
+            # Enable checkbutons
+            for checkbutton in checkbuttons.values():
+                checkbutton.configure(state='enabled')
+
             # Need to tell if event came from the combobox or a checkbutton
             # event==None is for dummy variable instantiation
-            if event == None or isinstance(event.widget, ttk.Combobox):
+            if eventType == None or eventType == ttk.Combobox:
                 # Remove current checkbuttons
                 for widget in self.selectorFrame.winfo_children():
                     if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
@@ -613,7 +641,7 @@ class CMFX_App(TestingApp):
                 ax.legend(lines, labels)
 
             # Change visibility of line when the checkbutton for that line is changed
-            elif isinstance(event.widget, ttk.Checkbutton):
+            elif eventType == ttk.Checkbutton:
                 label = event.widget.cget('text')
                 line = self.currentLines[label]
                 visible = checkbuttons[label].instate(['!selected'])
@@ -624,22 +652,31 @@ class CMFX_App(TestingApp):
             # Update plot
             self.resultsPlot.updatePlot()
 
-        elif resultsPlotView == 'SUBPLOTS':
+        elif self.resultsPlotView.get() == 1:
             # Remove single view and add subplots view
             self.resultsPlot.pack_forget()
             self.resultsPlotToolbar.pack_forget()
             self.resultsPlotSubplots.pack(side='top', expand=True)
-            self.resultsPlotSubplotsToolbar.pack()
+            self.resultsPlotSubplotsToolbar.pack(side='bottom', fill='x')
+
+            # Disable combobox
+            self.resultsPlotCombobox.configure(state='disabled')
 
             # Remove last subplot if there is an odd number
             if len(self.resultsPlotData) % 2 != 0:
                 self.resultsPlotSubplots.fig.axes[-1].axis('off')
 
             for i, plotSelection in enumerate(self.resultsPlotData):
+                # Disable check buttons
+                checkbuttons = self.resultsCheckbuttons[plotSelection]
+                for checkbutton in checkbuttons.values():
+                    checkbutton.configure(state='disabled')
+
                 plotProperties = self.resultsPlotData[plotSelection]
                 ax = self.resultsPlotSubplots.fig.axes[i]
                 ax.set_title(f'{plotSelection}')
                 ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+                ax.set_prop_cycle(None) # Reset the color cycle
 
                 # Add twin axis if specified
                 if not plotProperties['twinx']:
@@ -671,6 +708,9 @@ class CMFX_App(TestingApp):
 
             # Update plot
             self.resultsPlot.updatePlot()
+
+        if eventType == None or eventType == ttk.Radiobutton:
+            self.center_app()
 
     def reset(self):
         print('Reset')
