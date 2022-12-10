@@ -224,16 +224,16 @@ class CMFX_App(TestingApp):
 
         # Add plot and toolbar to frame
         # There are currently two viewing modes for results, one with single plots and one with subplots
-        self.resultsPlot = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
+        self.resultsPlotSingle = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
         nrows_subplots = int(np.ceil(len(self.resultsPlotData) / 2))
         self.resultsPlotSubplots = CanvasPlot(self.resultsPlotFrame, nrows=nrows_subplots, ncols=2, figsize=(16, 6))
 
-        self.resultsPlotToolbar = CustomToolbar(self.resultsPlot.canvas, self.resultsPlotFrame)
+        self.resultsPlotToolbar = CustomToolbar(self.resultsPlotSingle.canvas, self.resultsPlotFrame)
         self.resultsPlotSubplotsToolbar = CustomToolbar(self.resultsPlotSubplots.canvas, self.resultsPlotFrame)
         self.resultsPlotToolbar.update()
         self.resultsPlotSubplotsToolbar.update()
 
-        self.resultsPlot.pack(side='top', expand=True)
+        self.resultsPlotSingle.pack(side='top', expand=True)
         self.resultsPlotSubplots.pack(side='top', expand=True)
 
         # Frame for adjusting all aspects of the results plot view
@@ -387,6 +387,7 @@ class CMFX_App(TestingApp):
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
                 self.scope.setScale(self.chargeVoltage)
+                self.pulseGenerator.setDelay(pulseGeneratorChannels['dumpIgnitron']['chan'], self.dumpDelay)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -573,8 +574,8 @@ class CMFX_App(TestingApp):
                     ax.set_ylabel(plotProperties['ylabel'])
                     
                     # Remove twinx if it exists in single plot
-                    if len(self.resultsPlot.fig.axes) > 1:
-                        self.resultsPlot.fig.axes[1].remove()
+                    if len(self.resultsPlotSingle.fig.axes) > 1:
+                        self.resultsPlotSingle.fig.axes[1].remove()
                 else:
                     twin_ax = ax.twinx()
                     twin_ax.grid(False)
@@ -625,7 +626,7 @@ class CMFX_App(TestingApp):
             # Remove subplots and add single view
             self.resultsPlotSubplots.pack_forget()
             self.resultsPlotSubplotsToolbar.pack_forget()
-            self.resultsPlot.pack(side='top', expand=True)
+            self.resultsPlotSingle.pack(side='top', expand=True)
             self.resultsPlotToolbar.pack(side='bottom', fill='x')
 
             # Enable combobox
@@ -648,13 +649,13 @@ class CMFX_App(TestingApp):
                         widget.pack_forget()
 
                 # Remove current lines from plot
-                self.resultsPlot.clearFigLines()
+                self.resultsPlotSingle.clearFigLines()
 
                 # Change checkbuttons to new selection
                 for checkbutton in checkbuttons.values():
                     checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
 
-                ax = self.resultsPlot.ax
+                ax = self.resultsPlotSingle.ax
                 setup_plots(plotSelection, ax)                
 
             # Change visibility of line when the checkbutton for that line is changed
@@ -664,15 +665,15 @@ class CMFX_App(TestingApp):
                 visible = checkbuttons[label].instate(['!selected'])
                 line.set_visible(visible)
 
-                self.resultsPlot.ax.legend()
+                self.resultsPlotSingle.ax.legend()
 
             # Update plot
-            self.resultsPlot.updatePlot()
+            self.resultsPlotSingle.updatePlot()
 
         # Radiobutton selection
         elif self.resultsPlotView.get() == 1:
             # Remove single view and add subplots view
-            self.resultsPlot.pack_forget()
+            self.resultsPlotSingle.pack_forget()
             self.resultsPlotToolbar.pack_forget()
             self.resultsPlotSubplots.pack(side='top', expand=True)
             self.resultsPlotSubplotsToolbar.pack(side='bottom', fill='x')
@@ -694,7 +695,7 @@ class CMFX_App(TestingApp):
                 setup_plots(plotSelection, ax)
 
             # Update plot
-            self.resultsPlot.updatePlot()
+            self.resultsPlotSingle.updatePlot()
 
         if eventType == None or eventType == ttk.Radiobutton:
             self.center_app()
@@ -721,7 +722,7 @@ class CMFX_App(TestingApp):
 
         # Reset plots
         self.chargePlot.clearFigLines()
-        self.resultsPlot.clearFigLines()
+        self.resultsPlotSingle.clearFigLines()
         self.resultsPlotSubplots.clearFigLines()
 
         # Disable all buttons if logged in

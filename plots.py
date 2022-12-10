@@ -8,8 +8,7 @@ from constants import *
 from ttkbootstrap.themes import standard
 
 # Change color cycler for dark mode
-# Taken from https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data
-mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["#e60049", "#0bb4ff", "#50e991", "#e6d800", "#9b19f5", "#ffa300", "#dc0ab4", "#b3d4ff", "#00bfa0"]) 
+mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=color_palette) 
 
 # Change the colors of plot to match the theme
 theme_colors = standard.STANDARD_THEMES[themename]['colors']

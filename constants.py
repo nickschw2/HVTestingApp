@@ -19,9 +19,11 @@ CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
 Omega = '\u03A9'
 
 # Colors
-orange = '#ffa300'
-blue = '#0bb4ff'
-red = '#e60049'
+# Taken from https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data
+color_palette = ["#fd7f6f", "#7eb0d5", "#b2e061", "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7"]
+voltageColor = color_palette[0]
+currentColor = color_palette[1]
+fitColor = color_palette[2]
 
 # Widget display constants
 userInputWidth = 8
@@ -43,7 +45,7 @@ voltageYLim = 1.2 # kV
 currentYLim = 15 # mA
 
 # Styles
-themename = 'cyborg'
+themename = 'darkly'
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
 entry_opts = {'font':('Helvetica', 12)}
@@ -53,11 +55,6 @@ frame_opts = {'borderwidth': 3, 'relief': 'flat', 'padding': 12}
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
 format = re.compile('.{3}\d{3}')
-
-# Plotting constants
-voltageColor = blue
-currentColor = red
-fitColor = orange
 
 voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{PS}$')
@@ -96,16 +93,8 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
     'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}
 
-master_columns = {'runNumber': 'Run Number',
-    'runDate': 'Run Date',
-    'runTime': 'Run Time',
-    'capacitance': 'Capacitance (uF)',
-    'ballastResistance': 'Ballast Resistance (Ohms)',
-    'dumpResistance': 'Dump Resistance (Ohms)',
-    'dumpDelay': 'Dump Delay (ms)',
-    'pumpBasePressure': 'Pump Base Pressure (torr)',
-    'chamberBasePressure': 'Chamber Base Pressure (torr)',
-    'chargeVoltage': 'Charged Voltage (kV)',
-    'gasPuffTime': 'Gas Puff Time (ms)',
-    'preShotNotes': 'Pre-Shot Notes',
-    'postShotNotes': 'Post-Shot Notes'}
+# Columns to save to master lookup files
+master_columns = {}
+for variable, description in columns.items():
+    if description['type'] == 'scalar':
+        master_columns[variable] = description['name']
