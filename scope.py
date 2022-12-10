@@ -9,7 +9,7 @@ from messages import *
 # At  some point, make the change that we dont need to pass the brand name, and get it from IDN
 
 class Oscilloscope():
-    def __init__(self, nPoints=10000, memoryDepth='1M', auto_reset=True):
+    def __init__(self, nPoints=None, memoryDepth='1M', auto_reset=True):
         self.nPoints = nPoints
         self.memoryDepth = memoryDepth
         self.data = {}
@@ -165,9 +165,11 @@ class Oscilloscope():
             self.lenMax = len(dataarray)
 
             # Determine how often to subsample so that the saved file is a reasonable size
-            self.nSkip = int(np.round(stop / self.nPoints))
-
-            self.data[channel] = dataarray[::self.nSkip]
+            if self.nPoints is not None:
+                self.nSkip = int(np.round(stop / self.nPoints))
+                self.data[channel] = dataarray[::self.nSkip]
+            else:
+                self.data[channel] = dataarray
 
             self.readSuccess = True
 

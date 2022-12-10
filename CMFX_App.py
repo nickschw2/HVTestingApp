@@ -504,15 +504,15 @@ class CMFX_App(TestingApp):
             if not DEBUG_MODE:
                 print('Sleeping for 5 seconds to give scope its "me time"')	
                 time.sleep(5)
-                self.dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                self.interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                self.trigger = self.scope.get_data(self.scopePins['Trigger'])
-                self.dischargeTime, self.dischargeTimeUnit  = self.scope.get_time()
+                dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+                interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                trigger = self.scope.get_data(self.scopePins['Trigger'])
+                dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
                 
             else:
-                self.dischargeVoltageLoad, self.dischargeCurrentLoad, self.dischargeTime, self.dischargeTimeUnit = self.getDischargeTestValues()
+                dischargeVoltageLoad, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
 
-            if len(self.dischargeTime) != 0:
+            if len(dischargeTime) != 0:
                 # Plot results on the discharge graph and save them
                 # The only time results are saved is when there is a discharge that is preceded by charge
                 self.replotCharge()
@@ -523,12 +523,17 @@ class CMFX_App(TestingApp):
             else:
                 print('Oscilloscope was not triggered successfully')
 
-            self.current = self.NI_DAQ.dischargeData[0,:]
-            self.interferometer = self.NI_DAQ.dischargeData[1,:]
-            self.diamagneticAxial = self.NI_DAQ.dischargeData[2,:]
-            self.diamagneticRadial = self.NI_DAQ.dischargeData[3,:]
+            self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:]
+            self.diamagneticAxial = self.NI_DAQ.dischargeData[1,:]
+            self.diamagneticRadial = self.NI_DAQ.dischargeData[2,:]
 
-            self.resultsPlotData['Discharge']['lines']['Current'] = self.current
+            # Transform scope data to be on same timebase as daq
+            self.dischargeVoltageLoad = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltageLoad, left=np.nan, right=np.nan)
+            self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
+            self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
+
+            self.resultsPlotData['Discharge']['lines']['Voltage'] = self.dischargeVoltageLoad
+            self.resultsPlotData['Discharge']['lines']['Current'] = self.dischargeCurrent
             self.resultsPlotData['Interferometer']['lines']['Central'] = self.interferometer
             self.resultsPlotData['Diamagnetic']['lines']['Axial'] = self.diamagneticAxial
             self.resultsPlotData['Diamagnetic']['lines']['Radial'] = self.diamagneticRadial

@@ -28,9 +28,8 @@ do_defaults = {'Load Switch': 'line0',
     'Power Supply Switch': 'line1',
     'Voltage Divider Switch': 'line2'}
 diagnostics_defaults = {'Current': 'ai0',
-    'Intereferometer': 'ai5',
-    'Diamagnetic Axial': 'ai2',
-    'Diamagnetic Radial': 'ai3'}
+    'Diamagnetic Axial': 'ai1',
+    'Diamagnetic Radial': 'ai2'}
 charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
@@ -38,7 +37,7 @@ diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3']
 maxDischargeFreq = int(250000 / len(diagnostics_defaults)) # Hz
 
 # Results plot
-dischargeLines = {'Current': []}
+dischargeLines = {'Voltage': [], 'Current': []}
 interferometerLines = {'Central': []}
 diamagneticLines = {'Axial': [], 'Radial': []}
 
