@@ -100,7 +100,7 @@ class TestingApp(ttk.Window):
         self.pulseGenerator = PulseGenerator()
 
         # Setup delays
-        for trigger_values in pulseGeneratorChannels.values():
+        for trigger_values in pulseGeneratorOutputs.values():
             chan = trigger_values['chan']
             delay = trigger_values['delay']
             self.pulseGenerator.setDelay(chan, delay)

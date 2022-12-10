@@ -18,8 +18,8 @@ class PulseGenerator():
         print('Pulse generator has been triggered!')
 
     def setDelay(self, chan, delay):
-        self.inst.write(f'DT {chan},1,{delay}')
-        print('Pulse generator has been triggered!')
+        self.inst.write(f'DT {chan},{pulseGeneratorChans["T0"]},{delay}')
+        print(f'Pulse generator has been triggered!')
 
     def reset(self):
         return 0

@@ -88,7 +88,18 @@ duration = 0.5 # s
 pulse_period = 0.1 # s
 pulse_width = 0.01 # s
 
-pulseGeneratorChannels = {'gasPuff': {'chan': 2, 'delay': 0},
-                          'scopeTrigger': {'chan': 3, 'delay': 0},
-                          'interferometer': {'chan': 4, 'delay': 10e-3},
-                          'dumpIgnitron': {'chan': 5, 'delay': 300e-3}}
+# Pulse generator channels SRS DG535
+# Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
+pulseGeneratorChans = {'Trigger Input': 0,
+                          'T0': 1,
+                          'A': 2,
+                          'B': 3,
+                          'AB': 4,
+                          'C': 5,
+                          'D': 6,
+                          'CD': 7}
+
+pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
+                          'scopeTrigger': {'chan': pulseGeneratorChans['B'], 'delay': 0},
+                          'interferometer': {'chan': pulseGeneratorChans['C'], 'delay': 10e-3},
+                          'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 300e-3}}

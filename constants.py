@@ -56,6 +56,7 @@ frame_opts = {'borderwidth': 3, 'relief': 'flat', 'padding': 12}
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
 format = re.compile('.{3}\d{3}')
 
+# Lines for charging
 voltageLine = mlines.Line2D([], [], color=voltageColor, linestyle='-', label='V$_{PS}$')
 currentLine = mlines.Line2D([], [], color=currentColor, linestyle='-', label='I$_{PS}$')
 capacitorLine = mlines.Line2D([], [], color=voltageColor, linestyle='--', label='V$_{cap}$')

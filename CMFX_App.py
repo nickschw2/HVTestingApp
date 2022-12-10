@@ -334,19 +334,31 @@ class CMFX_App(TestingApp):
     def recordPreShotNotes(self):
         self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
         if self.discharged:
+            # Change individual results file
             results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
             columnName = columns['preShotNotes']['name']
             results_df.loc[0, columnName] = self.preShotNotes
             results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
+
+            # Change master file
+            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+            resultsMaster_df.loc[0, columnName] = self.preShotNotes
+            resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
         print('Pre-shot notes recorded')
 
     def recordPostShotNotes(self):
         self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
         if self.discharged:
+            # Change individual results file
             results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
             columnName = columns['postShotNotes']['name']
             results_df.loc[0, columnName] = self.postShotNotes
             results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
+
+            # Change master file
+            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+            resultsMaster_df.loc[0, columnName] = self.postShotNotes
+            resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
         print('Post-shot notes recorded')
 
     def setUserInputs(self):
@@ -387,7 +399,7 @@ class CMFX_App(TestingApp):
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
                 self.scope.setScale(self.chargeVoltage)
-                self.pulseGenerator.setDelay(pulseGeneratorChannels['dumpIgnitron']['chan'], self.dumpDelay)
+                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dumpIgnitron']['chan'], self.dumpDelay)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
