@@ -563,20 +563,6 @@ class TestingApp(ttk.Window):
         current = pearsonCoil * np.exp( - time / RCTime)
         return (voltage, current, time, tUnit)
 
-    # Removes all lines from a figure
-    def clearFigLines(self, fig):
-        axes = fig.axes
-        for axis in axes:
-            if len(axis.lines) != 0:
-                for i in range(len(axis.lines)):
-                    axis.lines[0].remove()
-
-    def resetPlot(self, canvas):
-        for ax in canvas.fig.axes:
-         for line in ax.get_lines():
-            line.set_data([],[])
-        canvas.updatePlot()
-
     # Popup window for help
     def help(self):
         webbrowser.open(f'{githubSite}/blob/main/README.md')

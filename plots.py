@@ -15,8 +15,9 @@ mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["#e60049", "#0bb4ff", "#50e9
 theme_colors = standard.STANDARD_THEMES[themename]['colors']
 mpl.rcParams['figure.facecolor'] = theme_colors['bg']
 mpl.rcParams['axes.facecolor'] = theme_colors['bg']
-mpl.rcParams['axes.labelcolor'] = theme_colors['bg']
+mpl.rcParams['axes.labelcolor'] = theme_colors['fg']
 mpl.rcParams['axes.edgecolor'] = theme_colors['fg']
+mpl.rcParams['axes.grid'] = True
 mpl.rcParams['grid.color'] = theme_colors['fg']
 mpl.rcParams['xtick.color'] = theme_colors['fg']
 mpl.rcParams['ytick.color'] = theme_colors['fg']
@@ -33,14 +34,6 @@ class CanvasPlot(ttk.Frame):
         self.master = master
         self.fig, self.ax = plt.subplots(constrained_layout=True, **kwargs)
 
-        # Adjust colors
-        # bg_color = ttk.Style().colors.bg
-        # fg_color = ttk.Style().colors.fg
-        # self.fig.patch.set_facecolor(bg_color)
-        # self.ax.patch.set_facecolor(bg_color)
-        # for spine in self.ax.spines:
-        #     self.ax.spines[spine].set_color(fg_color)
-
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         self.canvas.get_tk_widget().pack(expand=True, fill='both')
@@ -52,6 +45,14 @@ class CanvasPlot(ttk.Frame):
             ax.relim()
             ax.autoscale_view()
         self.canvas.draw()
+
+    # Removes all lines from a figure
+    def clearFigLines(self):
+        for ax in self.fig.axes:
+            if len(ax.lines) != 0:
+                for i in range(len(ax.lines)):
+                    # Remove the first one each time in the loop
+                    ax.lines[0].remove()
 
 
 class BlitManager:
@@ -125,3 +126,17 @@ class BlitManager:
             cv.blit(fig.bbox)
         # let the GUI event loop process anything it has to do
         cv.flush_events()
+
+class CustomToolbar(NavigationToolbar2Tk):  # subclass NavigationToolbar2Tk
+    def __init__(self, figcanvas, parent):
+        super().__init__(figcanvas, parent)  # init the base class as usual
+
+    # copied the method 'draw_rubberband()' right from NavigationToolbar2Tk
+    # we're only changing one line to add color to rectangle
+    def draw_rubberband(self, event, x0, y0, x1, y1):
+        height = self.canvas.figure.bbox.height
+        y0 = height - y0
+        y1 = height - y1
+        if hasattr(self, "lastrect"):
+            self.canvas._tkcanvas.delete(self.lastrect)
+        self.lastrect = self.canvas._tkcanvas.create_rectangle(x0, y0, x1, y1, outline=theme_colors['primary'])

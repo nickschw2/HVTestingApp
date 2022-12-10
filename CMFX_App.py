@@ -158,11 +158,13 @@ class CMFX_App(TestingApp):
 
         # Plot of charge
         self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
-        self.chargePlot.ax.grid(which='both')
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
         self.chargeCurrentAxis = self.chargePlot.ax.twinx()
+
+        # Turn off twin grid since it's normally on by default
+        self.chargeCurrentAxis.grid(False)
 
         self.chargePlot.ax.set_xlabel('Time (s)')
         self.chargeVoltageAxis.set_ylabel('Voltage (kV)')
@@ -184,7 +186,7 @@ class CMFX_App(TestingApp):
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
 
         # Add navigation toolbar to plots
-        self.chargePlotToolbar = NavigationToolbar2Tk(self.chargePlot.canvas, self.chargingStatusFrame)
+        self.chargePlotToolbar = CustomToolbar(self.chargePlot.canvas, self.chargingStatusFrame)
         self.chargePlotToolbar.update()
 
         # Place plot with toolbar in frame
@@ -221,13 +223,18 @@ class CMFX_App(TestingApp):
         self.resultsPlotFrame.pack(side='right', expand=True, padx=plotPadding)
 
         # Add plot and toolbar to frame
+        # There are currently two viewing modes for results, one with single plots and one with subplots
         self.resultsPlot = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
-        self.resultsPlot.ax.grid(which='both')
+        nrows_subplots = int(np.ceil(len(self.resultsPlotData) / 2))
+        self.resultsPlotSubplots = CanvasPlot(self.resultsPlotFrame, nrows=nrows_subplots, ncols=2, figsize=(16, 6))
 
-        self.resultsPlotToolbar = NavigationToolbar2Tk(self.resultsPlot.canvas, self.resultsPlotFrame)
+        self.resultsPlotToolbar = CustomToolbar(self.resultsPlot.canvas, self.resultsPlotFrame)
+        self.resultsPlotSubplotsToolbar = CustomToolbar(self.resultsPlotSubplots.canvas, self.resultsPlotFrame)
         self.resultsPlotToolbar.update()
+        self.resultsPlotSubplotsToolbar.update()
 
-        self.resultsPlot.pack(side='right', expand=True)
+        self.resultsPlot.pack(side='top', expand=True)
+        self.resultsPlotSubplots.pack(side='top', expand=True)
 
         # Frame for selecting which plots to show
         self.selectorFrame = ttk.LabelFrame(self.notebookFrames['Results'], text='Plot Selector', bootstyle='primary')
@@ -484,8 +491,8 @@ class CMFX_App(TestingApp):
         self.after(int(1000 / refreshRate), self.updateSystemStatus)
 
     def recordPressure(self):
-        self.chamberPressure = 8e-4
-        self.pumpPressure = 2e-4
+        self.chamberBasePressure = 8e-4
+        self.pumpBasePressure = 2e-4
 
     def saveDischarge(self):
             # Read from the load
@@ -541,72 +548,129 @@ class CMFX_App(TestingApp):
             self.dischargeTime = []
             self.dischargeTimeUnit = 's'
 
-        # Get value of combobox and associated checkbuttons
-        plotSelection = self.resultsPlotCombobox.get()
-        checkbuttons = self.resultsCheckbuttons[plotSelection]
+        if resultsPlotView == 'SINGLE':
+            # Remove subplots and add single view
+            self.resultsPlotSubplots.pack_forget()
+            self.resultsPlotSubplotsToolbar.pack_forget()
+            self.resultsPlot.pack(side='top', expand=True)
+            self.resultsPlotToolbar.pack()
 
-        # Need to tell if event came from the combobox or a checkbutton
-        # event==None is for dummy variable instantiation
-        if event == None or isinstance(event.widget, ttk.Combobox):
-            # Remove current checkbuttons
-            for widget in self.selectorFrame.winfo_children():
-                if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
-                    widget.pack_forget()
+            # Get value of combobox and associated checkbuttons
+            plotSelection = self.resultsPlotCombobox.get()
+            checkbuttons = self.resultsCheckbuttons[plotSelection]
 
-            # Remove current lines from plot
-            self.clearFigLines(self.resultsPlot.fig)
+            # Need to tell if event came from the combobox or a checkbutton
+            # event==None is for dummy variable instantiation
+            if event == None or isinstance(event.widget, ttk.Combobox):
+                # Remove current checkbuttons
+                for widget in self.selectorFrame.winfo_children():
+                    if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
+                        widget.pack_forget()
 
-            # Change checkbuttons to new selection
-            for checkbutton in checkbuttons.values():
-                checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
+                # Remove current lines from plot
+                self.resultsPlot.clearFigLines()
 
-            # Change plot to new selection
-            plotProperties = self.resultsPlotData[plotSelection]
-            axis = self.resultsPlot.ax
-            axis.set_title(f'{plotSelection}')
-            axis.set_xlabel(f'Time ({self.dischargeTimeUnit})')
-            axis.set_prop_cycle(None) # Reset the color cycle
-            
-            # Add twin axis if specified
-            if not plotProperties['twinx']:
-                axis.set_ylabel(plotProperties['ylabel'])
-            else:
-                twinAxis = axis.twinx()
-                axis.set_ylabel(plotProperties['ylabel'][0])
-                twinAxis.set_ylabel(plotProperties['ylabel'][1])
+                # Change checkbuttons to new selection
+                for checkbutton in checkbuttons.values():
+                    checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
 
-            # Some place to store the current lines on the plot to change visibility later
-            self.currentLines = {}
-            for i, (label, data) in enumerate(plotProperties['lines'].items()):
-                visible = checkbuttons[label].instate(['selected'])
-
-                # Plot second line on twin axis
+                # Change plot to new selection
+                plotProperties = self.resultsPlotData[plotSelection]
+                ax = self.resultsPlot.ax
+                ax.set_title(f'{plotSelection}')
+                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+                ax.set_prop_cycle(None) # Reset the color cycle
+                
+                # Add twin axis if specified
                 if not plotProperties['twinx']:
-                    line = axis.plot(self.dischargeTime, data, label=label, visible=visible)
+                    ax.set_ylabel(plotProperties['ylabel'])
                 else:
-                    if i == 0:
-                        line = axis.plot(self.dischargeTime, data, label=label, visible=visible)
-                    elif i == 1:
-                        # Skip first color
-                        next(twinAxis._get_lines.prop_cycler)
-                        line = twinAxis.plot(self.dischargeTime, data, label=label, visible=visible)
+                    twin_ax = ax.twinx()
+                    twin_ax.grid(False)
+                    ax.set_ylabel(plotProperties['ylabel'][0])
+                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
 
-                self.currentLines[label] = line[0]
+                # Some place to store the current lines on the plot to change visibility later
+                self.currentLines = {}
+                for i, (label, data) in enumerate(plotProperties['lines'].items()):
+                    visible = checkbuttons[label].instate(['selected'])
 
-            labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
-            axis.legend(lines, labels)
+                    # Plot second line on twin axis
+                    if not plotProperties['twinx']:
+                        line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                    else:
+                        if i == 0:
+                            line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                        elif i == 1:
+                            # Skip first color
+                            next(twin_ax._get_lines.prop_cycler)
+                            line = twin_ax.plot(self.dischargeTime, data, label=label, visible=visible)
 
-        # Change visibility of line when the checkbutton for that line is changed
-        elif isinstance(event.widget, ttk.Checkbutton):
-            label = event.widget.cget('text')
-            line = self.currentLines[label]
-            visible = checkbuttons[label].instate(['!selected'])
-            line.set_visible(visible)
+                    self.currentLines[label] = line[0]
 
-            self.resultsPlot.ax.legend()
+                # Get all labels onto one legend even if there's a twin axis
+                labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
+                ax.legend(lines, labels)
 
-        # Update plot
-        self.resultsPlot.updatePlot()
+            # Change visibility of line when the checkbutton for that line is changed
+            elif isinstance(event.widget, ttk.Checkbutton):
+                label = event.widget.cget('text')
+                line = self.currentLines[label]
+                visible = checkbuttons[label].instate(['!selected'])
+                line.set_visible(visible)
+
+                self.resultsPlot.ax.legend()
+
+            # Update plot
+            self.resultsPlot.updatePlot()
+
+        elif resultsPlotView == 'SUBPLOTS':
+            # Remove single view and add subplots view
+            self.resultsPlot.pack_forget()
+            self.resultsPlotToolbar.pack_forget()
+            self.resultsPlotSubplots.pack(side='top', expand=True)
+            self.resultsPlotSubplotsToolbar.pack()
+
+            # Remove last subplot if there is an odd number
+            if len(self.resultsPlotData) % 2 != 0:
+                self.resultsPlotSubplots.fig.axes[-1].axis('off')
+
+            for i, plotSelection in enumerate(self.resultsPlotData):
+                plotProperties = self.resultsPlotData[plotSelection]
+                ax = self.resultsPlotSubplots.fig.axes[i]
+                ax.set_title(f'{plotSelection}')
+                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+
+                # Add twin axis if specified
+                if not plotProperties['twinx']:
+                    ax.set_ylabel(plotProperties['ylabel'])
+                else:
+                    twin_ax = ax.twinx()
+                    twin_ax.grid(False)
+                    ax.set_ylabel(plotProperties['ylabel'][0])
+                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
+
+                self.currentLines = {}
+                for i, (label, data) in enumerate(plotProperties['lines'].items()):
+                    # Plot second line on twin axis
+                    if not plotProperties['twinx']:
+                        line = ax.plot(self.dischargeTime, data, label=label)
+                    else:
+                        if i == 0:
+                            line = ax.plot(self.dischargeTime, data, label=label)
+                        elif i == 1:
+                            # Skip first color
+                            next(twin_ax._get_lines.prop_cycler)
+                            line = twin_ax.plot(self.dischargeTime, data, label=label)
+
+                    self.currentLines[label] = line[0]
+
+                # Get all labels onto one legend even if there's a twin axis
+                labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
+                ax.legend(lines, labels)
+
+            # Update plot
+            self.resultsPlot.updatePlot()
 
     def reset(self):
         print('Reset')
@@ -629,8 +693,9 @@ class CMFX_App(TestingApp):
         self.idleMode = True
 
         # Reset plots
-        self.resetPlot(self.chargePlot)
-        self.resetPlot(self.resultsPlot)
+        self.chargePlot.clearFigLines()
+        self.resultsPlot.clearFigLines()
+        self.resultsPlotSubplots.clearFigLines()
 
         # Disable all buttons if logged in
         self.disableButtons()

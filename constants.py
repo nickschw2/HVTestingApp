@@ -43,13 +43,12 @@ voltageYLim = 1.2 # kV
 currentYLim = 15 # mA
 
 # Styles
+themename = 'cyborg'
 button_opts = {'font':('Helvetica', 12), 'state':'normal'}
 text_opts = {'font':('Helvetica', 12)}
 entry_opts = {'font':('Helvetica', 12)}
 # frame_opts = {'font':('Helvetica', 12), 'borderwidth': 3, 'relief': 'raised', 'padding': 12}
 frame_opts = {'borderwidth': 3, 'relief': 'flat', 'padding': 12}
-
-themename = 'cyborg'
 
 # Serial number format
 # 3 Character Capacitor origin 3 digit serial number, e.g. LBL001
@@ -75,8 +74,8 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'ballastResistance': {'name': 'Ballast Resistance (Ohms)', 'type': 'scalar'},
     'dumpResistance': {'name': 'Dump Resistance (Ohms)', 'type': 'scalar'},
     'dumpDelay': {'name': 'Dump Delay (ms)', 'type': 'scalar'},
-    'pumpPressure': {'name': 'Pump Pressure (torr)', 'type': 'scalar'},
-    'chamberPressure': {'name': 'Chamber Pressure (torr)', 'type': 'scalar'},
+    'pumpBasePressure': {'name': 'Pump Base Pressure (torr)', 'type': 'scalar'},
+    'chamberBasePressure': {'name': 'Chamber Base Pressure (torr)', 'type': 'scalar'},
     'equivalentSeriesResistance': {'name': 'ESR (Ohms)', 'type': 'scalar'},
     'dielectricAbsorptionRatio': {'name': 'DAR', 'type': 'scalar'},
     'polarizationIndex': {'name': 'PI', 'type': 'scalar'},
@@ -104,8 +103,8 @@ master_columns = {'runNumber': 'Run Number',
     'ballastResistance': 'Ballast Resistance (Ohms)',
     'dumpResistance': 'Dump Resistance (Ohms)',
     'dumpDelay': 'Dump Delay (ms)',
-    'pumpPressure': 'Pump Pressure (torr)',
-    'chamberPressure': 'Chamber Pressure (torr)',
+    'pumpBasePressure': 'Pump Base Pressure (torr)',
+    'chamberBasePressure': 'Chamber Base Pressure (torr)',
     'chargeVoltage': 'Charged Voltage (kV)',
     'gasPuffTime': 'Gas Puff Time (ms)',
     'preShotNotes': 'Pre-Shot Notes',
