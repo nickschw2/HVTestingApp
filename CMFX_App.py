@@ -548,13 +548,6 @@ class CMFX_App(TestingApp):
             self.saveResults()
 
     def changeResultsPlot(self, event):
-        if hasattr(self, 'NI_DAQ'):
-            self.dischargeTime = self.NI_DAQ.dischargeTime
-            self.dischargeTimeUnit = self.NI_DAQ.tUnit
-        else:
-            self.dischargeTime = []
-            self.dischargeTimeUnit = 's'
-
         # Have to do some weird logic because tkinter doesn't have virtual events
         # for Radiobuttons, but does for comboboxes
         if event == None:
@@ -568,7 +561,66 @@ class CMFX_App(TestingApp):
         else:
             eventType = None
 
+        def setup_plots(plotSelection, ax):
+            # Change plot to new selection
+                plotProperties = self.resultsPlotData[plotSelection]
+                ax.set_title(f'{plotSelection}')
+                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+                ax.set_prop_cycle(None) # Reset the color cycle
+                
+                # Add twin axis if specified
+                if not plotProperties['twinx']:
+                    ax.set_ylabel(plotProperties['ylabel'])
+                    
+                    # Remove twinx if it exists in single plot
+                    if len(self.resultsPlot.fig.axes) > 1:
+                        self.resultsPlot.fig.axes[1].remove()
+                else:
+                    twin_ax = ax.twinx()
+                    twin_ax.grid(False)
+                    ax.set_ylabel(plotProperties['ylabel'][0])
+                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
 
+                # Some place to store the current lines on the plot to change visibility later
+                # Don't reset currentLines if we're just switching the view to/from subplots
+                if eventType != ttk.Radiobutton:
+                    self.currentLines = {}
+                handles = []    
+                labels = []
+                for i, (label, data) in enumerate(plotProperties['lines'].items()):
+                    if eventType == ttk.Radiobutton:
+                        visible = True
+                    else:
+                        checkbuttons = self.resultsCheckbuttons[plotSelection]
+                        visible = checkbuttons[label].instate(['selected'])
+
+                    # Plot second line on twin axis
+                    if not plotProperties['twinx']:
+                        line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                    else:
+                        if i == 0:
+                            line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                        elif i == 1:
+                            # Skip first color
+                            next(twin_ax._get_lines.prop_cycler)
+                            line = twin_ax.plot(self.dischargeTime, data, label=label, visible=visible)
+
+                    if eventType != ttk.Radiobutton:
+                        self.currentLines[label] = line[0]
+                    handles.append(line[0])
+                    labels.append(label)
+
+                # Get all labels onto one legend even if there's a twin axis
+                ax.legend(handles, labels)
+
+        if hasattr(self, 'NI_DAQ'):
+            self.dischargeTime = self.NI_DAQ.dischargeTime
+            self.dischargeTimeUnit = self.NI_DAQ.tUnit
+        else:
+            self.dischargeTime = []
+            self.dischargeTimeUnit = 's'
+
+        # Combobox selection
         if self.resultsPlotView.get() == 0:
             # Remove subplots and add single view
             self.resultsPlotSubplots.pack_forget()
@@ -602,43 +654,8 @@ class CMFX_App(TestingApp):
                 for checkbutton in checkbuttons.values():
                     checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
 
-                # Change plot to new selection
-                plotProperties = self.resultsPlotData[plotSelection]
                 ax = self.resultsPlot.ax
-                ax.set_title(f'{plotSelection}')
-                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
-                ax.set_prop_cycle(None) # Reset the color cycle
-                
-                # Add twin axis if specified
-                if not plotProperties['twinx']:
-                    ax.set_ylabel(plotProperties['ylabel'])
-                else:
-                    twin_ax = ax.twinx()
-                    twin_ax.grid(False)
-                    ax.set_ylabel(plotProperties['ylabel'][0])
-                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
-
-                # Some place to store the current lines on the plot to change visibility later
-                self.currentLines = {}
-                for i, (label, data) in enumerate(plotProperties['lines'].items()):
-                    visible = checkbuttons[label].instate(['selected'])
-
-                    # Plot second line on twin axis
-                    if not plotProperties['twinx']:
-                        line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
-                    else:
-                        if i == 0:
-                            line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
-                        elif i == 1:
-                            # Skip first color
-                            next(twin_ax._get_lines.prop_cycler)
-                            line = twin_ax.plot(self.dischargeTime, data, label=label, visible=visible)
-
-                    self.currentLines[label] = line[0]
-
-                # Get all labels onto one legend even if there's a twin axis
-                labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
-                ax.legend(lines, labels)
+                setup_plots(plotSelection, ax)                
 
             # Change visibility of line when the checkbutton for that line is changed
             elif eventType == ttk.Checkbutton:
@@ -652,6 +669,7 @@ class CMFX_App(TestingApp):
             # Update plot
             self.resultsPlot.updatePlot()
 
+        # Radiobutton selection
         elif self.resultsPlotView.get() == 1:
             # Remove single view and add subplots view
             self.resultsPlot.pack_forget()
@@ -672,39 +690,8 @@ class CMFX_App(TestingApp):
                 for checkbutton in checkbuttons.values():
                     checkbutton.configure(state='disabled')
 
-                plotProperties = self.resultsPlotData[plotSelection]
                 ax = self.resultsPlotSubplots.fig.axes[i]
-                ax.set_title(f'{plotSelection}')
-                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
-                ax.set_prop_cycle(None) # Reset the color cycle
-
-                # Add twin axis if specified
-                if not plotProperties['twinx']:
-                    ax.set_ylabel(plotProperties['ylabel'])
-                else:
-                    twin_ax = ax.twinx()
-                    twin_ax.grid(False)
-                    ax.set_ylabel(plotProperties['ylabel'][0])
-                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
-
-                self.currentLines = {}
-                for i, (label, data) in enumerate(plotProperties['lines'].items()):
-                    # Plot second line on twin axis
-                    if not plotProperties['twinx']:
-                        line = ax.plot(self.dischargeTime, data, label=label)
-                    else:
-                        if i == 0:
-                            line = ax.plot(self.dischargeTime, data, label=label)
-                        elif i == 1:
-                            # Skip first color
-                            next(twin_ax._get_lines.prop_cycler)
-                            line = twin_ax.plot(self.dischargeTime, data, label=label)
-
-                    self.currentLines[label] = line[0]
-
-                # Get all labels onto one legend even if there's a twin axis
-                labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
-                ax.legend(lines, labels)
+                setup_plots(plotSelection, ax)
 
             # Update plot
             self.resultsPlot.updatePlot()
