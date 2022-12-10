@@ -89,5 +89,6 @@ pulse_period = 0.1 # s
 pulse_width = 0.01 # s
 
 pulseGeneratorChannels = {'gasPuff': {'chan': 2, 'delay': 0},
-                            'scopeTrigger': {'chan': 3, 'delay': 0},
-                            'dumpIgnitron': {'chan': 4, 'delay': 300e-3}}
+                          'scopeTrigger': {'chan': 3, 'delay': 0},
+                          'interferometer': {'chan': 4, 'delay': 10e-3},
+                          'dumpIgnitron': {'chan': 5, 'delay': 300e-3}}
