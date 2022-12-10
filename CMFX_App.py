@@ -157,24 +157,16 @@ class CMFX_App(TestingApp):
         self.chargeStateLabel.pack(side='top', expand=True, pady=(labelPadding, 0))
 
         # Plot of charge
-        fg_color = self.colors.fg
-
         self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
-        self.chargePlot.ax.grid(which='both', color=fg_color)
+        self.chargePlot.ax.grid(which='both')
 
         # Create two y-axes for current and voltage
         self.chargeVoltageAxis = self.chargePlot.ax
         self.chargeCurrentAxis = self.chargePlot.ax.twinx()
 
-        self.chargeVoltageAxis.tick_params(axis='both', which='both', colors=fg_color)
-        self.chargeCurrentAxis.tick_params(axis='both', which='both', colors=fg_color)
-        for spine in self.chargeCurrentAxis.spines:
-            self.chargeCurrentAxis.spines[spine].set_color(fg_color)
-
-
-        self.chargePlot.ax.set_xlabel('Time (s)', color=fg_color)
-        self.chargeVoltageAxis.set_ylabel('Voltage (kV)', color=fg_color)
-        self.chargeCurrentAxis.set_ylabel('Current (mA)', color=fg_color)
+        self.chargePlot.ax.set_xlabel('Time (s)')
+        self.chargeVoltageAxis.set_ylabel('Voltage (kV)')
+        self.chargeCurrentAxis.set_ylabel('Current (mA)')
 
         # Add lines to charging plot blit animation
         self.chargeVoltageLine, = self.chargeVoltageAxis.plot([],[], color=voltageColor) #Create line object on plot
@@ -219,7 +211,7 @@ class CMFX_App(TestingApp):
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
-        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': 'Voltage (kV)', 'lines': dischargeLines},
+        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeLines},
             'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
             'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
             }
@@ -230,11 +222,7 @@ class CMFX_App(TestingApp):
 
         # Add plot and toolbar to frame
         self.resultsPlot = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
-        self.resultsPlot.ax.grid(which='both', color=fg_color)
-
-        # Adjust colors
-        self.resultsPlot.ax.tick_params(axis='both', which='both', colors=fg_color)
-        self.resultsPlot.ax.tick_params(axis='both', which='both', colors=fg_color)
+        self.resultsPlot.ax.grid(which='both')
 
         self.resultsPlotToolbar = NavigationToolbar2Tk(self.resultsPlot.canvas, self.resultsPlotFrame)
         self.resultsPlotToolbar.update()
@@ -575,19 +563,38 @@ class CMFX_App(TestingApp):
             # Change plot to new selection
             plotProperties = self.resultsPlotData[plotSelection]
             axis = self.resultsPlot.ax
-            axis.set_title(f'{plotSelection}', color=self.colors.fg)
-            axis.set_xlabel(f'Time ({self.dischargeTimeUnit})', color=self.colors.fg)
-            axis.set_ylabel(plotProperties['ylabel'], color=self.colors.fg)
+            axis.set_title(f'{plotSelection}')
+            axis.set_xlabel(f'Time ({self.dischargeTimeUnit})')
             axis.set_prop_cycle(None) # Reset the color cycle
+            
+            # Add twin axis if specified
+            if not plotProperties['twinx']:
+                axis.set_ylabel(plotProperties['ylabel'])
+            else:
+                twinAxis = axis.twinx()
+                axis.set_ylabel(plotProperties['ylabel'][0])
+                twinAxis.set_ylabel(plotProperties['ylabel'][1])
 
             # Some place to store the current lines on the plot to change visibility later
             self.currentLines = {}
-            for label, data in plotProperties['lines'].items():
+            for i, (label, data) in enumerate(plotProperties['lines'].items()):
                 visible = checkbuttons[label].instate(['selected'])
-                line = axis.plot(self.dischargeTime, data, label=label, visible=visible)
+
+                # Plot second line on twin axis
+                if not plotProperties['twinx']:
+                    line = axis.plot(self.dischargeTime, data, label=label, visible=visible)
+                else:
+                    if i == 0:
+                        line = axis.plot(self.dischargeTime, data, label=label, visible=visible)
+                    elif i == 1:
+                        # Skip first color
+                        next(twinAxis._get_lines.prop_cycler)
+                        line = twinAxis.plot(self.dischargeTime, data, label=label, visible=visible)
+
                 self.currentLines[label] = line[0]
 
-            axis.legend()
+            labels, lines = (list(self.currentLines.keys()), list(self.currentLines.values()))
+            axis.legend(lines, labels)
 
         # Change visibility of line when the checkbutton for that line is changed
         elif isinstance(event.widget, ttk.Checkbutton):

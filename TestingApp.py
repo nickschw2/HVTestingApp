@@ -31,7 +31,7 @@ from console import *
 
 class TestingApp(ttk.Window):
     def __init__(self):
-        super().__init__(themename='cyborg')
+        super().__init__(themename=themename)
         style = ttk.Style()
         self.colors = style.colors
 

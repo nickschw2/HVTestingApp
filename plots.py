@@ -1,17 +1,29 @@
 # Import statements for creating plots in tkinter applications
-import matplotlib
-matplotlib.use('TkAgg')
+import matplotlib as mpl
+mpl.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 import ttkbootstrap as ttk
 from constants import *
+from ttkbootstrap.themes import standard
 
 # Change color cycler for dark mode
 # Taken from https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data
-matplotlib.rcParams['axes.prop_cycle'] = matplotlib.cycler(color=["#e60049", "#0bb4ff", "#50e991", "#e6d800", "#9b19f5", "#ffa300", "#dc0ab4", "#b3d4ff", "#00bfa0"]) 
+mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["#e60049", "#0bb4ff", "#50e991", "#e6d800", "#9b19f5", "#ffa300", "#dc0ab4", "#b3d4ff", "#00bfa0"]) 
 
-# import tkinter as tk
-# from tkinter import ttk
+# Change the colors of plot to match the theme
+theme_colors = standard.STANDARD_THEMES[themename]['colors']
+mpl.rcParams['figure.facecolor'] = theme_colors['bg']
+mpl.rcParams['axes.facecolor'] = theme_colors['bg']
+mpl.rcParams['axes.labelcolor'] = theme_colors['bg']
+mpl.rcParams['axes.edgecolor'] = theme_colors['fg']
+mpl.rcParams['grid.color'] = theme_colors['fg']
+mpl.rcParams['xtick.color'] = theme_colors['fg']
+mpl.rcParams['ytick.color'] = theme_colors['fg']
+mpl.rcParams['text.color'] = theme_colors['fg']
+mpl.rcParams['legend.facecolor'] = theme_colors['fg']
+mpl.rcParams['legend.facecolor'] = theme_colors['secondary']
+
 
 # Class for inserting plots into tkinter frames
 class CanvasPlot(ttk.Frame):
@@ -22,12 +34,12 @@ class CanvasPlot(ttk.Frame):
         self.fig, self.ax = plt.subplots(constrained_layout=True, **kwargs)
 
         # Adjust colors
-        bg_color = ttk.Style().colors.bg
-        fg_color = ttk.Style().colors.fg
-        self.fig.patch.set_facecolor(bg_color)
-        self.ax.patch.set_facecolor(bg_color)
-        for spine in self.ax.spines:
-            self.ax.spines[spine].set_color(fg_color)
+        # bg_color = ttk.Style().colors.bg
+        # fg_color = ttk.Style().colors.fg
+        # self.fig.patch.set_facecolor(bg_color)
+        # self.ax.patch.set_facecolor(bg_color)
+        # for spine in self.ax.spines:
+        #     self.ax.spines[spine].set_color(fg_color)
 
         # Function calls to insert figure onto canvas
         self.canvas = FigureCanvasTkAgg(self.fig, self)
