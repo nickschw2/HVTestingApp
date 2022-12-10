@@ -515,7 +515,7 @@ class CMFX_App(TestingApp):
             else:
                 dischargeVoltageLoad, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
 
-            if len(dischargeTime) != 0:
+            if len(dischargeTimeScope) != 0:
                 # Plot results on the discharge graph and save them
                 # The only time results are saved is when there is a discharge that is preceded by charge
                 self.replotCharge()
@@ -545,6 +545,9 @@ class CMFX_App(TestingApp):
             self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
 
             self.changeResultsPlot(None)
+
+            # Show results tab once finished plotting
+            self.notebook.select(2)
 
             self.saveResults()
 
