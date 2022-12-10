@@ -215,13 +215,13 @@ class Oscilloscope():
         # self.timeOffset = float(self.inst.query('TIM:OFFS?').strip())
         # self.timeScale = float(self.inst.query('TIM:SCAL?').strip())
         if self.readSuccess:
-            self.time = np.linspace(self.xorigin, self.lenMax * self.xinc, self.data_size)
+            self.time = np.linspace(self.xorigin, self.xorigin + (self.lenMax - 1) * self.xinc, self.data_size)
         else:
             self.time = np.array([])
         # self.time = self.time[::self.nSkip]
         # Now, generate a time axis.
         # timeBlocks = 5 # number of blocks on screen on time axis
-        # self.time = np.linspace(self.timeOffset - timeBlocks * self.timeScale - self.xorigin, self.timeOffset + timeBlocks * self.timeScale - self.xorigin, num=self.data_size)
+        # self.time = np.linspace(self.timeOffset - timeBlocks * self.timeScale, self.timeOffset + timeBlocks * self.timeScale, num=self.data_size)
 
         try:
             # See if we should use a different time axis
