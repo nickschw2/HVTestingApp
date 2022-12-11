@@ -443,6 +443,7 @@ class TestingApp(ttk.Window):
 
         self.charging = False
         self.discharged = True
+        self.idleMode = True
 
     def validateLogin(self):
         # If someone is not logged in then the buttons remain deactivated
