@@ -1,5 +1,5 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = True
+DEBUG_MODE = False
 ADMIN_MODE = True
 SHOT_MODE = True
 
@@ -29,7 +29,7 @@ do_defaults = {'Load Switch': 'line0',
     'Voltage Divider Switch': 'line2'}
 diagnostics_defaults = {'Current': 'ai0',
     'Diamagnetic Axial': 'ai1',
-    'Diamagnetic Radial': 'ai2'}
+    'Diamagnetic Radial': 'ai5'}
 charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
@@ -100,6 +100,6 @@ pulseGeneratorChans = {'Trigger Input': 0,
                           'CD': 7}
 
 pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                          'scopeTrigger': {'chan': pulseGeneratorChans['B'], 'delay': 0},
-                          'interferometer': {'chan': pulseGeneratorChans['C'], 'delay': 10e-3},
+                          'scopeTrigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
+                          'spectrometer': {'chan': pulseGeneratorChans['B'], 'delay': 10e-3},
                           'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 300e-3}}

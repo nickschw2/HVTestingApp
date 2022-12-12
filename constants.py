@@ -64,7 +64,7 @@ fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$'
 chargeHandles = [voltageLine, capacitorLine, currentLine]
 dischargeHandles = [voltageLine, currentLine]
 
-columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
+single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'runNumber': {'name': 'Run Number', 'type': 'scalar'},
     'runDate': {'name': 'Run Date', 'type': 'scalar'},
     'runTime': {'name': 'Run Time', 'type': 'scalar'},
@@ -87,15 +87,16 @@ columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'capacitorVoltage': {'name': 'Capacitor Voltage (V)', 'type': 'array'},
     'dischargeTime': {'name': 'Discharge Time', 'type': 'array'},
     'dischargeTimeUnit': {'name': 'Discharge Time Unit', 'type': 'scalar'},
-    'dischargeVoltageLoad': {'name': 'Discharge Voltage (V)', 'type': 'array'},
-    'dischargeCurrentLoad': {'name': 'Discharge Current (A)', 'type': 'array'},
+    'dischargeVoltage': {'name': 'Discharge Voltage (V)', 'type': 'array'},
+    'dischargeCurrent': {'name': 'Discharge Current (A)', 'type': 'array'},
     'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
-    'diamagnetic': {'name': 'Diamagnetic (V)', 'type': 'array'},
+    'diamagneticAxial': {'name': 'Diamagnetic Axial (V)', 'type': 'array'},
+    'diamagneticRadial': {'name': 'Diamagnetic Radial (V)', 'type': 'array'},
     'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
     'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}
 
 # Columns to save to master lookup files
 master_columns = {}
-for variable, description in columns.items():
+for variable, description in single_columns.items():
     if description['type'] == 'scalar':
         master_columns[variable] = description['name']

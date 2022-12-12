@@ -109,32 +109,40 @@ class TestingApp(ttk.Window):
         '''MASTER FILE SAVE'''
         # Create master file if it does not already exist
         self.runNumber = f'{0:05d}'
+        # Date
+        now = datetime.datetime.now()
+        self.runDate = now.date().strftime('%Y_%m_%d')
+        self.runTime = now.time().strftime('%H:%M:%S')
+        
+        master_columnsNames = [master_columns[variable] for variable in master_columns if hasattr(self, variable)]
+
         if resultsMasterName not in os.listdir(self.saveFolder):
-            resultsMaster_df = pd.DataFrame()
-            resultsMaster_df.columns = [master_columns[variable] for variable in master_columns]
+            resultsMaster_df = pd.DataFrame(columns=master_columnsNames)
             resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
         else:
             resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
             runNumbers = resultsMaster_df[master_columns['runNumber']]
             runNumber = max(runNumbers.astype(int)) + 1
             self.runNumber = f'{runNumber:05d}'
-            
-        # Create a unique identifier for the filename in the save folder
-        # Date
-        now = datetime.datetime.now()
-        self.runDate = now.date().strftime('%Y_%m_%d')
-        self.runTime = now.time().strftime('%H:%M:%S')
+            print(self.runNumber)
 
         # Save master results
-        resultMaster = [getattr(self, variable) for variable in master_columns if hasattr(self, variable)]
-        resultMaster_df = pd.DataFrame([pd.Series(val) for val in resultMaster]).T
-        resultsMaster_df = resultsMaster_df.concat([resultsMaster_df, resultMaster_df])
+        resultMaster = []
+        for variable in master_columns:
+            if hasattr(self, variable):
+                resultMaster.append(getattr(self, variable))
+
+        print(resultMaster)
+        print(master_columnsNames)
+        resultMaster_df = pd.DataFrame(columns=master_columnsNames)
+        resultMaster_df.loc[0] = resultMaster
+        resultsMaster_df = pd.concat([resultsMaster_df, resultMaster_df])
         resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
 
         '''RUN FILE SAVE'''
         # Create a folder for today's date if it doesn't already exist
         if self.runDate not in os.listdir(self.saveFolder):
-            os.mkdir(self.runDate)
+            os.mkdir(f'{self.saveFolder}/{self.runDate}')
 
         if SHOT_MODE:
             self.filename = f'CMFX_{self.runNumber}.csv'
@@ -143,11 +151,11 @@ class TestingApp(ttk.Window):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py
-        results = [getattr(self, variable) for variable in columns if hasattr(self, variable)]
+        results = [getattr(self, variable) for variable in single_columns if hasattr(self, variable)]
 
         # Creates a data frame which is easier to save to csv formats
-        results_df = pd.DataFrame([pd.Series(val) for val in results]).T
-        results_df.columns = [columns[variable]['name'] for variable in columns if hasattr(self, variable)]
+        results_df = pd.DataFrame([pd.Series(val, dtype='object') for val in results]).T
+        results_df.columns = [single_columns[variable]['name'] for variable in single_columns if hasattr(self, variable)]
         results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
     # Read in a csv file and plot those results
@@ -160,7 +168,7 @@ class TestingApp(ttk.Window):
             self.reset()
             self.resetButton.configure(state='normal')
 
-            for key, value in columns.items():
+            for key, value in single_columns.items():
                 if value['type'] == 'scalar':
                     if value['name'] in results_df:
                         self.__dict__.update({key: results_df[value['name']].values[0]})
@@ -373,6 +381,7 @@ class TestingApp(ttk.Window):
                 self.discharged = True
 
                 self.pulseGenerator.triggerStart()
+                self.NI_DAQ.discharge_reader.read_many_sample(self.NI_DAQ.dischargeData)
 
         if not self.idleMode:
             if not self.charged:
@@ -382,15 +391,19 @@ class TestingApp(ttk.Window):
                 self.operateSwitch('Voltage Divider Switch', True)	
                 time.sleep(0.5)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
                 self.pulseGenerator.triggerStart()
+                self.NI_DAQ.discharge_reader.read_many_sample(self.NI_DAQ.dischargeData)
 
                 # Wait a while before closing the mechanical dump switch
                 time.sleep(hardCloseWaitTime)	
                 self.operateSwitch('Load Switch', False)
 
             # Save discharge on a separate thread	
-            print('Saving discharge')	
-            thread = Thread(target=self.saveDischarge)	
-            thread.start()
+            print('Saving discharge...')
+            # self.saveDischarge()
+            self.saveDischarge_thread = Thread(target=self.saveDischarge)
+            self.saveDischarge_thread.start()
+            print('Discharge saved')
+
         else:
             popup()
 

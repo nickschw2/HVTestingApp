@@ -106,14 +106,14 @@ class NI_DAQ():
         pretrigger_fraction = 0.1
         posttrigger_samples = int(maxDischargeFreq * duration) + 1 # Add one to include t=0
         pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
-        pretrigger_duration = int(duration * pretrigger_fraction)
+        pretrigger_duration = duration * pretrigger_fraction
         discharge_samps_per_chan = pretrigger_samples + posttrigger_samples
         self.dischargeTime = np.linspace(-pretrigger_duration, duration, discharge_samps_per_chan)
         if duration < 1e-3:
-                self.dischargeTime = self.dischargeTime * 1e6
-                self.tUnit = 'us'
+            self.dischargeTime = self.dischargeTime * 1e6
+            self.tUnit = 'us'
         elif duration < 1:
-            self.tidischargeTimeme = self.dischargeTime * 1e3
+            self.dischargeTime = self.dischargeTime * 1e3
             self.tUnit = 'ms'
         else:
             self.tUnit = 's'
@@ -123,7 +123,7 @@ class NI_DAQ():
 
         self.task_diagnostics.timing.cfg_samp_clk_timing(maxDischargeFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
         self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.discharge_name}/PFI1', pretrigger_samples=pretrigger_samples, trigger_edge=Edge.RISING)
-        self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
+        # self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
 
         self.discharge_reader = AnalogMultiChannelReader(self.task_diagnostics.in_stream)
 
@@ -147,7 +147,7 @@ class NI_DAQ():
 
     def read_discharge(self, task_handle, signal_type, callback_data):
         if not self.dischargeTriggered:
-            print('DAQ has been triggered')
+            # print('DAQ has been triggered')
             # Read all discharge data and wait for acquisition to finish
             self.dischargeTriggered = True
             self.discharge_reader.read_many_sample(self.dischargeData)

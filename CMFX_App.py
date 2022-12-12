@@ -226,7 +226,7 @@ class CMFX_App(TestingApp):
         # There are currently two viewing modes for results, one with single plots and one with subplots
         self.resultsPlotSingle = CanvasPlot(self.resultsPlotFrame, figsize=(10, 4))
         nrows_subplots = int(np.ceil(len(self.resultsPlotData) / 2))
-        self.resultsPlotSubplots = CanvasPlot(self.resultsPlotFrame, nrows=nrows_subplots, ncols=2, figsize=(16, 6))
+        self.resultsPlotSubplots = CanvasPlot(self.resultsPlotFrame, nrows=nrows_subplots, ncols=2, figsize=(12, 6))
 
         self.resultsPlotToolbar = CustomToolbar(self.resultsPlotSingle.canvas, self.resultsPlotFrame)
         self.resultsPlotSubplotsToolbar = CustomToolbar(self.resultsPlotSubplots.canvas, self.resultsPlotFrame)
@@ -332,11 +332,11 @@ class CMFX_App(TestingApp):
         self.safetyLights()
 
     def recordPreShotNotes(self):
-        self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
+        self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end').strip()
         if self.discharged:
             # Change individual results file
             results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
-            columnName = columns['preShotNotes']['name']
+            columnName = single_columns['preShotNotes']['name']
             results_df.loc[0, columnName] = self.preShotNotes
             results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
@@ -347,11 +347,11 @@ class CMFX_App(TestingApp):
         print('Pre-shot notes recorded')
 
     def recordPostShotNotes(self):
-        self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
+        self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end').strip()
         if self.discharged:
             # Change individual results file
             results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
-            columnName = columns['postShotNotes']['name']
+            columnName = single_columns['postShotNotes']['name']
             results_df.loc[0, columnName] = self.postShotNotes
             results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
@@ -399,7 +399,7 @@ class CMFX_App(TestingApp):
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
                 self.scope.setScale(self.chargeVoltage)
-                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dumpIgnitron']['chan'], self.dumpDelay)
+                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dumpIgnitron']['chan'], self.dumpDelay / 1000)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -462,6 +462,16 @@ class CMFX_App(TestingApp):
             # Logic heirarchy for charge state and countdown text
             if self.discharged:
                 self.chargeStateText.set('Discharged!')
+
+                # Once the save thread has finished, then we can replot the discharge results
+                if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
+                    self.changeResultsPlot(None)
+                    self.saveResults()
+
+                    # Show results tab once finished plotting
+                    self.notebook.select(2)
+                    self.resultsSaved = True
+
             elif self.charged:
                 self.chargeStateText.set('Charged')
             else:
@@ -511,57 +521,50 @@ class CMFX_App(TestingApp):
         self.after(int(1000 / refreshRate), self.updateSystemStatus)
 
     def recordPressure(self):
-        self.chamberBasePressure = 8e-4
-        self.pumpBasePressure = 2e-4
+        self.chamberBasePressure = 8e-7
+        self.pumpBasePressure = 2e-7
 
     def saveDischarge(self):
             # Read from the load
-            if not DEBUG_MODE:
-                print('Sleeping for 5 seconds to give scope its "me time"')	
-                time.sleep(5)
-                dischargeVoltageLoad = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-                interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-                trigger = self.scope.get_data(self.scopePins['Trigger'])
-                dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
+            # if not DEBUG_MODE:
+            #     print('Sleeping for 5 seconds to give scope its "me time"')	
+            #     time.sleep(5)
+            #     # dischargeVoltage = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
+            #     # interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+            #     trigger = self.scope.get_data(self.scopePins['Trigger'])
+            #     dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
                 
-            else:
-                dischargeVoltageLoad, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
+            # else:
+            #     dischargeVoltage, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
 
-            if len(dischargeTimeScope) != 0:
-                # Plot results on the discharge graph and save them
-                # The only time results are saved is when there is a discharge that is preceded by charge
-                self.replotCharge()
-                self.replotDischarge()
+            # if len(dischargeTimeScope) != 0:
+            #     # Plot results on the discharge graph and save them
+            #     # The only time results are saved is when there is a discharge that is preceded by charge
+            #     self.replotCharge()
+            #     self.replotDischarge()
 
-                self.saveResults()
+            #     self.saveResults()
 
-            else:
-                print('Oscilloscope was not triggered successfully')
+            # else:
+            #     print('Oscilloscope was not triggered successfully')
 
             self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:]
             self.diamagneticAxial = self.NI_DAQ.dischargeData[1,:]
             self.diamagneticRadial = self.NI_DAQ.dischargeData[2,:]
 
             # Transform scope data to be on same timebase as daq
-            self.dischargeVoltageLoad = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltageLoad, left=np.nan, right=np.nan)
-            self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
-            self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
+            # self.dischargeVoltage = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltage, left=np.nan, right=np.nan)
+            # self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
+            # self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
 
-            self.resultsPlotData['Discharge']['lines']['Voltage'] = self.dischargeVoltageLoad
+            self.resultsPlotData['Discharge']['lines']['Voltage'] = self.diamagneticRadial#self.dischargeVoltage
             self.resultsPlotData['Discharge']['lines']['Current'] = self.dischargeCurrent
-            self.resultsPlotData['Interferometer']['lines']['Central'] = self.interferometer
+            self.resultsPlotData['Interferometer']['lines']['Central'] = self.dischargeCurrent#self.interferometer
             self.resultsPlotData['Diamagnetic']['lines']['Axial'] = self.diamagneticAxial
             self.resultsPlotData['Diamagnetic']['lines']['Radial'] = self.diamagneticRadial
 
             self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
-            self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')
-
-            self.changeResultsPlot(None)
-
-            # Show results tab once finished plotting
-            self.notebook.select(2)
-
-            self.saveResults()
+            self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')          
 
     def changeResultsPlot(self, event):
         # Have to do some weird logic because tkinter doesn't have virtual events
@@ -671,7 +674,7 @@ class CMFX_App(TestingApp):
                     checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
 
                 ax = self.resultsPlotSingle.ax
-                setup_plots(plotSelection, ax)                
+                setup_plots(plotSelection, ax)
 
             # Change visibility of line when the checkbutton for that line is changed
             elif eventType == ttk.Checkbutton:
@@ -710,7 +713,7 @@ class CMFX_App(TestingApp):
                 setup_plots(plotSelection, ax)
 
             # Update plot
-            self.resultsPlotSingle.updatePlot()
+            self.resultsPlotSubplots.updatePlot()
 
         if eventType == None or eventType == ttk.Radiobutton:
             self.center_app()
@@ -727,6 +730,11 @@ class CMFX_App(TestingApp):
         # Clear user inputs
         self.chargeVoltageEntry.delete(0, 'end')
         self.gasPuffEntry.delete(0, 'end')
+        self.dumpDelayEntry.delete(0, 'end')
+
+        if hasattr(self, 'NI_DAQ'):
+            if self.NI_DAQ.task_diagnostics.is_task_done():
+                self.NI_DAQ.task_diagnostics.start()
 
         # Reset all boolean variables, time, and checklist
         self.charged = False
@@ -734,6 +742,7 @@ class CMFX_App(TestingApp):
         self.discharged = False
         self.userInputsSet = False
         self.idleMode = True
+        self.resultsSaved = False
 
         # Reset plots
         self.chargePlot.clearFigLines()
