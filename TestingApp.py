@@ -124,7 +124,6 @@ class TestingApp(ttk.Window):
             runNumbers = resultsMaster_df[master_columns['runNumber']]
             runNumber = max(runNumbers.astype(int)) + 1
             self.runNumber = f'{runNumber:05d}'
-            print(self.runNumber)
 
         # Save master results
         resultMaster = []
@@ -132,8 +131,6 @@ class TestingApp(ttk.Window):
             if hasattr(self, variable):
                 resultMaster.append(getattr(self, variable))
 
-        print(resultMaster)
-        print(master_columnsNames)
         resultMaster_df = pd.DataFrame(columns=master_columnsNames)
         resultMaster_df.loc[0] = resultMaster
         resultsMaster_df = pd.concat([resultsMaster_df, resultMaster_df])
@@ -162,7 +159,7 @@ class TestingApp(ttk.Window):
     def readResults(self):
         readFile = filedialog.askopenfilename(filetypes=[('Comma separated values', '.csv')])
         if readFile != '':
-            results_df = pd.read_csv(readFile)
+            results_df = pd.read_csv(readFile, dtype='object')
 
             # Reset program and allow user to reset
             self.reset()
@@ -381,7 +378,16 @@ class TestingApp(ttk.Window):
                 self.discharged = True
 
                 self.pulseGenerator.triggerStart()
-                self.NI_DAQ.discharge_reader.read_many_sample(self.NI_DAQ.dischargeData)
+
+                # Read from DAQ
+                self.NI_DAQ.read_discharge()
+
+                # Save discharge on a separate thread	
+                print('Saving discharge...')
+                # self.saveDischarge()
+                self.saveDischarge_thread = Thread(target=self.saveDischarge)
+                self.saveDischarge_thread.start()
+                print('Discharge saved')
 
         if not self.idleMode:
             if not self.charged:
@@ -391,18 +397,20 @@ class TestingApp(ttk.Window):
                 self.operateSwitch('Voltage Divider Switch', True)	
                 time.sleep(0.5)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
                 self.pulseGenerator.triggerStart()
-                self.NI_DAQ.discharge_reader.read_many_sample(self.NI_DAQ.dischargeData)
+
+                # Read from DAQ
+                self.NI_DAQ.read_discharge()
 
                 # Wait a while before closing the mechanical dump switch
                 time.sleep(hardCloseWaitTime)	
                 self.operateSwitch('Load Switch', False)
 
-            # Save discharge on a separate thread	
-            print('Saving discharge...')
-            # self.saveDischarge()
-            self.saveDischarge_thread = Thread(target=self.saveDischarge)
-            self.saveDischarge_thread.start()
-            print('Discharge saved')
+                # Save discharge on a separate thread	
+                print('Saving discharge...')
+                # self.saveDischarge()
+                self.saveDischarge_thread = Thread(target=self.saveDischarge)
+                self.saveDischarge_thread.start()
+                print('Discharge saved')
 
         else:
             popup()

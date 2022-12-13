@@ -50,11 +50,9 @@ class NI_DAQ():
         # We need an extra task just for updating the labels that is running constantly
         self.task_systemStatus = nidaqmx.Task()
         self.task_charge_ao = nidaqmx.Task()
-        self.task_diagnostics = nidaqmx.Task()
 
         self.tasks.append(self.task_systemStatus)
         self.tasks.append(self.task_charge_ao)
-        self.tasks.append(self.task_diagnostics)
 
         # * Connect to analog input and output voltage channels on the named device
         #   C equivalent - DAQmxCreateAOVoltageChan
@@ -70,11 +68,6 @@ class NI_DAQ():
                                                                 min_val=0.0, max_val=10.0,
                                                                 name_to_assign_to_channel=name)
 
-        for name, diagnostic in self.diagnostics.items():
-            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}',
-                                                                  min_val=-10.0, max_val=10.0,
-                                                                  name_to_assign_to_channel=name)
-
         '''
         SET UP ANALOG INPUT
         '''
@@ -88,8 +81,33 @@ class NI_DAQ():
             self.task_systemStatus.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
 
         '''
+        SET UP DISCHARGE TRIGGER
+        '''
+        self.reset_discharge_trigger()
+
+    def reset_discharge_trigger(self):
+        # Remove and close prior versions of trigger tasks
+        if hasattr(self, 'task_diagnostics'):
+            self.tasks.remove(self.task_diagnostics)
+            self.task_diagnostics.stop()
+            self.task_diagnostics.close()
+
+        if hasattr(self, 'task_co'):
+            self.tasks.remove(self.task_co)
+            self.task_co.stop()
+            self.task_co.close()
+
+        '''
         SET UP DISCHARGE AND COUNTER TASKS
         '''
+        self.task_diagnostics = nidaqmx.Task()
+        self.tasks.append(self.task_diagnostics)
+
+        for name, diagnostic in self.diagnostics.items():
+            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}',
+                                                                  min_val=-10.0, max_val=10.0,
+                                                                  name_to_assign_to_channel=name)
+
         self.task_co = nidaqmx.Task()
         self.tasks.append(self.task_co)
 
@@ -129,6 +147,9 @@ class NI_DAQ():
 
         self.dischargeTriggered = False
 
+        self.task_diagnostics.start()
+        self.task_co.start()
+
     def write_value(self, value):
         self.task_charge_ao.write(value, timeout=2)
 
@@ -145,9 +166,9 @@ class NI_DAQ():
         self.read()
         return 0
 
-    def read_discharge(self, task_handle, signal_type, callback_data):
+    def read_discharge(self):
         if not self.dischargeTriggered:
-            # print('DAQ has been triggered')
+            print('DAQ has been triggered')
             # Read all discharge data and wait for acquisition to finish
             self.dischargeTriggered = True
             self.discharge_reader.read_many_sample(self.dischargeData)
@@ -159,7 +180,8 @@ class NI_DAQ():
             if not self._task_created(task):
                 return
             else:
-                task.start()
+                if task.is_task_done():
+                    task.start()
 
     def stop_acquisition(self):
         for task in self.tasks:

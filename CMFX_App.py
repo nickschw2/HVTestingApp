@@ -732,9 +732,9 @@ class CMFX_App(TestingApp):
         self.gasPuffEntry.delete(0, 'end')
         self.dumpDelayEntry.delete(0, 'end')
 
-        if hasattr(self, 'NI_DAQ'):
-            if self.NI_DAQ.task_diagnostics.is_task_done():
-                self.NI_DAQ.task_diagnostics.start()
+        # This condition executes every time except for the initialization
+        if self.loggedIn:
+            self.NI_DAQ.reset_discharge_trigger()
 
         # Reset all boolean variables, time, and checklist
         self.charged = False
@@ -743,6 +743,11 @@ class CMFX_App(TestingApp):
         self.userInputsSet = False
         self.idleMode = True
         self.resultsSaved = False
+
+        # Reset all plotted variables to empty array
+        for variable, description in single_columns.items():
+            if description['type'] == 'array' and hasattr(self, variable):
+                setattr(self, variable, np.array([]))
 
         # Reset plots
         self.chargePlot.clearFigLines()

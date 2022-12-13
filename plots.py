@@ -51,7 +51,10 @@ class CanvasPlot(ttk.Frame):
             if len(ax.lines) != 0:
                 for i in range(len(ax.lines)):
                     # Remove the first one each time in the loop
-                    ax.lines[0].remove()
+                    # ax.lines.remove(lines[0])
+                    ax.lines.pop(0)
+
+        self.updatePlot()
 
 
 class BlitManager:
