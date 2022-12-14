@@ -247,8 +247,8 @@ class CMFX_App(TestingApp):
         # Radio buttons for choosing which display style to show
         self.resultsPlotView = ttk.IntVar()
         self.resultsPlotView.set(0) # initialize view
-        singleRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Single', variable=self.resultsPlotView, value=0, command=lambda: self.changeResultsPlot(singleRadiobutton))
-        subplotsRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Subplots', variable=self.resultsPlotView, value=1, command=lambda: self.changeResultsPlot(subplotsRadiobutton))
+        singleRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Single', variable=self.resultsPlotView, value=0, command=lambda: self.replotResults(singleRadiobutton))
+        subplotsRadiobutton = ttk.Radiobutton(self.resultsRadioFrame, text='Subplots', variable=self.resultsPlotView, value=1, command=lambda: self.replotResults(subplotsRadiobutton))
 
         singleRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
         subplotsRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
@@ -261,7 +261,7 @@ class CMFX_App(TestingApp):
         plotOptions = list(self.resultsPlotData.keys())
         self.resultsPlotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', bootstyle='primary', **text_opts)
         self.resultsPlotCombobox.current(0) # Initializes the current value to first option
-        self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.changeResultsPlot)
+        self.resultsPlotCombobox.bind('<<ComboboxSelected>>', self.replotResults)
         self.resultsPlotCombobox.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
 
         # Initialize checkbuttons
@@ -272,10 +272,10 @@ class CMFX_App(TestingApp):
             for label in plotProperties['lines']:
                 checkbutton = ttk.Checkbutton(self.selectorFrame, text=label)
                 checkbutton.invoke() # Initialize it to be turned on
-                checkbutton.bind('<Button>', self.changeResultsPlot)
+                checkbutton.bind('<Button>', self.replotResults)
                 self.resultsCheckbuttons[plotOption][label] = checkbutton
 
-        self.changeResultsPlot(None)
+        self.replotResults(None)
 
         #### CONSOLE SECTION ####
         # Create frame to hold console and scroll bar
@@ -465,7 +465,7 @@ class CMFX_App(TestingApp):
 
                 # Once the save thread has finished, then we can replot the discharge results
                 if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
-                    self.changeResultsPlot(None)
+                    self.replotResults(None)
                     self.saveResults()
 
                     # Show results tab once finished plotting
@@ -566,7 +566,7 @@ class CMFX_App(TestingApp):
             self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
             self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')          
 
-    def changeResultsPlot(self, event):
+    def replotResults(self, event):
         # Have to do some weird logic because tkinter doesn't have virtual events
         # for Radiobuttons, but does for comboboxes
         if event == None:
@@ -750,9 +750,11 @@ class CMFX_App(TestingApp):
                 setattr(self, variable, np.array([]))
 
         # Reset plots
-        self.chargePlot.clearFigLines()
-        self.resultsPlotSingle.clearFigLines()
-        self.resultsPlotSubplots.clearFigLines()
+        self.replotCharge()
+        self.replotResults()
+        # self.chargePlot.clearFigLines()
+        # self.resultsPlotSingle.clearFigLines()
+        # self.resultsPlotSubplots.clearFigLines()
 
         # Disable all buttons if logged in
         self.disableButtons()

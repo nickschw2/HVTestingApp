@@ -188,7 +188,7 @@ class TestingApp(ttk.Window):
             self.chargeVoltageEntry.insert(0, self.chargeVoltage)
 
             self.replotCharge()
-            self.changeResultsPlot()
+            self.replotResults()
 
     def openSite(self):
         webbrowser.open(githubSite)
