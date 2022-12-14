@@ -165,25 +165,30 @@ class TestingApp(ttk.Window):
             self.reset()
             self.resetButton.configure(state='normal')
 
-            for key, value in single_columns.items():
-                if value['type'] == 'scalar':
-                    if value['name'] in results_df:
-                        self.__dict__.update({key: results_df[value['name']].values[0]})
-                    else:
-                        self.__dict__.update({key: np.nan})
+            for variable, description in single_columns.items():
+                if description['type'] == 'scalar':
+                    if description['name'] in results_df:
+                        setattr(self, variable, results_df[description['name']].values[0])
+                    # else:
+                    #     self.__dict__.update({variable: np.nan})
                 else:
-                    if value['name'] in results_df:
-                        self.__dict__.update({key: results_df[value['name']].dropna().values})
-                    else:
-                        self.__dict__.update({key: np.zeros(0)})
+                    if description['name'] in results_df:
+                        setattr(self, variable, results_df[description['name']].dropna().values)
+                    # else:
+                    #     self.__dict__.update({variable: np.array([])})
 
             # Place values for all user inputs and plots
-            self.serialNumberEntry.insert(0, self.serialNumber)
+            if SHOT_MODE:
+                self.gasPuffEntry.insert(0, self.gasPuffTime)
+                self.dumpDelayEntry.insert(0, self.dumpDelay)
+            else:
+                self.serialNumberEntry.insert(0, self.serialNumber)
+                self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
+
             self.chargeVoltageEntry.insert(0, self.chargeVoltage)
-            self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
 
             self.replotCharge()
-            self.replotDischarge()
+            self.changeResultsPlot()
 
     def openSite(self):
         webbrowser.open(githubSite)
