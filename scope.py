@@ -154,6 +154,7 @@ class Oscilloscope():
                     # Progress bar
                     j = (i + 1) / loopcount
                     print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
+                    print(f'', end='\r')
                 print()
 
             # Convert from binary to actual voltages
