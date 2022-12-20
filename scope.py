@@ -37,15 +37,15 @@ class Oscilloscope():
         return resources[0]
 
     def setScale(self, chargeVoltage):
-        timeScale = duration / 10 
+        timeScale = duration / 5 
         voltageScale = chargeVoltage / 5
-        currentScale = chargeVoltage * 1000 / 500 * 0.01 / 20
+        currentScale = chargeVoltage * 1000 / 500 * 0.01 / 10
         interferometerScale = 0.005 # Volts
         diamagneticScale = 1 # Volts
 
         # Initialize the scope view
         self.inst.write(f':TIM:SCAL {timeScale}')
-        self.inst.write(f':TIM:OFFS {5 * timeScale}')
+        self.inst.write(f':TIM:OFFS {4 * timeScale}')
 
         self.inst.write(':CHAN1:DISP 1')
         self.inst.write(':CHAN2:DISP 1')
@@ -55,17 +55,17 @@ class Oscilloscope():
         self.inst.write(f':CHAN1:SCAL {voltageScale}')
         self.inst.write(f':CHAN1:OFFS {-1 * voltageScale}')
         self.inst.write(f':CHAN2:SCAL {currentScale}')
-        self.inst.write(f':CHAN2:OFFS {-4 * currentScale}')
-        self.inst.write(f':CHAN3:SCAL {interferometerScale}')
+        self.inst.write(f':CHAN2:OFFS {0}')
+        self.inst.write(f':CHAN3:SCAL {diamagneticScale}')
         self.inst.write(f':CHAN3:OFFS {0}')
         self.inst.write(f':CHAN4:SCAL {diamagneticScale}')
         self.inst.write(f':CHAN4:OFFS {0}')
 
         # Set up triggering
         self.inst.write(':TRIG:MODE:EDGE')
-        self.inst.write(':TRIG:EDGE:SOUR CHAN4')
+        self.inst.write(':TRIG:EDGE:SOUR CHAN3')
         self.inst.write(':TRIG:EDGE:SLOP POS')
-        self.inst.write(f':TRIG:EDGE:LEV {3.5 * diamagneticScale}')
+        self.inst.write(f':TRIG:EDGE:LEV {3.5}')
 
     # stop reading data
     def reset(self):
@@ -154,7 +154,7 @@ class Oscilloscope():
                     # Progress bar
                     j = (i + 1) / loopcount
                     print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
-                    print(f'', end='\r')
+                    # print(f'', end='\r')
                 print()
 
             # Convert from binary to actual voltages

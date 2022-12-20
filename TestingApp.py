@@ -122,7 +122,7 @@ class TestingApp(ttk.Window):
         else:
             resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
             runNumbers = resultsMaster_df[master_columns['runNumber']]
-            runNumber = max(runNumbers.astype(int)) + 1
+            runNumber = int(max(runNumbers)) + 1
             self.runNumber = f'{runNumber:05d}'
 
         # Save master results
@@ -159,36 +159,40 @@ class TestingApp(ttk.Window):
     def readResults(self):
         readFile = filedialog.askopenfilename(filetypes=[('Comma separated values', '.csv')])
         if readFile != '':
-            results_df = pd.read_csv(readFile, dtype='object')
+            results_df = pd.read_csv(readFile, low_memory=False)
 
             # Reset program and allow user to reset
-            self.reset()
             self.resetButton.configure(state='normal')
 
             for variable, description in single_columns.items():
                 if description['type'] == 'scalar':
                     if description['name'] in results_df:
-                        setattr(self, variable, results_df[description['name']].values[0])
-                    # else:
-                    #     self.__dict__.update({variable: np.nan})
+                        scalar_data = results_df[description['name']].values[0]
+                        setattr(self, variable, scalar_data)
                 else:
                     if description['name'] in results_df:
-                        setattr(self, variable, results_df[description['name']].dropna().values)
-                    # else:
-                    #     self.__dict__.update({variable: np.array([])})
+                        array_data = results_df[description['name']].dropna().values
+                        setattr(self, variable, array_data)
 
             # Place values for all user inputs and plots
             if SHOT_MODE:
+                self.gasPuffEntry.delete(0, 'end')
+                self.dumpDelayEntry.delete(0, 'end')
                 self.gasPuffEntry.insert(0, self.gasPuffTime)
                 self.dumpDelayEntry.insert(0, self.dumpDelay)
             else:
+                self.serialNumberEntry.delete(0, 'end')
+                self.holdChargeTimeEntry.delete(0, 'end')
                 self.serialNumberEntry.insert(0, self.serialNumber)
                 self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
 
+            self.chargeVoltageEntry.delete(0, 'end')
             self.chargeVoltageEntry.insert(0, self.chargeVoltage)
 
             self.replotCharge()
-            self.replotResults()
+
+            self.setResultsData()
+            self.replotResults(None)
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -339,11 +343,12 @@ class TestingApp(ttk.Window):
             self.idleMode = False
 
             # Operate switches
+            self.operateSwitch('Dump Switch', False)
             self.operateSwitch('Load Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
             # LASER TEST	
-            # self.operateSwitch('Voltage Divider Switch', True)	
+            # self.operateSwitch('Dump Switch', True)	
             # self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
@@ -399,9 +404,14 @@ class TestingApp(ttk.Window):
                 popup()
 
             else:
-                self.operateSwitch('Voltage Divider Switch', True)	
-                time.sleep(0.5)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
+                # startTime = time.time()
+                # print(startTime)
+                # self.operateSwitch('Load Switch', False)
+                # print(f'Switch close time: {time.time() - startTime}')
+                # time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
+                # print(f'gas puff wait time: {time.time() - startTime}')
                 self.pulseGenerator.triggerStart()
+                # print(f'trigger start time: {time.time() - startTime}')
 
                 # Read from DAQ
                 self.NI_DAQ.read_discharge()
@@ -409,6 +419,9 @@ class TestingApp(ttk.Window):
                 # Wait a while before closing the mechanical dump switch
                 time.sleep(hardCloseWaitTime)	
                 self.operateSwitch('Load Switch', False)
+                
+                self.charging = False
+                self.discharged = True
 
                 # Save discharge on a separate thread	
                 print('Saving discharge...')
@@ -439,8 +452,8 @@ class TestingApp(ttk.Window):
         except IndexError:
             print('Mismatch in shape')
 
-        if self.timePoint > plotTimeLimit:
-            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint)
+        if self.timePoint + 0.2 * plotTimeLimit > plotTimeLimit:
+            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint + 0.2 * plotTimeLimit)
         else:
             self.chargePlot.ax.set_xlim(0, plotTimeLimit)
 
@@ -464,8 +477,8 @@ class TestingApp(ttk.Window):
         # Operate switches
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
+        self.operateSwitch('Dump Switch', False)
         self.operateSwitch('Load Switch', False)
-        self.operateSwitch('Voltage Divider Switch', False)
 
         self.charging = False
         self.discharged = True
@@ -526,11 +539,11 @@ class TestingApp(ttk.Window):
     def on_closing(self):
         self.powerSupplyRamp(action='discharge')
 
-        # Open power supply and voltage divider switch and close load switch
+        # Open power supply and Dump Switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)
-        self.operateSwitch('Voltage Divider Switch', False)
+        self.operateSwitch('Dump Switch', False)
 
         if not DEBUG_MODE:
             # Stop NI communication

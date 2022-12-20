@@ -213,10 +213,7 @@ class CMFX_App(TestingApp):
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
-        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeLines},
-            'Interferometer': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': interferometerLines},
-            'Diamagnetic': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': diamagneticLines}
-            }
+        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeLines}}
 
         # Frame for displaying the results plots
         self.resultsPlotFrame = ttk.Frame(self.notebookFrames['Results'])
@@ -269,13 +266,11 @@ class CMFX_App(TestingApp):
         for plotOption, plotProperties in self.resultsPlotData.items():
             # Need to create a dictionary for each checkbutton corresponding to its label
             self.resultsCheckbuttons[plotOption] = {}
-            for label in plotProperties['lines']:
-                checkbutton = ttk.Checkbutton(self.selectorFrame, text=label)
+            for line in plotProperties['lines'].values():
+                checkbutton = ttk.Checkbutton(self.selectorFrame, text=line.label)
                 checkbutton.invoke() # Initialize it to be turned on
                 checkbutton.bind('<Button>', self.replotResults)
-                self.resultsCheckbuttons[plotOption][label] = checkbutton
-
-        self.replotResults(None)
+                self.resultsCheckbuttons[plotOption][line.label] = checkbutton
 
         #### CONSOLE SECTION ####
         # Create frame to hold console and scroll bar
@@ -313,6 +308,8 @@ class CMFX_App(TestingApp):
         self.loggedIn = False
         self.reset()
 
+        self.replotResults(None)
+
         if ADMIN_MODE:
             self.loggedIn = True
             self.saveFolder = saveFolderShotDefault
@@ -331,34 +328,36 @@ class CMFX_App(TestingApp):
         
         self.safetyLights()
 
+    def editNotes(self, notes, type):
+        # Change individual results file
+        results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', low_memory=False)
+        columnName = single_columns[type]['name']
+        results_df.at[0, columnName] = notes
+        results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
+
+        # Change master file
+        resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+        row = resultsMaster_df.index[resultsMaster_df['Run Number'] == int(self.runNumber)].tolist()[0]
+        resultsMaster_df.at[row, columnName] = notes
+        resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
+
+
     def recordPreShotNotes(self):
         self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end').strip()
-        if self.discharged:
-            # Change individual results file
-            results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
-            columnName = single_columns['preShotNotes']['name']
-            results_df.loc[0, columnName] = self.preShotNotes
-            results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
-            # Change master file
-            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
-            resultsMaster_df.loc[0, columnName] = self.preShotNotes
-            resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
+        # Edit the csv file on a separate thread
+        if self.resultsSaved:
+            Thread(target=self.editNotes, args=[self.preShotNotes, 'preShotNotes']).start()
+
         print('Pre-shot notes recorded')
 
     def recordPostShotNotes(self):
         self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end').strip()
-        if self.discharged:
-            # Change individual results file
-            results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}')
-            columnName = single_columns['postShotNotes']['name']
-            results_df.loc[0, columnName] = self.postShotNotes
-            results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
 
-            # Change master file
-            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
-            resultsMaster_df.loc[0, columnName] = self.postShotNotes
-            resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
+        # Edit the csv file on a separate thread
+        if self.resultsSaved:
+            Thread(target=self.editNotes, args=[self.postShotNotes, 'postShotNotes']).start()
+
         print('Post-shot notes recorded')
 
     def setUserInputs(self):
@@ -465,21 +464,25 @@ class CMFX_App(TestingApp):
 
                 # Once the save thread has finished, then we can replot the discharge results
                 if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
-                    self.replotResults(None)
-                    self.saveResults()
-
                     # Show results tab once finished plotting
                     self.notebook.select(2)
                     self.resultsSaved = True
+
+                    print('Saving results to file and replotting...')
+                    
+                    # Start saving on separate threads
+                    # Can't replot results on a separate thread from the main because it throws run time error
+                    Thread(target=self.saveResults).start()
+                    self.replotResults(None)
 
             elif self.charged:
                 self.chargeStateText.set('Charged')
             else:
                 self.chargeStateText.set('Not Charged')
 
-            if self.charging:
+            if self.charging and not self.discharged:
                 N = len(self.chargeVoltagePS)	
-                self.chargeTime = np.linspace(0, N / systemStatus_sample_rate, N)	
+                self.chargeTime = np.linspace(0, (N - 1) / systemStatus_sample_rate, N)	
                 self.timePoint = (N - 1) / systemStatus_sample_rate
 
                 # Sometimes there's a mismatch in length of voltages read from daq
@@ -494,18 +497,15 @@ class CMFX_App(TestingApp):
                 self.replotCharge()
 
                 # Voltage reaches a certain value of chargeVoltage to begin countown clock
-                if self.capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 and not self.discharged:
-                    self.charged = True
-
+                if self.capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 and not self.charged:
                     # Actually begin discharging power supply before opening power supply switch so it doesnt overshoot
                     self.powerSupplyRamp(action='discharge')
 
                     # Open power supply switch
                     self.operateSwitch('Power Supply Switch', False)
 
-                    # Have to set discharged to True and charging to False before starting discharge thread	
-                    self.discharged = True	
-                    self.charging = False	
+                    # Have to set charged to True before starting discharge thread
+                    self.charged = True
                     thread = Thread(target=self.discharge)	
                     thread.start()
 
@@ -524,15 +524,22 @@ class CMFX_App(TestingApp):
         self.chamberBasePressure = 8e-7
         self.pumpBasePressure = 2e-7
 
+    def setResultsData(self):
+        for plotOption, plotProperties in self.resultsPlotData.items():
+            for variable in plotProperties['lines'].keys():
+                if hasattr(self, variable):
+                    self.resultsPlotData[plotOption]['lines'][variable].data = getattr(self, variable)
+
     def saveDischarge(self):
             # Read from the load
-            # if not DEBUG_MODE:
-            #     print('Sleeping for 5 seconds to give scope its "me time"')	
-            #     time.sleep(5)
-            #     # dischargeVoltage = self.scope.get_data(self.scopePins['Load Voltage']) * voltageDivider
-            #     # interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-            #     trigger = self.scope.get_data(self.scopePins['Trigger'])
-            #     dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
+            if not DEBUG_MODE:
+                print('Sleeping for 5 seconds to give scope its "me time"')	
+                time.sleep(5)
+                dischargeVoltage = self.scope.get_data(self.scopePins['Discharge Voltage']) * voltageDivider
+                dischargeCurrent = self.scope.get_data(self.scopePins['Discharge Current']) / pearsonCoil
+                # interferometer = self.scope.get_data(self.scopePins['Interferometer'])
+                # trigger = self.scope.get_data(self.scopePins['Trigger'])
+                dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
                 
             # else:
             #     dischargeVoltage, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
@@ -548,20 +555,20 @@ class CMFX_App(TestingApp):
             # else:
             #     print('Oscilloscope was not triggered successfully')
 
-            self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:]
-            self.diamagneticAxial = self.NI_DAQ.dischargeData[1,:]
-            self.diamagneticRadial = self.NI_DAQ.dischargeData[2,:]
+            # self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:]
+            # self.interferometer = self.NI_DAQ.dischargeData[1,:]
+            # self.diamagneticAxial = self.NI_DAQ.dischargeData[1,:]
+            # self.diamagneticRadial = self.NI_DAQ.dischargeData[2,:]
 
             # Transform scope data to be on same timebase as daq
-            # self.dischargeVoltage = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltage, left=np.nan, right=np.nan)
+            self.dischargeVoltage = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltage, left=np.nan, right=np.nan)
+            self.dischargeCurrent = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeCurrent, left=np.nan, right=np.nan)
             # self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
             # self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
+            # self.interferometer = self.diamagneticRadial
+            # self.dischargeVoltage = self.diamagneticRadial
 
-            self.resultsPlotData['Discharge']['lines']['Voltage'] = self.diamagneticRadial#self.dischargeVoltage
-            self.resultsPlotData['Discharge']['lines']['Current'] = self.dischargeCurrent
-            self.resultsPlotData['Interferometer']['lines']['Central'] = self.dischargeCurrent#self.interferometer
-            self.resultsPlotData['Diamagnetic']['lines']['Axial'] = self.diamagneticAxial
-            self.resultsPlotData['Diamagnetic']['lines']['Radial'] = self.diamagneticRadial
+            self.setResultsData()
 
             self.preShotNotes = self.preShotNotesEntry.text.get('1.0', 'end')
             self.postShotNotes = self.postShotNotesEntry.text.get('1.0', 'end')          
@@ -587,13 +594,13 @@ class CMFX_App(TestingApp):
                 ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
                 ax.set_prop_cycle(None) # Reset the color cycle
                 
+                # Remove extra twinx in single plot
+                while len(self.resultsPlotSingle.fig.axes) > 1:
+                    self.resultsPlotSingle.fig.axes[1].remove()
+
                 # Add twin axis if specified
                 if not plotProperties['twinx']:
                     ax.set_ylabel(plotProperties['ylabel'])
-                    
-                    # Remove twinx if it exists in single plot
-                    if len(self.resultsPlotSingle.fig.axes) > 1:
-                        self.resultsPlotSingle.fig.axes[1].remove()
                 else:
                     twin_ax = ax.twinx()
                     twin_ax.grid(False)
@@ -606,38 +613,38 @@ class CMFX_App(TestingApp):
                     self.currentLines = {}
                 handles = []    
                 labels = []
-                for i, (label, data) in enumerate(plotProperties['lines'].items()):
+                for i, line in enumerate(plotProperties['lines'].values()):
                     if eventType == ttk.Radiobutton:
                         visible = True
                     else:
                         checkbuttons = self.resultsCheckbuttons[plotSelection]
-                        visible = checkbuttons[label].instate(['selected'])
+                        visible = checkbuttons[line.label].instate(['selected'])
 
-                    # Plot second line on twin axis
+                    # Check for twin axis
                     if not plotProperties['twinx']:
-                        line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                        handle = ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
+                    # Plot second line on twin axis
+                    # Can only have a twin axis when there are two lines and no more
                     else:
                         if i == 0:
-                            line = ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                            handle = ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
                         elif i == 1:
                             # Skip first color
                             next(twin_ax._get_lines.prop_cycler)
-                            line = twin_ax.plot(self.dischargeTime, data, label=label, visible=visible)
+                            handle = twin_ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
 
                     if eventType != ttk.Radiobutton:
-                        self.currentLines[label] = line[0]
-                    handles.append(line[0])
-                    labels.append(label)
+                        self.currentLines[line.label] = handle[0]
+                    handles.append(handle[0])
+                    labels.append(line.label)
 
                 # Get all labels onto one legend even if there's a twin axis
                 ax.legend(handles, labels)
 
-        if hasattr(self, 'NI_DAQ'):
+        if self.discharged:
             self.dischargeTime = self.NI_DAQ.dischargeTime
             self.dischargeTimeUnit = self.NI_DAQ.tUnit
-        else:
-            self.dischargeTime = []
-            self.dischargeTimeUnit = 's'
+            
 
         # Combobox selection
         if self.resultsPlotView.get() == 0:
@@ -683,7 +690,10 @@ class CMFX_App(TestingApp):
                 visible = checkbuttons[label].instate(['!selected'])
                 line.set_visible(visible)
 
-                self.resultsPlotSingle.ax.legend()
+                handles = self.currentLines.values()
+                labels = self.currentLines.keys()
+
+                self.resultsPlotSingle.ax.legend(handles, labels)
 
             # Update plot
             self.resultsPlotSingle.updatePlot()
@@ -721,20 +731,16 @@ class CMFX_App(TestingApp):
     def reset(self):
         print('Reset')
 
-        # Open power supply and voltage divider switch and close load switch	
+        # Open power supply and close load and dump
         self.operateSwitch('Power Supply Switch', False)	
         time.sleep(switchWaitTime)	
         self.operateSwitch('Load Switch', False)	
-        self.operateSwitch('Voltage Divider Switch', False)
+        self.operateSwitch('Dump Switch', False)
 
         # Clear user inputs
         self.chargeVoltageEntry.delete(0, 'end')
         self.gasPuffEntry.delete(0, 'end')
         self.dumpDelayEntry.delete(0, 'end')
-
-        # This condition executes every time except for the initialization
-        if self.loggedIn:
-            self.NI_DAQ.reset_discharge_trigger()
 
         # Reset all boolean variables, time, and checklist
         self.charged = False
@@ -744,17 +750,31 @@ class CMFX_App(TestingApp):
         self.idleMode = True
         self.resultsSaved = False
 
-        # Reset all plotted variables to empty array
-        for variable, description in single_columns.items():
-            if description['type'] == 'array' and hasattr(self, variable):
-                setattr(self, variable, np.array([]))
+        # Reset the charging time point
+        self.timePoint = 0.0
 
-        # Reset plots
-        self.replotCharge()
-        self.replotResults()
-        # self.chargePlot.clearFigLines()
-        # self.resultsPlotSingle.clearFigLines()
-        # self.resultsPlotSubplots.clearFigLines()
+        # Reset the discharge plot time axis
+        self.dischargeTime = []
+        self.dischargeTimeUnit = 's'
+
+        # This condition executes every time except for the initialization
+        if self.loggedIn:
+            # Resets discharge trigger
+            self.NI_DAQ.reset_discharge_trigger()
+
+            # Reset all plotted variables to empty array
+            for variable, description in single_columns.items():
+                if description['type'] == 'array' and hasattr(self, variable):
+                    setattr(self, variable, np.array([]))
+
+            self.setResultsData()
+
+            # The filtered array is not in the list of saved variables, so set this equal to empty array as well
+            self.capacitorVoltageFiltered = np.array([])
+
+            # Reset plots
+            self.replotCharge()
+            self.replotResults(None)
 
         # Disable all buttons if logged in
         self.disableButtons()

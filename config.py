@@ -10,7 +10,7 @@ maxVoltageInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'Load Voltage': '1', 'Interferometer': '2', 'Trigger': '4'}
+scopeChannelDefaults = {'Discharge Voltage': '1', 'Discharge Current': '2', 'Trigger': '3'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -26,10 +26,8 @@ systemStatus_defaults = {'Power Supply Voltage': 'ai0',
     'Capacitor Voltage': 'ai2'} # analog inputs
 do_defaults = {'Load Switch': 'line0',
     'Power Supply Switch': 'line1',
-    'Voltage Divider Switch': 'line2'}
-diagnostics_defaults = {'Current': 'ai0',
-    'Diamagnetic Axial': 'ai1',
-    'Diamagnetic Radial': 'ai5'}
+    'Dump Switch': 'line2'}
+diagnostics_defaults = {'Current': 'ai5'}
 charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
@@ -37,9 +35,15 @@ diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3']
 maxDischargeFreq = int(250000 / len(diagnostics_defaults)) # Hz
 
 # Results plot
-dischargeLines = {'Voltage': [], 'Current': []}
-interferometerLines = {'Central': []}
-diamagneticLines = {'Axial': [], 'Radial': []}
+# Create a small class to store line label and data so that the data is mutable (unlike namedtuple, for example)
+class Line:
+    def __init__(self, label, data):
+        self.label = label
+        self.data = data
+
+dischargeLines = {'dischargeVoltage': Line('Voltage', []), 'dischargeCurrent': Line('Current', [])}
+interferometerLines = {'interferometer': Line('Central', [])}
+diamagneticLines = {'diamagneticAxial': Line('Axial', []),'diamagneticRadial': Line('Radial', [])}
 
 # Diagnostic hardware
 voltageDivider = 1000 # voltage ratio in:out
@@ -67,6 +71,7 @@ refreshRate = 100.0 # Hz
 # Time between switch operations in seconds
 switchWaitTime = 0.2
 hardCloseWaitTime = 4
+gasPuffWaitTime = 0.4
 
 # Is the ignitron used for switching?
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
@@ -85,8 +90,9 @@ maxValidDumpDelay = 1000 # ms
 
 # Discharge timing
 duration = 0.5 # s
-pulse_period = 0.1 # s
-pulse_width = 0.01 # s
+pulse_period = 10.1e-3 # s
+pulse_width = 50e-6 # s
+spectrometer_delay = 0 # s
 
 # Pulse generator channels SRS DG535
 # Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
@@ -99,7 +105,8 @@ pulseGeneratorChans = {'Trigger Input': 0,
                           'D': 6,
                           'CD': 7}
 
-pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                          'scopeTrigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
-                          'spectrometer': {'chan': pulseGeneratorChans['B'], 'delay': 10e-3},
-                          'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 300e-3}}
+# Gas puff is on T0
+pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
+                         'loadIgnitron': {'chan': pulseGeneratorChans['B'], 'delay': 4e-3},
+                         'scopeTrigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
+                         'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 300e-3}}
