@@ -92,8 +92,8 @@ class CMFX_App(TestingApp):
         self.preShotNotesFrame.pack(side='top', expand=True)
         self.postShotNotesFrame.pack(side='top', expand=True)
 
-        self.preShotNotesEntry = scrolled.ScrolledText(self.preShotNotesFrame, font=('Helvetica', 10), height=10)
-        self.postShotNotesEntry = scrolled.ScrolledText(self.postShotNotesFrame, font=('Helvetica', 10), height=10)
+        self.preShotNotesEntry = scrolled.ScrolledText(self.preShotNotesFrame, font=('Helvetica', 10), height=10, wrap='word')
+        self.postShotNotesEntry = scrolled.ScrolledText(self.postShotNotesFrame, font=('Helvetica', 10), height=10, wrap='word')
 
         self.preShotNotesButton = ttk.Button(self.preShotNotesFrame, text='Record', command=self.recordPreShotNotes)
         self.postShotNotesButton = ttk.Button(self.postShotNotesFrame, text='Record', command=self.recordPostShotNotes)
