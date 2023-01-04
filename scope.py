@@ -38,10 +38,10 @@ class Oscilloscope():
 
     def setScale(self, chargeVoltage):
         timeScale = duration / 5 
-        voltageScale = chargeVoltage / 5
+        voltageScale = chargeVoltage / 8
         currentScale = chargeVoltage * 1000 / 500 * 0.01 / 10
-        interferometerScale = 0.005 # Volts
-        diamagneticScale = 1 # Volts
+        interferometerScale = 0.01 # Volts
+        triggerScale = 1 # Volts
 
         # Initialize the scope view
         self.inst.write(f':TIM:SCAL {timeScale}')
@@ -53,12 +53,12 @@ class Oscilloscope():
         self.inst.write(':CHAN4:DISP 1')
 
         self.inst.write(f':CHAN1:SCAL {voltageScale}')
-        self.inst.write(f':CHAN1:OFFS {-1 * voltageScale}')
-        self.inst.write(f':CHAN2:SCAL {currentScale}')
-        self.inst.write(f':CHAN2:OFFS {0}')
-        self.inst.write(f':CHAN3:SCAL {diamagneticScale}')
+        self.inst.write(f':CHAN1:OFFS {-4 * voltageScale}')
+        self.inst.write(f':CHAN2:SCAL {interferometerScale}')
+        self.inst.write(f':CHAN2:OFFS {-100e-3}')
+        self.inst.write(f':CHAN3:SCAL {triggerScale}')
         self.inst.write(f':CHAN3:OFFS {0}')
-        self.inst.write(f':CHAN4:SCAL {diamagneticScale}')
+        self.inst.write(f':CHAN4:SCAL {currentScale}')
         self.inst.write(f':CHAN4:OFFS {0}')
 
         # Set up triggering

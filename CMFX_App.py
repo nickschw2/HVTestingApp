@@ -213,7 +213,8 @@ class CMFX_App(TestingApp):
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
-        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeLines}}
+        self.resultsPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeLines},
+                                'Interferometer': {'twinx': False, 'ylabel': 'Interferometer (V)', 'lines': interferometerLines}}
 
         # Frame for displaying the results plots
         self.resultsPlotFrame = ttk.Frame(self.notebookFrames['Results'])
@@ -536,7 +537,7 @@ class CMFX_App(TestingApp):
                 print('Sleeping for 5 seconds to give scope its "me time"')	
                 time.sleep(5)
                 dischargeVoltage = self.scope.get_data(self.scopePins['Discharge Voltage']) * voltageDivider
-                dischargeCurrent = self.scope.get_data(self.scopePins['Discharge Current']) / pearsonCoil
+                # dischargeCurrent = self.scope.get_data(self.scopePins['Discharge Current']) / pearsonCoil
                 # interferometer = self.scope.get_data(self.scopePins['Interferometer'])
                 # trigger = self.scope.get_data(self.scopePins['Trigger'])
                 dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
@@ -555,14 +556,14 @@ class CMFX_App(TestingApp):
             # else:
             #     print('Oscilloscope was not triggered successfully')
 
-            # self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:]
-            # self.interferometer = self.NI_DAQ.dischargeData[1,:]
+            self.dischargeCurrent = self.NI_DAQ.dischargeData[0,:] / pearsonCoil
+            self.interferometer = self.NI_DAQ.dischargeData[1,:]
             # self.diamagneticAxial = self.NI_DAQ.dischargeData[1,:]
             # self.diamagneticRadial = self.NI_DAQ.dischargeData[2,:]
 
             # Transform scope data to be on same timebase as daq
             self.dischargeVoltage = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltage, left=np.nan, right=np.nan)
-            self.dischargeCurrent = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeCurrent, left=np.nan, right=np.nan)
+            # self.dischargeCurrent = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeCurrent, left=np.nan, right=np.nan)
             # self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
             # self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
             # self.interferometer = self.diamagneticRadial
