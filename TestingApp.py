@@ -307,7 +307,7 @@ class TestingApp(ttk.Window):
         if not DEBUG_MODE:
             try:
                 with nidaqmx.Task() as task:
-                    task.do_channels.add_do_chan(f'{discharge_name}/{digitalOutName}/{self.do_Pins[switchName]}')
+                    task.do_channels.add_do_chan(f'{output_name}/{digitalOutName}/{self.do_Pins[switchName]}')
                     task.write(state)
                     print(f'{switchName} in {state} state')
 

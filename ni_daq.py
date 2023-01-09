@@ -13,7 +13,7 @@
 '''
 
 import nidaqmx
-from nidaqmx.constants import (AcquisitionType, Signal, Edge)
+from nidaqmx.constants import (AcquisitionType, Edge, TerminalConfiguration)
 from nidaqmx.stream_readers import (AnalogMultiChannelReader)
 import numpy as np
 from config import *
@@ -63,7 +63,8 @@ class NI_DAQ():
         for name, ai_chan in self.systemStatus_channels.items():
             self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{self.systemStatus_name}/{ai_chan}', 
                                                                    min_val=0.0, max_val=10.0,
-                                                                   name_to_assign_to_channel=name)
+                                                                   name_to_assign_to_channel=name,
+                                                                   terminal_config=TerminalConfiguration.DIFF)
 
         for name, ao_chan in self.charge_ao_channels.items():
             self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{self.output_name}/{ao_chan}',
@@ -107,8 +108,9 @@ class NI_DAQ():
 
         for name, diagnostic in self.diagnostics.items():
             self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}',
-                                                                  min_val=-10.0, max_val=10.0,
-                                                                  name_to_assign_to_channel=name)
+                                                                  min_val=-1.0, max_val=1.0,
+                                                                  name_to_assign_to_channel=name,
+                                                                  terminal_config=TerminalConfiguration.DIFF)
 
         self.task_co = nidaqmx.Task()
         self.tasks.append(self.task_co)
@@ -126,7 +128,7 @@ class NI_DAQ():
         # Create time array for discharge
         n_channels = len(self.diagnostics)
         pretrigger_fraction = 0.1
-        posttrigger_samples = int(maxDischargeFreq * duration) + 1 # Add one to include t=0
+        posttrigger_samples = int(maxDiagnosticsFreq * duration) + 1 # Add one to include t=0
         pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
         pretrigger_duration = duration * pretrigger_fraction
         discharge_samps_per_chan = pretrigger_samples + posttrigger_samples
@@ -143,7 +145,7 @@ class NI_DAQ():
 
         self.dischargeData = np.zeros((n_channels, discharge_samps_per_chan))
 
-        self.task_diagnostics.timing.cfg_samp_clk_timing(maxDischargeFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
+        self.task_diagnostics.timing.cfg_samp_clk_timing(maxDiagnosticsFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
         self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.output_name}/PFI1', pretrigger_samples=pretrigger_samples, trigger_edge=Edge.RISING)
         # self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
 

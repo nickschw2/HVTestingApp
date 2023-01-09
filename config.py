@@ -10,7 +10,7 @@ maxVoltageInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'Discharge Voltage': '1', 'Discharge Current': '4', 'Trigger': '3', 'Interferometer': '2'}
+scopeChannelDefaults = {'Discharge Voltage': '1', 'Trigger': '3'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -28,13 +28,13 @@ systemStatus_defaults = {'Power Supply Voltage': 'ai0',
 do_defaults = {'Load Switch': 'line0',
     'Power Supply Switch': 'line1',
     'Dump Switch': 'line2'}
-diagnostics_defaults = {'Current': 'ai0',
+diagnostics_defaults = {'Discharge Current': 'ai0',
     'Interferometer': 'ai1'}
 charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
 diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3']
-maxDischargeFreq = int(250000 / len(diagnostics_defaults)) # Hz
+maxDiagnosticsFreq = 1000000 # Hz
 
 # Results plot
 # Create a small class to store line label and data so that the data is mutable (unlike namedtuple, for example)
@@ -91,7 +91,7 @@ maxValidGasPuff = 500 # ms
 maxValidDumpDelay = maxValidGasPuff + 1000 # ms
 
 # Discharge timing
-duration = 0.7 # s
+duration = 0.2 # s
 pulse_period = 10.1e-3 # s
 pulse_width = 50e-6 # s
 spectrometer_delay = 0 # s
@@ -109,6 +109,6 @@ pulseGeneratorChans = {'Trigger Input': 0,
 
 # Gas puff is on T0
 pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'loadIgnitron': {'chan': pulseGeneratorChans['B'], 'delay': 495e-3},
+                         'loadIgnitron': {'chan': pulseGeneratorChans['B'], 'delay': 4e-3},
                          'scopeTrigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
-                         'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 300e-3}}
+                         'dumpIgnitron': {'chan': pulseGeneratorChans['D'], 'delay': 100e-3}}

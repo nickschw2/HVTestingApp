@@ -742,6 +742,8 @@ class CMFX_App(TestingApp):
         self.chargeVoltageEntry.delete(0, 'end')
         self.gasPuffEntry.delete(0, 'end')
         self.dumpDelayEntry.delete(0, 'end')
+        self.preShotNotesEntry.text.delete('1.0', 'end')
+        self.postShotNotesEntry.text.delete('1.0', 'end')
 
         # Reset all boolean variables, time, and checklist
         self.charged = False
