@@ -19,13 +19,19 @@ import numpy as np
 from config import *
 
 class NI_DAQ():
-    def __init__(self, systemStatus_name, output_name, discharge_name, systemStatus_sample_rate, systemStatus_channels={}, charge_ao_channels={}, diagnostics={}, n_pulses=None, autostart=True):
+    def __init__(self, systemStatus_sample_rate, systemStatus_name, output_name,
+                 diagnostics_name, diagnostics2_name=None, systemStatus_channels={},
+                 charge_ao_channels={}, diagnostics={}, diagnostics2={},
+                 n_pulses=None, autostart=True):
+        
         self.systemStatus_name = systemStatus_name
         self.output_name = output_name
-        self.discharge_name = discharge_name
+        self.diagnostics_name = diagnostics_name
+        self.diagnostics2_name = diagnostics2_name
         self.systemStatus_channels = systemStatus_channels
         self.charge_ao_channels = charge_ao_channels
         self.diagnostics = diagnostics
+        self.diagnostics2 = diagnostics2
         self.systemStatus_sample_rate = systemStatus_sample_rate
         self.n_pulses = n_pulses
 
@@ -63,8 +69,7 @@ class NI_DAQ():
         for name, ai_chan in self.systemStatus_channels.items():
             self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{self.systemStatus_name}/{ai_chan}', 
                                                                    min_val=0.0, max_val=10.0,
-                                                                   name_to_assign_to_channel=name,
-                                                                   terminal_config=TerminalConfiguration.DIFF)
+                                                                   name_to_assign_to_channel=name)
 
         for name, ao_chan in self.charge_ao_channels.items():
             self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{self.output_name}/{ao_chan}',
@@ -100,18 +105,14 @@ class NI_DAQ():
             self.task_co.stop()
             self.task_co.close()
 
+        # if hasattr(self, 'task_switch'):
+        #     self.tasks.remove(self.task_switch)
+        #     self.task_switch.stop()
+        #     self.task_switch.close()
+                                                 
         '''
-        SET UP DISCHARGE AND COUNTER TASKS
+        COUNTER TASK
         '''
-        self.task_diagnostics = nidaqmx.Task()
-        self.tasks.append(self.task_diagnostics)
-
-        for name, diagnostic in self.diagnostics.items():
-            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.discharge_name}/{diagnostic}',
-                                                                  min_val=-1.0, max_val=1.0,
-                                                                  name_to_assign_to_channel=name,
-                                                                  terminal_config=TerminalConfiguration.DIFF)
-
         self.task_co = nidaqmx.Task()
         self.tasks.append(self.task_co)
 
@@ -123,12 +124,45 @@ class NI_DAQ():
         self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr0', freq=freq, duty_cycle=duty_cycle, initial_delay=spectrometer_delay)
         self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
         self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
-        self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
+        self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+
+        '''
+        DIGITAL OUTPUT TASKS
+        '''
+        # self.task_switch = nidaqmx.Task()
+        # self.tasks.append(self.task_switch)
+
+        # chan0 = self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.diagnostics_name}/ctr0', low_time=0.1, high_time=0.1)
+        # # chan1 = self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.diagnostics_name}/ctr1', low_time=0.05, high_time=0.1)
+
+        # self.task_switch.channels.co_pulse_term = f'/{self.output_name}/PFI6'
+        # # chan0.co_pulse_term = f'/{self.diagnostics_name}/PFI8'
+        # # chan1.co_pulse_term = f'/{self.diagnostics_name}/PFI3'
+
+        # self.task_switch.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=1)        
+        # self.task_switch.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
+
+        '''
+        DIAGNOSTICS TASK
+        '''
+        self.task_diagnostics = nidaqmx.Task() 
+        self.tasks.append(self.task_diagnostics)
+
+        for name, diagnostic in self.diagnostics.items():
+            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.diagnostics_name}/{diagnostic}',
+                                                                  min_val=-10.0, max_val=10.0,
+                                                                  name_to_assign_to_channel=name)
+            
+        if self.diagnostics2_name != None:
+            for name, diagnostic in self.diagnostics2.items():
+                self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.diagnostics2_name}/{diagnostic}',
+                                                                    min_val=-10.0, max_val=10.0,
+                                                                    name_to_assign_to_channel=name)
 
         # Create time array for discharge
-        n_channels = len(self.diagnostics)
+        n_channels = len(self.diagnostics) + len(self.diagnostics2)
         pretrigger_fraction = 0.1
-        posttrigger_samples = int(maxDiagnosticsFreq * duration) + 1 # Add one to include t=0
+        posttrigger_samples = int(sample_freq * duration) + 1 # Add one to include t=0
         pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
         pretrigger_duration = duration * pretrigger_fraction
         discharge_samps_per_chan = pretrigger_samples + posttrigger_samples
@@ -142,19 +176,45 @@ class NI_DAQ():
         else:
             self.tUnit = 's'
 
-
         self.dischargeData = np.zeros((n_channels, discharge_samps_per_chan))
 
-        self.task_diagnostics.timing.cfg_samp_clk_timing(maxDiagnosticsFreq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
-        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.output_name}/PFI1', pretrigger_samples=pretrigger_samples, trigger_edge=Edge.RISING)
+        self.task_diagnostics.timing.cfg_samp_clk_timing(sample_freq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
+        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.diagnostics_name}/PFI0', pretrigger_samples=pretrigger_samples, trigger_edge=Edge.RISING)
         # self.task_diagnostics.register_signal_event(Signal.SAMPLE_COMPLETE, self.read_discharge)
 
         self.discharge_reader = AnalogMultiChannelReader(self.task_diagnostics.in_stream)
 
         self.dischargeTriggered = False
 
+        '''START TASKS'''
         self.task_diagnostics.start()
         self.task_co.start()
+        # self.task_switch.start()
+
+    def setup_switch(self, chan):
+        # self.task_switch = nidaqmx.Task()
+        # self.tasks.append(self.task_switch)
+
+        # # self.task_switch.do_channels.add_do_chan(f'{self.output_name}/PFI5')
+        # self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.diagnostics_name}/ctr0', low_time=0.1, high_time=0.1)
+        # self.task_switch.channels.co_pulse_term = f'/{self.output_name}/PFI6'
+        # self.task_switch.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=1)  
+        # self.task_switch.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
+        # # self.task_switch.write(True, autostart=False)
+
+        self.task_switch = nidaqmx.Task()
+        self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.output_name}/ctr0', low_time=0.1, high_time=0.1)
+        self.task_switch.channels.co_pulse_term = f'/{self.output_name}/PFI5'
+        self.task_switch.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=1)
+        self.task_switch.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
+
+        # self.task = nidaqmx.Task()
+        # self.task.do_channels.add_do_chan(f'{self.output_name}/PFI5')
+        # self.task.timing.cfg_samp_clk_timing(1000, source=f'{self.output_name}/ai/SampleClock', sample_mode=AcquisitionType.CONTINUOUS)
+
+        # self.dummy_task = nidaqmx.Task()
+        # self.dummy_task.ai_channels.add_ai_voltage_chan(f'{self.output_name}/ai0')
+        # self.dummy_task.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
 
     def write_value(self, value):
         self.task_charge_ao.write(value, timeout=2)

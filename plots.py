@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import ttkbootstrap as ttk
 from constants import *
 from ttkbootstrap.themes import standard
+import numpy as np
 
 # Change color cycler for dark mode
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=color_palette) 
@@ -140,3 +141,238 @@ class CustomToolbar(NavigationToolbar2Tk):  # subclass NavigationToolbar2Tk
         if hasattr(self, "lastrect"):
             self.canvas._tkcanvas.delete(self.lastrect)
         self.lastrect = self.canvas._tkcanvas.create_rectangle(x0, y0, x1, y1, outline=theme_colors['primary'])
+
+class PlotViewer(ttk.Frame):
+    def __init__(self, master, plotData, **kwargs):
+
+        super().__init__(master)
+        self.master = master
+        self.plotData = plotData
+
+        # Frame for displaying the plots
+        self.plotFrame = ttk.Frame(self.master)
+        self.plotFrame.pack(side='right', expand=True, padx=plotPadding)
+
+        # Add plot and toolbar to frame
+        # There are currently two viewing modes, one with single plots and one with subplots
+        self.plotSingle = CanvasPlot(self.plotFrame, figsize=(10, 4))
+        nrows_subplots = int(np.ceil(len(self.plotData) / 2))
+        self.plotSubplots = CanvasPlot(self.plotFrame, nrows=nrows_subplots, ncols=2, figsize=(12, 6))
+
+        self.plotToolbar = CustomToolbar(self.plotSingle.canvas, self.plotFrame)
+        self.plotSubplotsToolbar = CustomToolbar(self.plotSubplots.canvas, self.plotFrame)
+        self.plotToolbar.update()
+        self.plotSubplotsToolbar.update()
+
+        self.plotSingle.pack(side='top', expand=True)
+        self.plotSubplots.pack(side='top', expand=True)
+
+        # Frame for adjusting all aspects of the plot view
+        self.viewFrame = ttk.Frame(self.master)
+        self.viewFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+
+        # Frame for selecting which plots to show
+        self.radioFrame = ttk.LabelFrame(self.viewFrame, text='View Style', bootstyle='primary')
+        self.radioFrame.pack(side='top', expand=True, pady=(0, framePadding))
+
+        # Radio buttons for choosing which display style to show
+        self.plotView = ttk.IntVar()
+        self.plotView.set(0) # initialize view
+        singleRadiobutton = ttk.Radiobutton(self.radioFrame, text='Single', variable=self.plotView, value=0, command=lambda: self.replot(singleRadiobutton))
+        subplotsRadiobutton = ttk.Radiobutton(self.radioFrame, text='Subplots', variable=self.plotView, value=1, command=lambda: self.replot(subplotsRadiobutton))
+
+        singleRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
+        subplotsRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
+
+        # Frame for selecting which plots to show
+        self.selectorFrame = ttk.LabelFrame(self.viewFrame, text='Plot Selector', bootstyle='primary')
+        self.selectorFrame.pack(side='top', expand=True)
+
+        # Selector for showing a certain plot
+        plotOptions = list(self.plotData.keys())
+        self.plotCombobox = ttk.Combobox(self.selectorFrame, value=plotOptions, state='readonly', bootstyle='primary', **text_opts)
+        self.plotCombobox.current(0) # Initializes the current value to first option
+        self.plotCombobox.bind('<<ComboboxSelected>>', self.replot)
+        self.plotCombobox.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
+
+        # Initialize checkbuttons
+        self.checkbuttons = {}
+        for plotOption, plotProperties in self.plotData.items():
+            # Need to create a dictionary for each checkbutton corresponding to its label
+            self.checkbuttons[plotOption] = {}
+            for line in plotProperties['lines'].values():
+                checkbutton = ttk.Checkbutton(self.selectorFrame, text=line.label)
+                checkbutton.invoke() # Initialize it to be turned on
+                checkbutton.bind('<Button>', self.replot)
+                self.checkbuttons[plotOption][line.label] = checkbutton
+
+        
+        # Preset discharge timing
+        self.dischargeTime = []
+        self.dischargeTimeUnit = 's'
+        
+        self.replot()
+
+    def replot(self, event=None):
+        # Have to do some weird logic because tkinter doesn't have virtual events
+        # for Radiobuttons, but does for comboboxes
+        if event == None:
+            eventType = None
+        elif isinstance(event, ttk.Radiobutton):
+            eventType = ttk.Radiobutton
+        elif isinstance(event.widget, ttk.Combobox):
+            eventType = ttk.Combobox
+        elif isinstance(event.widget, ttk.Checkbutton):
+            eventType = ttk.Checkbutton
+        else:
+            eventType = None
+
+        # Get timing from grandparent (CMFX_App)
+        if hasattr(self.master.master.master, 'dischargeTime'):
+            self.dischargeTime = self.master.master.master.dischargeTime
+            self.dischargeTimeUnit = self.master.master.master.dischargeTimeUnit
+
+        def setup_plots(plotSelection, ax):
+            # Change plot to new selection
+                plotProperties = self.plotData[plotSelection]
+                ax.set_title(f'{plotSelection}')
+                ax.set_xlabel(f'Time ({self.dischargeTimeUnit})')
+                ax.set_prop_cycle(None) # Reset the color cycle
+                
+                # Remove extra twinx in single plot
+                while len(self.plotSingle.fig.axes) > 1:
+                    self.plotSingle.fig.axes[1].remove()
+
+                # Add twin axis if specified
+                if not plotProperties['twinx']:
+                    ax.set_ylabel(plotProperties['ylabel'])
+                else:
+                    twin_ax = ax.twinx()
+                    twin_ax.grid(False)
+                    ax.set_ylabel(plotProperties['ylabel'][0])
+                    twin_ax.set_ylabel(plotProperties['ylabel'][1])
+
+                # Some place to store the current lines on the plot to change visibility later
+                # Don't reset currentLines if we're just switching the view to/from subplots
+                if eventType != ttk.Radiobutton:
+                    self.currentLines = {}
+                handles = []    
+                labels = []
+                for i, line in enumerate(plotProperties['lines'].values()):
+                    if eventType == ttk.Radiobutton:
+                        visible = True
+                    else:
+                        checkbuttons = self.checkbuttons[plotSelection]
+                        visible = checkbuttons[line.label].instate(['selected'])
+
+                    # try:
+                    # Check for twin axis
+                    if not plotProperties['twinx']:
+                        handle = ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
+                    # Plot second line on twin axis
+                    # Can only have a twin axis when there are two lines and no more
+                    else:
+                        if i == 0:
+                            handle = ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
+                        elif i == 1:
+                            # Skip first color
+                            next(twin_ax._get_lines.prop_cycler)
+                            handle = twin_ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
+                        elif i == 2:
+                            # Skip first two color
+                            next(twin_ax._get_lines.prop_cycler)
+                            next(twin_ax._get_lines.prop_cycler)
+                            handle = twin_ax.plot(self.dischargeTime, line.data, label=line.label, visible=visible)
+
+                    if eventType != ttk.Radiobutton:
+                        self.currentLines[line.label] = handle[0]
+                    handles.append(handle[0])
+                    labels.append(line.label)
+                    # except ValueError:
+                    #     print(f'Plotting failed on {line.label}.')
+
+                # Get all labels onto one legend even if there's a twin axis
+                ax.legend(handles, labels)            
+
+        # Combobox selection
+        if self.plotView.get() == 0:
+            # Remove subplots and add single view
+            self.plotSubplots.pack_forget()
+            self.plotSubplotsToolbar.pack_forget()
+            self.plotSingle.pack(side='top', expand=True)
+            self.plotToolbar.pack(side='bottom', fill='x')
+
+            # Enable combobox
+            self.plotCombobox.configure(state='readonly')
+
+            # Get value of combobox and associated checkbuttons
+            plotSelection = self.plotCombobox.get()
+            checkbuttons = self.checkbuttons[plotSelection]
+
+            # Enable checkbutons
+            for checkbutton in checkbuttons.values():
+                checkbutton.configure(state='enabled')
+
+            # Need to tell if event came from the combobox or a checkbutton
+            # event==None is for dummy variable instantiation
+            if eventType == None or eventType == ttk.Combobox:
+                # Remove current checkbuttons
+                for widget in self.selectorFrame.winfo_children():
+                    if isinstance(widget, ttk.Checkbutton) and widget.winfo_ismapped():
+                        widget.pack_forget()
+
+                # Remove current lines from plot
+                self.plotSingle.clearFigLines()
+
+                # Change checkbuttons to new selection
+                for checkbutton in checkbuttons.values():
+                    checkbutton.pack(expand=True, anchor='w', padx=framePadding, pady=setPinsPaddingY)
+
+                ax = self.plotSingle.ax
+                setup_plots(plotSelection, ax)
+
+            # Change visibility of line when the checkbutton for that line is changed
+            elif eventType == ttk.Checkbutton:
+                label = event.widget.cget('text')
+                line = self.currentLines[label]
+                visible = checkbuttons[label].instate(['!selected'])
+                line.set_visible(visible)
+
+                handles = self.currentLines.values()
+                labels = self.currentLines.keys()
+
+                self.plotSingle.ax.legend(handles, labels)
+
+            # Update plot
+            self.plotSingle.updatePlot()
+
+        # Radiobutton selection
+        elif self.plotView.get() == 1:
+            # Remove single view and add subplots view
+            self.plotSingle.pack_forget()
+            self.plotToolbar.pack_forget()
+            self.plotSubplots.pack(side='top', expand=True)
+            self.plotSubplotsToolbar.pack(side='bottom', fill='x')
+
+            # Disable combobox
+            self.plotCombobox.configure(state='disabled')
+
+            # Remove last subplot if there is an odd number
+            if len(self.plotData) % 2 != 0:
+                self.plotSubplots.fig.axes[-1].axis('off')
+
+            for i, plotSelection in enumerate(self.plotData):
+                # Disable check buttons
+                checkbuttons = self.checkbuttons[plotSelection]
+                for checkbutton in checkbuttons.values():
+                    checkbutton.configure(state='disabled')
+
+                ax = self.plotSubplots.fig.axes[i]
+                setup_plots(plotSelection, ax)
+
+            # Update plot
+            self.plotSubplots.updatePlot()
+
+        if eventType == None or eventType == ttk.Radiobutton:
+            # Heirarchy: PlotViewer --> Notebook --> CMFX_App
+            self.master.master.master.center_app()

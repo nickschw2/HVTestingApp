@@ -64,6 +64,9 @@ fitLine = mlines.Line2D([], [], color=fitColor, linestyle='-', label='V$_{fit}$'
 chargeHandles = [voltageLine, capacitorLine, currentLine]
 dischargeHandles = [voltageLine, currentLine]
 
+# Analysis of data
+cutoff_freq = 10000 # Hz
+
 single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'runNumber': {'name': 'Run Number', 'type': 'scalar'},
     'runDate': {'name': 'Run Date', 'type': 'scalar'},
@@ -90,9 +93,17 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'dischargeTimeUnit': {'name': 'Discharge Time Unit', 'type': 'scalar'},
     'dischargeVoltage': {'name': 'Discharge Voltage (V)', 'type': 'array'},
     'dischargeCurrent': {'name': 'Discharge Current (A)', 'type': 'array'},
+    'dumpCurrent': {'name': 'Dump Current (A)', 'type': 'array'},
+    'groundCurrent': {'name': 'Ground Current (A)', 'type': 'array'},
     'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
-    'diamagneticAxial': {'name': 'Diamagnetic Axial (V)', 'type': 'array'},
-    'diamagneticRadial': {'name': 'Diamagnetic Radial (V)', 'type': 'array'},
+    'DIA01': {'name': 'DIA01 (V)', 'type': 'array'},
+    'DIA02': {'name': 'DIA02 (V)', 'type': 'array'},
+    'DIA03': {'name': 'DIA03 (V)', 'type': 'array'},
+    'DIA04': {'name': 'DIA04 (V)', 'type': 'array'},
+    'BR01': {'name': 'BR01 (V)', 'type': 'array'},
+    'BR02': {'name': 'BR02 (V)', 'type': 'array'},
+    'BR03': {'name': 'BR03 (V)', 'type': 'array'},
+    'BR04': {'name': 'BR04 (V)', 'type': 'array'},
     'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
     'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}
 

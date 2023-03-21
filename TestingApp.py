@@ -9,7 +9,6 @@ import os
 import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
-from scipy.ndimage import uniform_filter1d
 import datetime
 from threading import Thread
 from constants import *
@@ -21,6 +20,7 @@ from ni_daq import *
 from timer import *
 from gpib import *
 from console import *
+from analysis import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -45,9 +45,11 @@ class TestingApp(ttk.Window):
         style.configure('TCheckbutton', **text_opts)
         self.option_add('*TCombobox*Listbox.font', text_opts)
         
-        # Special code for styling big red button
-        style.configure('big.TButton', font=(None, 24,), justify='center', background=self.colors.danger)
-        style.map('big.TButton', background=[('active', '#bc0303')])
+        # Special code for styling big buttons
+        style.configure('bigRed.TButton', font=(None, 24,), justify='center', background=self.colors.danger)
+        style.configure('bigOrange.TButton', font=(None, 24,), justify='center', background=self.colors.warning)
+        style.map('bigRed.TButton', background=[('active', '#e74c3c')])
+        style.map('bigOrange.TButton', background=[('active', '#f39c12')])
 
         # Initialize pins to default values
         self.scopePins = scopeChannelDefaults
@@ -55,6 +57,7 @@ class TestingApp(ttk.Window):
         self.systemStatus_Pins = systemStatus_defaults
         self.do_Pins = do_defaults
         self.diagnostics_Pins = diagnostics_defaults
+        self.diagnostics2_Pins = diagnostics2_defaults
 
     def center_app(self):
         self.update_idletasks()
@@ -74,27 +77,30 @@ class TestingApp(ttk.Window):
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
     def init_DAQ(self):
         # We need both an analog input and output
-        self.NI_DAQ = NI_DAQ(systemStatus_name, output_name, discharge_name, systemStatus_sample_rate,
+        self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_name, output_name, diagnostics_name,
+                             diagnostics2_name=diagnostics2_name,
                              systemStatus_channels=self.systemStatus_Pins,
                              charge_ao_channels=self.charge_ao_Pins,
-                             diagnostics=self.diagnostics_Pins)
+                             diagnostics=self.diagnostics_Pins,
+                             diagnostics2=self.diagnostics2_Pins,
+                             n_pulses=n_pulses)
 
         # Discharge the power supply on startup
         self.powerSupplyRamp(action='discharge')
 
         # Initialize the scope over ethernet
-        try:
-            self.scope = Oscilloscope()
-        except visa.errors.VisaIOError:
-            scopeErrorName = 'Oscilloscope Connection'
-            scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
-            scopeErrorWindow = MessageWindow(self, scopeErrorName, scopeErrorText)
+        # try:
+        #     self.scope = Oscilloscope()
+        # except visa.errors.VisaIOError:
+        #     scopeErrorName = 'Oscilloscope Connection'
+        #     scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
+        #     scopeErrorWindow = MessageWindow(self, scopeErrorName, scopeErrorText)
 
-            scopeErrorWindow.wait_window()
+        #     scopeErrorWindow.wait_window()
 
-            # If the user presses the Okay button, charging begins
-            if scopeErrorWindow.OKPress:
-                self.on_closing()
+        #     # If the user presses the Okay button, charging begins
+        #     if scopeErrorWindow.OKPress:
+        #         self.on_closing()
 
     def init_PulseGenerator(self):
         self.pulseGenerator = PulseGenerator()
@@ -191,8 +197,8 @@ class TestingApp(ttk.Window):
 
             self.replotCharge()
 
-            self.setResultsData()
-            self.replotResults(None)
+            self.setData(self.resultsPlotData)
+            self.resultsPlotViewer.replot()
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -237,6 +243,7 @@ class TestingApp(ttk.Window):
         systemStatus_PinsOptions = selectPins(systemStatus_defaults, systemStatus_options)
         do_PinsOptions = selectPins(do_defaults, do_options)
         diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
+        diagnostics2_PinsOptions = selectPins(diagnostics2_defaults, diagnostics_options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -252,17 +259,22 @@ class TestingApp(ttk.Window):
 
             for channel in systemStatus_PinsOptions:
                 self.systemStatus_Pins[channel] = systemStatus_PinsOptions[channel].get()
+
             for channel in do_PinsOptions:
                 self.do_Pins[channel] = do_PinsOptions[channel].get()
 
             for channel in diagnostics_PinsOptions:
                 self.diagnostics_Pins[channel] = diagnostics_PinsOptions[channel].get()
 
+            for channel in diagnostics2_PinsOptions:
+                self.diagnostics2_Pins[channel] = diagnostics2_PinsOptions[channel].get()
+
             print(self.scopePins)
             print(self.charge_ao_Pins)
             print(self.systemStatus_Pins)
             print(self.do_Pins)
             print(self.diagnostics_Pins)
+            print(self.diagnostics2_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
@@ -343,12 +355,12 @@ class TestingApp(ttk.Window):
             self.idleMode = False
 
             # Operate switches
-            self.operateSwitch('Dump Switch', False)
-            self.operateSwitch('Load Switch', True)
+            self.operateSwitch('Load Switch', False)
+            self.operateSwitch('Dump Switch', True)
             time.sleep(switchWaitTime)
             self.operateSwitch('Power Supply Switch', True)
             # LASER TEST	
-            # self.operateSwitch('Dump Switch', True)	
+            # self.operateSwitch('Load Switch', True)	
             # self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
@@ -382,7 +394,7 @@ class TestingApp(ttk.Window):
                 # Operate switches
                 self.operateSwitch('Power Supply Switch', False)
                 time.sleep(switchWaitTime)
-                self.operateSwitch('Load Switch', False)
+                self.operateSwitch('Dump Switch', False)
 
                 self.charging = False
                 self.discharged = True
@@ -392,43 +404,35 @@ class TestingApp(ttk.Window):
                 # Read from DAQ
                 self.NI_DAQ.read_discharge()
 
-                # Save discharge on a separate thread	
-                print('Saving discharge...')
-                # self.saveDischarge()
+                # Save discharge on a separate thread
                 self.saveDischarge_thread = Thread(target=self.saveDischarge)
                 self.saveDischarge_thread.start()
-                print('Discharge saved')
 
         if not self.idleMode:
             if not self.charged:
                 popup()
 
             else:
-                # startTime = time.time()
-                # print(startTime)
-                # self.operateSwitch('Load Switch', False)
-                # print(f'Switch close time: {time.time() - startTime}')
-                # time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
-                # print(f'gas puff wait time: {time.time() - startTime}')
+                self.operateSwitch('Load Switch', True)
+                time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
                 self.pulseGenerator.triggerStart()
-                # print(f'trigger start time: {time.time() - startTime}')
+
+                time.sleep(self.dumpDelay / 1000)
+                self.operateSwitch('Dump Switch', False)
 
                 # Read from DAQ
                 self.NI_DAQ.read_discharge()
 
                 # Wait a while before closing the mechanical dump switch
-                time.sleep(hardCloseWaitTime)	
-                self.operateSwitch('Load Switch', False)
+                # time.sleep(hardCloseWaitTime)	
+                # self.operateSwitch('Dump Switch', False)
                 
                 self.charging = False
                 self.discharged = True
 
                 # Save discharge on a separate thread	
-                print('Saving discharge...')
-                # self.saveDischarge()
                 self.saveDischarge_thread = Thread(target=self.saveDischarge)
                 self.saveDischarge_thread.start()
-                print('Discharge saved')
 
         else:
             popup()
@@ -445,20 +449,17 @@ class TestingApp(ttk.Window):
         # If the capacitor is only being read every so often, only plot non nan values
         try:
             nanIndices = np.isnan(self.capacitorVoltage)
-            if hasattr(self, 'capacitorVoltageFiltered'):
-                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltageFiltered / 1000)
-            else:
-                self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
+            self.capacitorVoltageLine.set_data(self.chargeTime[~nanIndices], self.capacitorVoltage[~nanIndices] / 1000)
         except IndexError:
             print('Mismatch in shape')
 
         if self.timePoint + 0.2 * plotTimeLimit > plotTimeLimit:
-            self.chargePlot.ax.set_xlim(self.timePoint - plotTimeLimit, self.timePoint + 0.2 * plotTimeLimit)
+            self.chargePlot.ax.set_xlim(self.timePoint - 0.8 * plotTimeLimit, self.timePoint + 0.2 * plotTimeLimit)
         else:
             self.chargePlot.ax.set_xlim(0, plotTimeLimit)
 
-        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.chargeVoltagePS) / 1000 > voltageYLim:
-            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.chargeVoltagePS) / 1000)
+        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.capacitorVoltage) / 1000 > voltageYLim:
+            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.capacitorVoltage) / 1000)
 
         try:
             self.bm.update()
@@ -477,8 +478,8 @@ class TestingApp(ttk.Window):
         # Operate switches
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
-        self.operateSwitch('Dump Switch', False)
         self.operateSwitch('Load Switch', False)
+        self.operateSwitch('Dump Switch', False)
 
         self.charging = False
         self.discharged = True
@@ -539,11 +540,11 @@ class TestingApp(ttk.Window):
     def on_closing(self):
         self.powerSupplyRamp(action='discharge')
 
-        # Open power supply and Dump Switch and close load switch
+        # Open power supply and Cap Switch and close load switch
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
-        self.operateSwitch('Load Switch', False)
         self.operateSwitch('Dump Switch', False)
+        self.operateSwitch('Load Switch', False)
 
         if not DEBUG_MODE:
             # Stop NI communication
@@ -573,7 +574,7 @@ class TestingApp(ttk.Window):
             if channel == 'Load Voltage':
                 dataarray *= voltageDivider
             elif channel == 'Load Current':
-                dataarray /= pearsonCoil
+                dataarray /= pearsonCoilDischarge
             else:
                 print('Incorrect channel chosen')
 
@@ -623,7 +624,7 @@ class TestingApp(ttk.Window):
         time = np.linspace(0, 1, 100)
         tUnit = 's'
         voltage = self.chargeVoltage * voltageDivider * np.exp( - time / RCTime)
-        current = pearsonCoil * np.exp( - time / RCTime)
+        current = pearsonCoilDischarge * np.exp( - time / RCTime)
         return (voltage, current, time, tUnit)
 
     # Popup window for help
