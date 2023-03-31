@@ -25,7 +25,7 @@ digitalOutName = 'port0'
 charge_ao_defaults = {'Power Supply Output': 'ao0'} # analog outputs
 systemStatus_defaults = {'Power Supply Voltage': 'ai0',
                          'Power Supply Current': 'ai1',
-                         'Capacitor Voltage': 'ai3'} # analog inputs
+                         'Capacitor Voltage': 'ai2'} # analog inputs
 do_defaults = {'Power Supply Switch': 'line0',
                'Dump Switch': 'line1',
                'Load Switch': 'line2'}
@@ -69,6 +69,8 @@ BRLines = {'BR01': Line('BR01', []),
            'BR03': Line('BR03', []),
            'BR04': Line('BR04', [])}
 
+dischargeAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', []),
+                          'dischargeCurrentFiltered': Line('Current', [])}
 diamagneticAnalysisLines = {'DIA01Density': Line('DIA01', []),
                             'DIA02Density': Line('DIA02', []),
                             'DIA03Density': Line('DIA03', []),

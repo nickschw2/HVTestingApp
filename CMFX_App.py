@@ -216,7 +216,8 @@ class CMFX_App(TestingApp):
 
         #### ANALYSIS SECTION ####
         # Initialize the data structure to hold results plot
-        self.analysisPlotData = {'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines}}
+        self.analysisPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeAnalysisLines},
+                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines}}
         
         self.analysisPlotViewer = PlotViewer(self.notebookFrames['Analysis'], self.analysisPlotData)
 
@@ -492,13 +493,15 @@ class CMFX_App(TestingApp):
 
     def performAnalysis(self):
         print('Performing analysis...')
-        analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit)
+        analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent)
+        self.dischargeVoltageFiltered = analysis.voltage
+        self.dischargeCurrentFiltered = analysis.current
 
         # Diamagnetic loops
         for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
             densityVariable = f'{variable}Density'
             signal = line.data
-            density = analysis.analyzeDiamagnetic(signal)
+            density = analysis.get_diamagneticDensity(signal)
             setattr(self, densityVariable, density)
 
         self.setData(self.analysisPlotData)

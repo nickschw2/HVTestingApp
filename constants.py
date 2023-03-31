@@ -66,6 +66,21 @@ dischargeHandles = [voltageLine, currentLine]
 
 # Analysis of data
 cutoff_freq = 10000 # Hz
+m_p = 1.673e-27 # proton mass (kg)
+A = 1 # Atomic mass number
+m_i = m_p * A 
+
+# Diamagnetic constants
+N_turns = 16
+B0 = 3.0 # background magnetic field (T)
+d_r = 0.05 # distance of magnetic shift (m)
+chamber_radius = 0.3513 # Inner radius of chamber (m)
+plasma_radius = 0.2363 # Plasma radius (m)
+
+
+
+# Physics constants
+mu0 = 1.2566e-6 # Vaccum permeability (H/m)
 
 single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'runNumber': {'name': 'Run Number', 'type': 'scalar'},

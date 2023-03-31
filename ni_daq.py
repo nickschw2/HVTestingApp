@@ -132,6 +132,14 @@ class NI_DAQ():
         # self.task_switch = nidaqmx.Task()
         # self.tasks.append(self.task_switch)
 
+        # self.task_switch.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/line4')
+        # self.task_switch.timing.cfg_samp_clk_timing(rate=1000, source="OnboardClock", active_edge=Edge.RISING, sample_mode=AcquisitionType.FINITE, samps_per_chan=100)      
+        # self.task_switch.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+        # self.task_switch.write([0, 15])
+
+        # self.task_switch = nidaqmx.Task()
+        # self.tasks.append(self.task_switch)
+
         # chan0 = self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.diagnostics_name}/ctr0', low_time=0.1, high_time=0.1)
         # # chan1 = self.task_switch.co_channels.add_co_pulse_chan_time(f'{self.diagnostics_name}/ctr1', low_time=0.05, high_time=0.1)
 
