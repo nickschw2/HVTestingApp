@@ -75,7 +75,8 @@ N_turns = 16
 B0 = 3.0 # background magnetic field (T)
 d_r = 0.05 # distance of magnetic shift (m)
 chamber_radius = 0.3513 # Inner radius of chamber (m)
-plasma_radius = 0.2363 # Plasma radius (m)
+plasma_radius_outer = 0.2363 # Plasma radius (m)\
+plasma_radius_inner = 0.05 # Plasma radius (m)
 
 
 
@@ -110,7 +111,8 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'dischargeCurrent': {'name': 'Discharge Current (A)', 'type': 'array'},
     'dumpCurrent': {'name': 'Dump Current (A)', 'type': 'array'},
     'groundCurrent': {'name': 'Ground Current (A)', 'type': 'array'},
-    'interferometer': {'name': 'Interferometer (V)', 'type': 'array'},
+    'INT01': {'name': 'INT01 (V)', 'type': 'array'},
+    'INT02': {'name': 'INT01 (V)', 'type': 'array'},
     'DIA01': {'name': 'DIA01 (V)', 'type': 'array'},
     'DIA02': {'name': 'DIA02 (V)', 'type': 'array'},
     'DIA03': {'name': 'DIA03 (V)', 'type': 'array'},
@@ -119,6 +121,7 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'BR02': {'name': 'BR02 (V)', 'type': 'array'},
     'BR03': {'name': 'BR03 (V)', 'type': 'array'},
     'BR04': {'name': 'BR04 (V)', 'type': 'array'},
+    'Trigger': {'name': 'Trigger (V)', 'type': 'array'},
     'preShotNotes': {'name': 'Pre-Shot Notes', 'type': 'scalar'},
     'postShotNotes': {'name': 'Post-Shot Notes', 'type': 'scalar'}}
 

@@ -9,6 +9,7 @@ When reset, the results plot shows up immediately
 After resetting a second time, it does charge? Or at least nothing shows up on the plot
 Need to allow for plotting of more than one line on twinx
 Need to figure out weird zoom effect on single plots
+The digital filter trigger enable is not working
 '''
 
 if __name__ == "__main__":

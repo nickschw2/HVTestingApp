@@ -209,14 +209,14 @@ class CMFX_App(TestingApp):
         self.resultsPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (kV)', 'lines': voltageLines},
                                 'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentLines},
                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Diamagnetic (V)', 'lines': diamagneticLines},
-                                'BR': {'twinx': False, 'ylabel': 'B_$R$ (V)', 'lines': BRLines},
-                                'Interferometer': {'twinx': False, 'ylabel': 'Interferometer (V)', 'lines': interferometerLines}}
+                                'Trigger': {'twinx': False, 'ylabel': 'Trigger (V)', 'lines': triggerLines}}
         
         self.resultsPlotViewer = PlotViewer(self.notebookFrames['Results'], self.resultsPlotData)
 
         #### ANALYSIS SECTION ####
         # Initialize the data structure to hold results plot
-        self.analysisPlotData = {'Discharge': {'twinx': True, 'ylabel': ['Voltage (kV)', 'Current (A)'], 'lines': dischargeAnalysisLines},
+        self.analysisPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (kV)', 'lines': voltageAnalysisLines},
+                                 'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentAnalysisLines},
                                  'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines}}
         
         self.analysisPlotViewer = PlotViewer(self.notebookFrames['Analysis'], self.analysisPlotData)
@@ -360,7 +360,7 @@ class CMFX_App(TestingApp):
             # Set the scale on the oscilloscope based on inputs
             # if not DEBUG_MODE:
             #     # self.scope.setScale(self.chargeVoltage)
-            #     self.pulseGenerator.setDelay(pulseGeneratorOutputs['dumpIgnitron']['chan'], self.dumpDelay / 1000)
+                # self.pulseGenerator.setDelay(pulseGeneratorOutputs['ignitron']['chan'], self.dumpDelay / 1000)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -494,15 +494,17 @@ class CMFX_App(TestingApp):
     def performAnalysis(self):
         print('Performing analysis...')
         analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent)
-        self.dischargeVoltageFiltered = analysis.voltage
+        self.dischargeVoltageFiltered = analysis.voltage / 1000
         self.dischargeCurrentFiltered = analysis.current
+        self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent, cutoff_freq)
 
         # Diamagnetic loops
         for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
-            densityVariable = f'{variable}Density'
-            signal = line.data
-            density = analysis.get_diamagneticDensity(signal)
-            setattr(self, densityVariable, density)
+            if hasattr(self, variable):
+                densityVariable = f'{variable}Density'
+                signal = line.data
+                density = analysis.get_diamagneticDensity(signal)
+                setattr(self, densityVariable, density)
 
         self.setData(self.analysisPlotData)
         print('Analysis complete!')
@@ -597,6 +599,16 @@ class CMFX_App(TestingApp):
             for variable, description in single_columns.items():
                 if description['type'] == 'array' and hasattr(self, variable):
                     setattr(self, variable, np.array([]))
+
+            # Reset all analysis variables to empty array
+            for plotData in self.analysisPlotData.values():
+                for variable in plotData['lines'].keys():
+                    setattr(self, variable, np.array([]))
+
+                if description['type'] == 'array' and hasattr(self, variable):
+                    setattr(self, variable, np.array([]))
+
+            #### NEED TO RESET THE ANAL YSIS DATA FOR THE RESET BUTTON TO WORK ####
 
             self.setData(self.resultsPlotData)
             self.setData(self.analysisPlotData)

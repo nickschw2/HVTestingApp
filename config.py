@@ -20,15 +20,15 @@ pulseGeneratorGPIBAddress = 15
 output_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
 systemStatus_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
 diagnostics_name = 'PXI1Slot4' # The name of the DAQ device as shown in MAX
-diagnostics2_name = None # The name of the DAQ device as shown in MAX
+diagnostics2_name = 'PXI1Slot5' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
 charge_ao_defaults = {'Power Supply Output': 'ao0'} # analog outputs
 systemStatus_defaults = {'Power Supply Voltage': 'ai0',
                          'Power Supply Current': 'ai1',
                          'Capacitor Voltage': 'ai2'} # analog inputs
-do_defaults = {'Power Supply Switch': 'line0',
+do_defaults = {'Load Switch': 'line0',
                'Dump Switch': 'line1',
-               'Load Switch': 'line2'}
+               'Power Supply Switch': 'line2'}
 diagnostics_defaults = {'dischargeCurrent': 'ai0',
                         'dumpCurrent': 'ai1',
                         'DIA01': 'ai2',
@@ -36,16 +36,18 @@ diagnostics_defaults = {'dischargeCurrent': 'ai0',
                         'DIA03': 'ai4',
                         'dischargeVoltage': 'ai5',
                         'DIA04': 'ai6',
-                        'BR01': 'ai7'}
-diagnostics2_defaults = {'BR02': 'ai0',
-                         'BR03': 'ai1',
-                         'BR04': 'ai2',}
-diagnostics2_defaults = {}
+                        'trigger': 'ai7'}
+diagnostics2_defaults = {'BR01': 'ai0',
+                         'BR02': 'ai1',
+                         'BR03': 'ai2',
+                         'BR04': 'ai3'}
+# diagnostics2_defaults = {}
 charge_ao_options = ['ao0', 'ao1']
 systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
 do_options = ['line0', 'line1', 'line2', 'line3']
 diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5', 'ai6', 'ai7']
-sample_freq = 1000000 # Hz
+samp_freq = 1000000 # Frequency for acquiring data [Hz]
+switch_samp_freq = 1000 # Frequency for triggering switches [Hz]
 
 # Results plot
 # Create a small class to store line label and data so that the data is mutable (unlike namedtuple, for example)
@@ -59,7 +61,8 @@ class Line:
 voltageLines = {'dischargeVoltage': Line('Voltage', [])}
 currentLines = {'dischargeCurrent': Line('Dis. Current', []),
                 'dumpCurrent': Line('Dump Current', [])}
-interferometerLines = {'interferometer': Line('Central', [])}
+interferometerLines = {'INT01': Line('INT01', []),
+                       'INT02': Line('INT02', [])}
 diamagneticLines = {'DIA01': Line('DIA01', []),
                     'DIA02': Line('DIA02', []),
                     'DIA03': Line('DIA03', []),
@@ -68,9 +71,11 @@ BRLines = {'BR01': Line('BR01', []),
            'BR02': Line('BR02', []),
            'BR03': Line('BR03', []),
            'BR04': Line('BR04', [])}
+triggerLines = {'trigger': Line('Trigger', [])}
 
-dischargeAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', []),
-                          'dischargeCurrentFiltered': Line('Current', [])}
+voltageAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', [])}
+currentAnalysisLines = {'dischargeCurrentFiltered': Line('Dis. Current', []),
+                        'dumpCurrentFiltered': Line('Dump Current', [])}
 diamagneticAnalysisLines = {'DIA01Density': Line('DIA01', []),
                             'DIA02Density': Line('DIA02', []),
                             'DIA03Density': Line('DIA03', []),
@@ -101,7 +106,7 @@ refreshRate = 100.0 # Hz
 # Time between switch operations in seconds
 switchWaitTime = 0.2
 hardCloseWaitTime = 4
-gasPuffWaitTime = 0.1
+gasPuffWaitTime = 0.2
 
 # Is the ignitron used for switching?
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
@@ -109,7 +114,7 @@ ignitronInstalled = True
 
 # Circuit constants
 maxVoltage = {'LBL': 5, 'BLU': 50, 'GRA': 10, '': 'N/A'}
-capacitance = 72 # uF
+capacitance = 144 # uF
 ballastResistance = 500 # Ohms
 dumpResistance = 0.29 / 7 # Ohms
 
@@ -125,6 +130,8 @@ pulse_width = 50e-6 # s
 spectrometer_delay = 0 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
+default_dump_time = 0.2 # s
+
 # Pulse generator channels SRS DG535
 # Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
 pulseGeneratorChans = {'Trigger Input': 0,
@@ -138,5 +145,6 @@ pulseGeneratorChans = {'Trigger Input': 0,
 
 # Gas puff is on T0
 pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'daq': {'chan': pulseGeneratorChans['B'], 'delay': 0},
-                         'trigger': {'chan': pulseGeneratorChans['C'], 'delay': 0}}
+                         'daq': {'chan': pulseGeneratorChans['B'], 'delay': 0.05},
+                         'trigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
+                         'ignitron': {'chan': pulseGeneratorChans['D'], 'delay': default_dump_time}}
