@@ -358,7 +358,8 @@ class CMFX_App(TestingApp):
             self.dumpDelay = float(self.dumpDelayEntry.get())
 
             # Set the scale on the oscilloscope based on inputs
-            # if not DEBUG_MODE:
+            if not DEBUG_MODE:
+                self.NI_DAQ.set_dumpDelay(self.dumpDelay / 1000)
             #     # self.scope.setScale(self.chargeVoltage)
                 # self.pulseGenerator.setDelay(pulseGeneratorOutputs['ignitron']['chan'], self.dumpDelay / 1000)
 
@@ -562,9 +563,13 @@ class CMFX_App(TestingApp):
     def reset(self):
         print('Reset')
 
-        # Open power supply and close load and dump
+        # Close the switch tasks so we can close the switches with hardware instead of software
+        if hasattr(self, 'NI_DAQ'):
+            self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
+
+        # Open power supply and load and close dump
         self.operateSwitch('Power Supply Switch', False)	
-        time.sleep(switchWaitTime)	
+        time.sleep(switchWaitTime)
         self.operateSwitch('Load Switch', False)	
         self.operateSwitch('Dump Switch', False)
 
@@ -589,6 +594,9 @@ class CMFX_App(TestingApp):
         # Reset the discharge plot time axis
         self.dischargeTime = []
         self.dischargeTimeUnit = 's'
+
+        # Reset the charge plot time axis
+        self.chargeTime = []
 
         # This condition executes every time except for the initialization
         if self.loggedIn:

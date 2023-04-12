@@ -355,13 +355,13 @@ class TestingApp(ttk.Window):
             self.idleMode = False
 
             # Operate switches
-            self.operateSwitch('Load Switch', False)
-            self.operateSwitch('Dump Switch', True)
+            # Send trigger signal to open dump switch
+            self.operateSwitch('Dump Trigger', True)
+            self.operateSwitch('Dump Trigger', False)
             time.sleep(switchWaitTime)
+
+            # Close power supply switch
             self.operateSwitch('Power Supply Switch', True)
-            # LASER TEST	
-            # self.operateSwitch('Load Switch', True)	
-            # self.voltageDividerClosed = True
             time.sleep(switchWaitTime)
 
             # Actually begin charging power supply
@@ -391,6 +391,8 @@ class TestingApp(ttk.Window):
                 # Force power supply to discharge
                 self.powerSupplyRamp(action='discharge')
 
+                self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
+
                 # Operate switches
                 self.operateSwitch('Power Supply Switch', False)
                 time.sleep(switchWaitTime)
@@ -413,12 +415,12 @@ class TestingApp(ttk.Window):
                 popup()
 
             else:
-                self.operateSwitch('Load Switch', True)
-                time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
+                # self.operateSwitch('Load Switch', True)
+                # time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
                 self.pulseGenerator.triggerStart()
 
-                time.sleep(self.dumpDelay / 1000)
-                self.operateSwitch('Dump Switch', False)
+                # time.sleep(self.dumpDelay / 1000)
+                # self.operateSwitch('Dump Switch', False)
 
                 # Read from DAQ
                 self.NI_DAQ.read_discharge()
@@ -474,6 +476,10 @@ class TestingApp(ttk.Window):
         print('Emergency Off')
         # Force power supply to discharge
         self.powerSupplyRamp(action='discharge')
+
+        # Close the switch tasks so we can close the switches with hardware instead of software
+        if hasattr(self, 'NI_DAQ'):
+            self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
         # Operate switches
         self.operateSwitch('Power Supply Switch', False)
@@ -539,6 +545,10 @@ class TestingApp(ttk.Window):
     # Special function for closing the window and program
     def on_closing(self):
         self.powerSupplyRamp(action='discharge')
+
+        # Close the switch tasks so we can close the switches with hardware instead of software
+        if hasattr(self, 'NI_DAQ'):
+            self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
         # Open power supply and Cap Switch and close load switch
         self.operateSwitch('Power Supply Switch', False)

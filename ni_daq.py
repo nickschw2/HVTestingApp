@@ -39,6 +39,13 @@ class NI_DAQ():
 
         self.tasks = []
         self.closed = False
+
+        self.dumpDelay = default_dumpDelay
+
+        self.status_task_names = ['task_systemStatus', 'task_charge_ao']
+        self.switch_task_names = ['task_switch_trigger', 'task_switch']
+        self.dump_task_names = ['task_dump_trigger', 'task_dump']
+        self.trigger_task_names = ['task_diagnostics', 'task_co']
         
         self.set_up_tasks()
         print('NI DAQ has been successfully initialized')
@@ -56,11 +63,7 @@ class NI_DAQ():
         #   C equivalent - DAQmxCreateTask
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcreatetask/
         # We need an extra task just for updating the labels that is running constantly
-        self.task_systemStatus = nidaqmx.Task()
-        self.task_charge_ao = nidaqmx.Task()
-
-        self.tasks.append(self.task_systemStatus)
-        self.tasks.append(self.task_charge_ao)
+        self.add_tasks(self.status_task_names)
 
         # * Connect to analog input and output voltage channels on the named device
         #   C equivalent - DAQmxCreateAOVoltageChan
@@ -93,36 +96,25 @@ class NI_DAQ():
         '''
         self.reset_discharge_trigger()
 
-    def remove_trigger_tasks(self, task_names):
-        for task_name in task_names:
-            if hasattr(self, task_name):
-                task = getattr(self, task_name)
-                self.tasks.remove(task)
-                task.stop()
-                task.close()
-
     def reset_discharge_trigger(self):
         # Remove and close prior versions of trigger tasks
-        trigger_task_names = ['task_diagnostics', 'task_dump_trigger', 'task_dump']
-        self.remove_trigger_tasks(trigger_task_names)
+        self.remove_tasks(self.trigger_task_names + self.dump_task_names)
 
         # Create tasks and add them to task list
-        for task in trigger_task_names:
-            setattr(self, task, nidaqmx.Task())
-            self.tasks.append(getattr(self, task))
+        self.add_tasks(self.trigger_task_names + self.dump_task_names)
                                                  
         '''
         COUNTER TASK
         '''
-        # freq = 1 / pulse_period
-        # duty_cycle = pulse_width / pulse_period
-        # # Normally send as many pulses as possible
-        # if self.n_pulses == None:
-        #     self.n_pulses = int(duration / pulse_period)
-        # self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr0', freq=freq, duty_cycle=duty_cycle, initial_delay=spectrometer_delay)
-        # self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
-        # self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
-        # self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+        freq = 1 / pulse_period
+        duty_cycle = pulse_width / pulse_period
+        # Normally send as many pulses as possible
+        if self.n_pulses == None:
+            self.n_pulses = int(duration / pulse_period)
+        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr0', freq=freq, duty_cycle=duty_cycle, initial_delay=spectrometer_delay)
+        self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
+        self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
+        self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
 
         '''
         DIGITAL OUTPUT TASKS
@@ -182,7 +174,7 @@ class NI_DAQ():
         self.task_diagnostics.timing.cfg_samp_clk_timing(samp_freq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
 
         # Add analog signal trigger
-        self.task_diagnostics.triggers.reference_trigger.cfg_anlg_edge_ref_trig(f'trigger', pretrigger_samples=pretrigger_samples, trigger_level=3.0)
+        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.diagnostics_name}/PFI0', pretrigger_samples=pretrigger_samples)
         
         # Specify a minimum pulse width (in sec) to avoid false trigger
         # self.task_diagnostics.triggers.reference_trigger.anlg_edge_dig_fltr_enable = True
@@ -195,16 +187,14 @@ class NI_DAQ():
         self.dischargeTriggered = False
 
         '''START TASKS'''
-        for task in trigger_task_names:
+        for task in self.trigger_task_names + self.dump_task_names:
             task = getattr(self, task)
-            task.start()
+            if len(task.channel_names) != 0:
+                task.start()
 
     def set_switch_trigger(self, task_handle, status, callback_data):
         # Remove the old dump switch tasks
-        old_trigger_task_names = ['task_dump_trigger', 'task_dump']
-        self.remove_trigger_tasks(old_trigger_task_names)
-
-        self.switch_task_names = ['task_switch_trigger', 'task_switch']
+        self.remove_tasks(self.dump_task_names)
 
         # Create tasks and add them to task list
         for task in self.switch_task_names:
@@ -217,7 +207,7 @@ class NI_DAQ():
         self.task_switch_trigger.timing.cfg_samp_clk_timing(rate=switch_samp_freq, source='OnboardClock', sample_mode=AcquisitionType.CONTINUOUS)
 
         # Trigger the signal generation with the pulse generator to this PFI channel
-        self.task_switch_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source=f'/{self.output_name}/PFI0', trigger_edge=Edge.RISING)
+        self.task_switch_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source=f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
 
         # Setup pause trigger
         # self.task_switch_trigger.triggers.pause_trigger.trig_type = TriggerType.DIGITAL_LEVEL
@@ -228,12 +218,9 @@ class NI_DAQ():
         self.task_switch.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Load Switch"]}')
         self.task_switch.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Dump Switch"]}')
 
-        return 0
-    
-    def write_task_switch(self, dump_delay):
         # Switch timing
-        n_load_samples = int(switch_samp_freq * (gasPuffWaitTime + dump_delay + switchWaitTime))
-        n_dump_samples = int(switch_samp_freq * (gasPuffWaitTime + dump_delay))
+        n_load_samples = int(switch_samp_freq * (gasPuffWaitTime + self.dumpDelay + switchWaitTime))
+        n_dump_samples = int(switch_samp_freq * (gasPuffWaitTime + self.dumpDelay))
 
         # Construct digital arrays to pass to the do channels
         load_list = [True] * n_load_samples
@@ -249,10 +236,23 @@ class NI_DAQ():
 
         self.task_switch.write([load_list, dump_list], auto_start=False)
 
+        # When the switch operation has completed, remove tasks
+        self.task_switch.register_done_event(self.remove_switch_tasks)
+
         '''START TASKS'''
         for task in self.switch_task_names:
             task = getattr(self, task)
             task.start()
+
+        return 0
+
+    def set_dumpDelay(self, dumpDelay):
+        self.dumpDelay = dumpDelay
+        print(f'Set dump delay to {self.dumpDelay} s')
+
+    def remove_switch_tasks(self, task_handle, status, callback_data):
+        self.remove_tasks(self.switch_task_names)
+        return 0
 
     def write_value(self, value):
         self.task_charge_ao.write(value, timeout=2)
@@ -278,13 +278,27 @@ class NI_DAQ():
             self.discharge_reader.read_many_sample(self.dischargeData)
 
         return 0
+    
+    def remove_tasks(self, task_names):
+        for task_name in task_names:
+            if hasattr(self, task_name):
+                task = getattr(self, task_name)
+                if task in self.tasks:
+                    self.tasks.remove(task)
+                    task.stop()
+                    task.close()
+
+    def add_tasks(self, task_names):
+        for task in task_names:
+            setattr(self, task, nidaqmx.Task())
+            self.tasks.append(getattr(self, task))
 
     def start_acquisition(self):
         for task in self.tasks:
             if not self._task_created(task):
                 return
             else:
-                if task.is_task_done():
+                if len(task.channel_names) != 0 and task.is_task_done():
                     task.start()
 
     def stop_acquisition(self):

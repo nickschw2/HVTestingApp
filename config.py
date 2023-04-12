@@ -28,7 +28,8 @@ systemStatus_defaults = {'Power Supply Voltage': 'ai0',
                          'Capacitor Voltage': 'ai2'} # analog inputs
 do_defaults = {'Load Switch': 'line0',
                'Dump Switch': 'line1',
-               'Power Supply Switch': 'line2'}
+               'Power Supply Switch': 'line2',
+               'Dump Trigger': 'line4'}
 diagnostics_defaults = {'dischargeCurrent': 'ai0',
                         'dumpCurrent': 'ai1',
                         'DIA01': 'ai2',
@@ -104,9 +105,9 @@ acceptablePasswords = ['plasma']
 refreshRate = 100.0 # Hz
 
 # Time between switch operations in seconds
-switchWaitTime = 0.2
+switchWaitTime = 0.1
 hardCloseWaitTime = 4
-gasPuffWaitTime = 0.2
+gasPuffWaitTime = switchWaitTime
 
 # Is the ignitron used for switching?
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
@@ -124,13 +125,13 @@ maxValidGasPuff = 500 # ms
 maxValidDumpDelay = maxValidGasPuff + 1000 # ms
 
 # Discharge timing
-duration = 0.4 # s
+duration = 0.8 # s
 pulse_period = 10.1e-3 # s
-pulse_width = 50e-6 # s
-spectrometer_delay = 0 # s
+pulse_width = 50e-4 # s
+spectrometer_delay = 0.0 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
-default_dump_time = 0.2 # s
+default_dumpDelay = 0.2 # s
 
 # Pulse generator channels SRS DG535
 # Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
@@ -144,7 +145,7 @@ pulseGeneratorChans = {'Trigger Input': 0,
                           'CD': 7}
 
 # Gas puff is on T0
-pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'daq': {'chan': pulseGeneratorChans['B'], 'delay': 0.05},
+pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['B'], 'delay': switchWaitTime},
+                         'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
                          'trigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
-                         'ignitron': {'chan': pulseGeneratorChans['D'], 'delay': default_dump_time}}
+                         'ignitron': {'chan': pulseGeneratorChans['D'], 'delay': 0}}
