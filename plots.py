@@ -142,6 +142,31 @@ class CustomToolbar(NavigationToolbar2Tk):  # subclass NavigationToolbar2Tk
             self.canvas._tkcanvas.delete(self.lastrect)
         self.lastrect = self.canvas._tkcanvas.create_rectangle(x0, y0, x1, y1, outline=theme_colors['primary'])
 
+    # copied the method '_update_view()' right from NavigationToolbar2 in backend_bases.py
+    # we're only adding lines to relim and autoscale
+    def _update_view(self):
+        """
+        Update the viewlim and position from the view and position stack for
+        each axes.
+        """
+        nav_info = self._nav_stack()
+        if nav_info is None:
+            return
+        # Retrieve all items at once to avoid any risk of GC deleting an Axes
+        # while in the middle of the loop below.
+        items = list(nav_info.items())
+        for ax, (view, (pos_orig, pos_active)) in items:
+            ax._set_view(view)
+
+             # Rescale the plot
+            ax.relim()
+            ax.autoscale()
+
+            # Restore both the original and modified positions
+            ax._set_position(pos_orig, 'original')
+            ax._set_position(pos_active, 'active')
+        self.canvas.draw_idle()
+
 class PlotViewer(ttk.Frame):
     def __init__(self, master, plotData, **kwargs):
 
@@ -171,8 +196,18 @@ class PlotViewer(ttk.Frame):
         self.viewFrame = ttk.Frame(self.master)
         self.viewFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
+        # Add frame for run number
+        self.runNumberFrame = ttk.LabelFrame(self.viewFrame, text='Run #', width=systemStatusFrameWidth, height=20, bootstyle='primary')
+        self.runNumberFrame.pack(side='top', expand=True, pady=(0, framePadding))
+
+        # Create text variables for Run Number, associate with labels, and place
+        self.runNumberText = ttk.StringVar()
+        self.runNumberText.set(f'Run #N/A')	
+        self.runNumberLabel = ttk.Label(self.runNumberFrame, textvariable=self.runNumberText)
+        self.runNumberLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+
         # Frame for selecting which plots to show
-        self.radioFrame = ttk.LabelFrame(self.viewFrame, text='View Style', bootstyle='primary')
+        self.radioFrame = ttk.LabelFrame(self.viewFrame, text='View Style', width=systemStatusFrameWidth, bootstyle='primary')
         self.radioFrame.pack(side='top', expand=True, pady=(0, framePadding))
 
         # Radio buttons for choosing which display style to show
@@ -185,7 +220,7 @@ class PlotViewer(ttk.Frame):
         subplotsRadiobutton.pack(side='top', expand=True, padx=framePadding, pady=setPinsPaddingY)
 
         # Frame for selecting which plots to show
-        self.selectorFrame = ttk.LabelFrame(self.viewFrame, text='Plot Selector', bootstyle='primary')
+        self.selectorFrame = ttk.LabelFrame(self.viewFrame, text='Plot Selector', width=systemStatusFrameWidth, bootstyle='primary')
         self.selectorFrame.pack(side='top', expand=True)
 
         # Selector for showing a certain plot
@@ -205,7 +240,6 @@ class PlotViewer(ttk.Frame):
                 checkbutton.invoke() # Initialize it to be turned on
                 checkbutton.bind('<Button>', self.replot)
                 self.checkbuttons[plotOption][line.label] = checkbutton
-
         
         # Preset discharge timing
         self.dischargeTime = []
@@ -231,6 +265,10 @@ class PlotViewer(ttk.Frame):
         if hasattr(self.master.master.master, 'dischargeTime'):
             self.dischargeTime = self.master.master.master.dischargeTime
             self.dischargeTimeUnit = self.master.master.master.dischargeTimeUnit
+
+        # Update run number text
+        if hasattr(self.master.master.master, 'runNumber'):
+            self.runNumberText.set(f'Run #{int(self.master.master.master.runNumber)}')
 
         def setup_plots(plotSelection, ax):
             # Change plot to new selection
@@ -330,6 +368,10 @@ class PlotViewer(ttk.Frame):
 
                 ax = self.plotSingle.ax
                 setup_plots(plotSelection, ax)
+
+                # Rescale the plot
+                ax.relim()
+                ax.autoscale()
 
             # Change visibility of line when the checkbutton for that line is changed
             elif eventType == ttk.Checkbutton:

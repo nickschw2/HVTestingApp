@@ -206,10 +206,11 @@ class CMFX_App(TestingApp):
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
-        self.resultsPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (kV)', 'lines': voltageLines},
+        self.resultsPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': voltageLines},
                                 'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentLines},
                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Diamagnetic (V)', 'lines': diamagneticLines},
-                                'Trigger': {'twinx': False, 'ylabel': 'Trigger (V)', 'lines': triggerLines}}
+                                'B-Radial': {'twinx': False, 'ylabel': 'B$_R$ (V)', 'lines': BRLines},
+                                'Diode': {'twinx': False, 'ylabel': 'Diode (V)', 'lines': DIODELines}}
         
         self.resultsPlotViewer = PlotViewer(self.notebookFrames['Results'], self.resultsPlotData)
 
@@ -357,11 +358,14 @@ class CMFX_App(TestingApp):
             self.gasPuffTime = float(self.gasPuffEntry.get())
             self.dumpDelay = float(self.dumpDelayEntry.get())
 
+            # Set the ignitron delay when in use
+            self.ignitronDelay = ignitronDelay
+
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
-                self.NI_DAQ.set_dumpDelay(self.dumpDelay / 1000)
-            #     # self.scope.setScale(self.chargeVoltage)
-                # self.pulseGenerator.setDelay(pulseGeneratorOutputs['ignitron']['chan'], self.dumpDelay / 1000)
+                # self.NI_DAQ.set_dumpDelay(self.dumpDelay / 1000)
+                # self.scope.setScale(self.chargeVoltage)
+                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + ignitronDelay)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -570,7 +574,7 @@ class CMFX_App(TestingApp):
         # Open power supply and load and close dump
         self.operateSwitch('Power Supply Switch', False)	
         time.sleep(switchWaitTime)
-        self.operateSwitch('Load Switch', False)	
+        # self.operateSwitch('Load Switch', False)	
         self.operateSwitch('Dump Switch', False)
 
         # Clear user inputs

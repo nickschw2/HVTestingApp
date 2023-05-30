@@ -57,7 +57,6 @@ class TestingApp(ttk.Window):
         self.systemStatus_Pins = systemStatus_defaults
         self.do_Pins = do_defaults
         self.diagnostics_Pins = diagnostics_defaults
-        self.diagnostics2_Pins = diagnostics2_defaults
 
     def center_app(self):
         self.update_idletasks()
@@ -77,12 +76,8 @@ class TestingApp(ttk.Window):
     # The Oscilloscope is triggered when the capacitor discharges and reads waveform from the discharge
     def init_DAQ(self):
         # We need both an analog input and output
-        self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_name, output_name, diagnostics_name,
-                             diagnostics2_name=diagnostics2_name,
-                             systemStatus_channels=self.systemStatus_Pins,
-                             charge_ao_channels=self.charge_ao_Pins,
-                             diagnostics=self.diagnostics_Pins,
-                             diagnostics2=self.diagnostics2_Pins,
+        self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_channels=self.systemStatus_Pins,
+                             charge_ao_channels=self.charge_ao_Pins, diagnostics=self.diagnostics_Pins,
                              n_pulses=n_pulses)
 
         # Discharge the power supply on startup
@@ -195,10 +190,21 @@ class TestingApp(ttk.Window):
             self.chargeVoltageEntry.delete(0, 'end')
             self.chargeVoltageEntry.insert(0, self.chargeVoltage)
 
+            # Load pre- and post-shot notes
+            self.preShotNotesEntry.text.delete('1.0', 'end')
+            self.postShotNotesEntry.text.delete('1.0', 'end')
+            self.preShotNotesEntry.text.insert('1.0', self.preShotNotes)
+            self.postShotNotesEntry.text.insert('1.0', self.postShotNotes)
+
             self.replotCharge()
 
+            # Load the results plots
             self.setData(self.resultsPlotData)
             self.resultsPlotViewer.replot()
+
+            # Load the analysis plots
+            self.performAnalysis()
+            self.analysisPlotViewer.replot()
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -243,7 +249,6 @@ class TestingApp(ttk.Window):
         systemStatus_PinsOptions = selectPins(systemStatus_defaults, systemStatus_options)
         do_PinsOptions = selectPins(do_defaults, do_options)
         diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
-        diagnostics2_PinsOptions = selectPins(diagnostics2_defaults, diagnostics_options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -266,15 +271,11 @@ class TestingApp(ttk.Window):
             for channel in diagnostics_PinsOptions:
                 self.diagnostics_Pins[channel] = diagnostics_PinsOptions[channel].get()
 
-            for channel in diagnostics2_PinsOptions:
-                self.diagnostics2_Pins[channel] = diagnostics2_PinsOptions[channel].get()
-
             print(self.scopePins)
             print(self.charge_ao_Pins)
             print(self.systemStatus_Pins)
             print(self.do_Pins)
             print(self.diagnostics_Pins)
-            print(self.diagnostics2_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
@@ -319,7 +320,7 @@ class TestingApp(ttk.Window):
         if not DEBUG_MODE:
             try:
                 with nidaqmx.Task() as task:
-                    task.do_channels.add_do_chan(f'{output_name}/{digitalOutName}/{self.do_Pins[switchName]}')
+                    task.do_channels.add_do_chan(f'{self.do_Pins[switchName]}')
                     task.write(state)
                     print(f'{switchName} in {state} state')
 
@@ -356,8 +357,9 @@ class TestingApp(ttk.Window):
 
             # Operate switches
             # Send trigger signal to open dump switch
-            self.operateSwitch('Dump Trigger', True)
-            self.operateSwitch('Dump Trigger', False)
+            # self.operateSwitch('Dump Trigger', True)
+            # self.operateSwitch('Dump Trigger', False)
+            self.operateSwitch('Dump Switch', True)
             time.sleep(switchWaitTime)
 
             # Close power supply switch
@@ -426,8 +428,8 @@ class TestingApp(ttk.Window):
                 self.NI_DAQ.read_discharge()
 
                 # Wait a while before closing the mechanical dump switch
-                # time.sleep(hardCloseWaitTime)	
-                # self.operateSwitch('Dump Switch', False)
+                time.sleep(hardCloseWaitTime)	
+                self.operateSwitch('Dump Switch', False)
                 
                 self.charging = False
                 self.discharged = True
@@ -484,7 +486,7 @@ class TestingApp(ttk.Window):
         # Operate switches
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
-        self.operateSwitch('Load Switch', False)
+        # self.operateSwitch('Load Switch', False)
         self.operateSwitch('Dump Switch', False)
 
         self.charging = False
@@ -554,7 +556,7 @@ class TestingApp(ttk.Window):
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
         self.operateSwitch('Dump Switch', False)
-        self.operateSwitch('Load Switch', False)
+        # self.operateSwitch('Load Switch', False)
 
         if not DEBUG_MODE:
             # Stop NI communication

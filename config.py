@@ -22,31 +22,53 @@ systemStatus_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
 diagnostics_name = 'PXI1Slot4' # The name of the DAQ device as shown in MAX
 diagnostics2_name = 'PXI1Slot5' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
-charge_ao_defaults = {'Power Supply Output': 'ao0'} # analog outputs
-systemStatus_defaults = {'Power Supply Voltage': 'ai0',
-                         'Power Supply Current': 'ai1',
-                         'Capacitor Voltage': 'ai2'} # analog inputs
-do_defaults = {'Load Switch': 'line0',
-               'Dump Switch': 'line1',
-               'Power Supply Switch': 'line2',
-               'Dump Trigger': 'line4'}
-diagnostics_defaults = {'dischargeCurrent': 'ai0',
-                        'dumpCurrent': 'ai1',
-                        'DIA01': 'ai2',
-                        'DIA02': 'ai3',
-                        'DIA03': 'ai4',
-                        'dischargeVoltage': 'ai5',
-                        'DIA04': 'ai6',
-                        'trigger': 'ai7'}
-diagnostics2_defaults = {'BR01': 'ai0',
-                         'BR02': 'ai1',
-                         'BR03': 'ai2',
-                         'BR04': 'ai3'}
-# diagnostics2_defaults = {}
-charge_ao_options = ['ao0', 'ao1']
-systemStatus_options = ['ai0', 'ai1', 'ai2', 'ai3']
-do_options = ['line0', 'line1', 'line2', 'line3']
-diagnostics_options = ['ai0', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5', 'ai6', 'ai7']
+
+# Channels
+''' 
+HOW TO ADD NEW CHANNEL
+There are a few important bits of information when assigning a new channel:
+Variable name: name of the variable in the program
+Channel: which analog input channel it's connected to, i.e. ai0
+Description: Plan english description of variable, i.e. Discharge Current
+Units: Units of variable, i.e. (V) or (A)
+1. Each DAQ card port has 8 channels, if a 'default' is filled with 8 channels, add another DAQ card.
+2. Add channel to 'diagnosticsN_defaults', where N is the card you're referencing
+3. Add channel to a specific line group, i.e. all the diamagnetic signals are grouped together
+    diamagneticLines = {'DIA01': Line('DIA01', []),
+                    'DIA02': Line('DIA02', []),
+                    'DIA03': Line('DIA03', []),
+                    'DIA04': Line('DIA04', [])}
+    (it's okay to have one channel in a line group).
+4. In CMFX_App.py, change the value of 'self.resultsPlotData' to add your line group, if it is not there already.
+5. In constants.py, change the value of 'single_columns' to include your channel in the following format:
+    'variable_name': {'name': 'description (units)', 'type': 'array'},
+'''
+charge_ao_defaults = {'Power Supply Output': f'{output_name}/ao0'} # analog outputs
+systemStatus_defaults = {'Power Supply Voltage': f'{systemStatus_name}/ai0',
+                         'Power Supply Current': f'{systemStatus_name}/ai1',
+                         'Capacitor Voltage': f'{systemStatus_name}/ai2'} # analog inputs
+do_defaults = {'Load Switch': f'{output_name}/{digitalOutName}/line0',
+               'Dump Switch': f'{output_name}/{digitalOutName}/line1',
+               'Power Supply Switch': f'{output_name}/{digitalOutName}/line2'}
+diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai0',
+                        'DIA01': f'{diagnostics_name}/ai2',
+                        'DIA02': f'{diagnostics_name}/ai3',
+                        'DIA03': f'{diagnostics_name}/ai4',
+                        'DIA04': f'{diagnostics_name}/ai6',
+                        'DIODE02': f'{diagnostics_name}/ai7',
+                        'BR01': f'{diagnostics2_name}/ai0',
+                        'BR02': f'{diagnostics2_name}/ai1',
+                        'BR03': f'{diagnostics2_name}/ai2',
+                        'BR04': f'{diagnostics2_name}/ai3',
+                        'dumpCurrent': f'{diagnostics2_name}/ai4',
+                        'DIODE00': f'{diagnostics2_name}/ai5',
+                        'DIODE01': f'{diagnostics2_name}/ai6',
+                        'dischargeVoltage': f'{diagnostics2_name}/ai7'}
+charge_ao_options = [f'{output_name}/a0{i}' for i in list(range(2))]
+systemStatus_options = [f'{systemStatus_name}/ai{i}' for i in list(range(8))]
+do_options = [f'{output_name}/{digitalOutName}/line{8}' for i in list(range(16))]
+diagnostics_options = [f'{diagnostics_name}/ai{i}' for i in list(range(8))] + \
+                      [f'{diagnostics2_name}/ai{i}' for i in list(range(8))]
 samp_freq = 1000000 # Frequency for acquiring data [Hz]
 switch_samp_freq = 1000 # Frequency for triggering switches [Hz]
 
@@ -62,8 +84,7 @@ class Line:
 voltageLines = {'dischargeVoltage': Line('Voltage', [])}
 currentLines = {'dischargeCurrent': Line('Dis. Current', []),
                 'dumpCurrent': Line('Dump Current', [])}
-interferometerLines = {'INT01': Line('INT01', []),
-                       'INT02': Line('INT02', [])}
+# interferometerLines = {'INT01': Line('INT01', [])}
 diamagneticLines = {'DIA01': Line('DIA01', []),
                     'DIA02': Line('DIA02', []),
                     'DIA03': Line('DIA03', []),
@@ -72,7 +93,9 @@ BRLines = {'BR01': Line('BR01', []),
            'BR02': Line('BR02', []),
            'BR03': Line('BR03', []),
            'BR04': Line('BR04', [])}
-triggerLines = {'trigger': Line('Trigger', [])}
+DIODELines = {'DIODE00': Line('DIODE00', []),
+              'DIODE01': Line('DIODE01', []),
+              'DIODE02': Line('DIODE02', [])}
 
 voltageAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', [])}
 currentAnalysisLines = {'dischargeCurrentFiltered': Line('Dis. Current', []),
@@ -84,6 +107,7 @@ diamagneticAnalysisLines = {'DIA01Density': Line('DIA01', []),
 
 # Diagnostic hardware
 voltageDivider = 10000 # voltage ratio in:out
+voltageDivider_2 = 1000 # voltage ratio in:out
 pearsonCoilDischarge = 0.01 # V/A
 # Changing waterResistor temporarily to match plasma
 waterResistor = 500 # Ohms
@@ -125,13 +149,15 @@ maxValidGasPuff = 500 # ms
 maxValidDumpDelay = maxValidGasPuff + 1000 # ms
 
 # Discharge timing
-duration = 0.8 # s
+default_dumpDelay = 0.2 # s
+ignitronDelay = 0.01 # s
+gasPuffTime = 0.03 # s
+
+duration = 0.4 # s
 pulse_period = 10.1e-3 # s
 pulse_width = 50e-4 # s
 spectrometer_delay = 0.0 # s
 n_pulses = 1 # pulses sent to the spectrometer
-
-default_dumpDelay = 0.2 # s
 
 # Pulse generator channels SRS DG535
 # Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
@@ -145,7 +171,7 @@ pulseGeneratorChans = {'Trigger Input': 0,
                           'CD': 7}
 
 # Gas puff is on T0
-pulseGeneratorOutputs = {'gasPuff': {'chan': pulseGeneratorChans['B'], 'delay': switchWaitTime},
-                         'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'trigger': {'chan': pulseGeneratorChans['C'], 'delay': 0},
-                         'ignitron': {'chan': pulseGeneratorChans['D'], 'delay': 0}}
+pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
+                         'gasPuffStop': {'chan': pulseGeneratorChans['B'], 'delay': gasPuffTime},
+                         'load_ign': {'chan': pulseGeneratorChans['C'], 'delay': ignitronDelay},
+                         'dump_ign': {'chan': pulseGeneratorChans['D'], 'delay': default_dumpDelay + ignitronDelay}}

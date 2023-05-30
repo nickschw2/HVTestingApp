@@ -19,19 +19,15 @@ import numpy as np
 from config import *
 
 class NI_DAQ():
-    def __init__(self, systemStatus_sample_rate, systemStatus_name, output_name,
-                 diagnostics_name, diagnostics2_name=None, systemStatus_channels={},
-                 charge_ao_channels={}, diagnostics={}, diagnostics2={},
+    def __init__(self, systemStatus_sample_rate, systemStatus_channels={},
+                 charge_ao_channels={}, diagnostics={},
                  n_pulses=None, autostart=True):
         
-        self.systemStatus_name = systemStatus_name
         self.output_name = output_name
         self.diagnostics_name = diagnostics_name
-        self.diagnostics2_name = diagnostics2_name
         self.systemStatus_channels = systemStatus_channels
         self.charge_ao_channels = charge_ao_channels
         self.diagnostics = diagnostics
-        self.diagnostics2 = diagnostics2
         self.systemStatus_sample_rate = systemStatus_sample_rate
         self.n_pulses = n_pulses
 
@@ -69,13 +65,13 @@ class NI_DAQ():
         #   C equivalent - DAQmxCreateAOVoltageChan
         #   http://zone.ni.com/reference/en-XX/help/370471AE-01/daqmxcfunc/daqmxcreateaovoltagechan/
         # https://nidaqmx-python.readthedocs.io/en/latest/ao_channel_collection.html
-        for name, ai_chan in self.systemStatus_channels.items():
-            self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{self.systemStatus_name}/{ai_chan}', 
+        for name, systemStatus_chan in self.systemStatus_channels.items():
+            self.task_systemStatus.ai_channels.add_ai_voltage_chan(f'{systemStatus_chan}', 
                                                                    min_val=0.0, max_val=10.0,
                                                                    name_to_assign_to_channel=name)
 
-        for name, ao_chan in self.charge_ao_channels.items():
-            self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{self.output_name}/{ao_chan}',
+        for name, charge_ao_chan in self.charge_ao_channels.items():
+            self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{charge_ao_chan}',
                                                                 min_val=0.0, max_val=10.0,
                                                                 name_to_assign_to_channel=name)
 
@@ -119,41 +115,35 @@ class NI_DAQ():
         '''
         DIGITAL OUTPUT TASKS
         '''
-        #### Open dump switch initially ####
-        # We need to open the dump switch initially with a single pulse, because we don't know how long the charging process will take
-        # Our old PXI model (6133 or 6225) doesn't have the ability to generate a do trigger
-        # So we create a dummy ai task and use the ai Sample Clock, then trigger the ai task
-        self.task_dump_trigger.ai_channels.add_ai_voltage_chan(f'{self.output_name}/ai0')
-        self.task_dump_trigger.timing.cfg_samp_clk_timing(rate=switch_samp_freq, source='OnboardClock', sample_mode=AcquisitionType.CONTINUOUS)
+        # #### Open dump switch initially ####
+        # # We need to open the dump switch initially with a single pulse, because we don't know how long the charging process will take
+        # # Our old PXI model (6133 or 6225) doesn't have the ability to generate a do trigger
+        # # So we create a dummy ai task and use the ai Sample Clock, then trigger the ai task
+        # self.task_dump_trigger.ai_channels.add_ai_voltage_chan(f'{self.output_name}/ai0')
+        # self.task_dump_trigger.timing.cfg_samp_clk_timing(rate=switch_samp_freq, source='OnboardClock', sample_mode=AcquisitionType.CONTINUOUS)
 
-        # We trigger the dump switch to open with a separate digital signal to this PFI line
-        self.task_dump_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source=f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
+        # # We trigger the dump switch to open with a separate digital signal to this PFI line
+        # self.task_dump_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source=f'/{self.output_name}/PFI1', trigger_edge=Edge.RISING)
 
-        # Set up the do task to open the dump switch when it is triggered
-        # We only need to write a single true value to the channel
-        self.task_dump.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Dump Switch"]}')
-        self.task_dump.timing.cfg_samp_clk_timing(rate=switch_samp_freq, source=f'/{self.output_name}/ai/SampleClock', active_edge=Edge.RISING, sample_mode=AcquisitionType.FINITE, samps_per_chan=1)
-        self.task_dump.write(True, auto_start=False)
+        # # Set up the do task to open the dump switch when it is triggered
+        # # We only need to write a single true value to the channel
+        # self.task_dump.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Dump Switch"]}')
+        # self.task_dump.timing.cfg_samp_clk_timing(rate=switch_samp_freq, source=f'/{self.output_name}/ai/SampleClock', active_edge=Edge.RISING, sample_mode=AcquisitionType.FINITE, samps_per_chan=1)
+        # self.task_dump.write(True, auto_start=False)
 
-        # When the switch has been opened, setup the triggering for switching the load and dump
-        self.task_dump.register_done_event(self.set_switch_trigger)
+        # # When the switch has been opened, setup the triggering for switching the load and dump
+        # self.task_dump.register_done_event(self.set_switch_trigger)
 
         '''
         DIAGNOSTICS TASK
         '''
         for name, diagnostic in self.diagnostics.items():
-            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.diagnostics_name}/{diagnostic}',
+            self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{diagnostic}',
                                                                   min_val=-10.0, max_val=10.0,
                                                                   name_to_assign_to_channel=name)
-            
-        if self.diagnostics2_name != None:
-            for name, diagnostic in self.diagnostics2.items():
-                self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{self.diagnostics2_name}/{diagnostic}',
-                                                                    min_val=-10.0, max_val=10.0,
-                                                                    name_to_assign_to_channel=name)
 
         # Create time array for discharge
-        n_channels = len(self.diagnostics) + len(self.diagnostics2)
+        n_channels = len(self.diagnostics)
         pretrigger_fraction = 0.1
         posttrigger_samples = int(samp_freq * duration) + 1 # Add one to include t=0
         pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
@@ -215,8 +205,8 @@ class NI_DAQ():
         # self.task_switch_trigger.triggers.pause_trigger.dig_lvl_when = Level.HIGH
 
         # Add digital output to switch lines
-        self.task_switch.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Load Switch"]}')
-        self.task_switch.do_channels.add_do_chan(f'{self.output_name}/{digitalOutName}/{do_defaults["Dump Switch"]}')
+        self.task_switch.do_channels.add_do_chan(f'{do_defaults["Load Switch"]}')
+        self.task_switch.do_channels.add_do_chan(f'{do_defaults["Dump Switch"]}')
 
         # Switch timing
         n_load_samples = int(switch_samp_freq * (gasPuffWaitTime + self.dumpDelay + switchWaitTime))
