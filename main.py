@@ -7,7 +7,8 @@ Force user to take pre- and post- shot notes
 Fix oscilloscope loading bar
 Need to allow for plotting of more than one line on twinx
 The digital filter trigger enable is not working
-Add gas puff delay to recorded data
+Add dump delay to ni_daq so that we can record for different times AND so that we can record neutrons only during shot
+Add Working Gas to config
 '''
 
 if __name__ == "__main__":

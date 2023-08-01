@@ -20,7 +20,7 @@ from config import *
 
 class NI_DAQ():
     def __init__(self, systemStatus_sample_rate, systemStatus_channels={},
-                 charge_ao_channels={}, diagnostics={},
+                 charge_ao_channels={}, diagnostics={}, counters={},
                  n_pulses=None, autostart=True):
         
         self.output_name = output_name
@@ -28,6 +28,7 @@ class NI_DAQ():
         self.systemStatus_channels = systemStatus_channels
         self.charge_ao_channels = charge_ao_channels
         self.diagnostics = diagnostics
+        self.counters = counters
         self.systemStatus_sample_rate = systemStatus_sample_rate
         self.n_pulses = n_pulses
 
@@ -36,18 +37,46 @@ class NI_DAQ():
         self.tasks = []
         self.closed = False
 
-        self.dumpDelay = default_dumpDelay
-
         self.status_task_names = ['task_systemStatus', 'task_charge_ao']
         self.switch_task_names = ['task_switch_trigger', 'task_switch']
         self.dump_task_names = ['task_dump_trigger', 'task_dump']
         self.trigger_task_names = ['task_diagnostics', 'task_co']
+        self.counters_task_names = ['task_ci_trigger', 'task_ci']
+
+        # Set default duration
+        self.set_timing(default_dumpDelay)
         
         self.set_up_tasks()
         print('NI DAQ has been successfully initialized')
 
         if autostart:
             self.start_acquisition()
+
+    def set_timing(self, dumpDelay):
+        # Dump delay in seconds
+        self.dumpDelay = dumpDelay
+        self.duration = self.dumpDelay + post_dump_duration + ignitronDelay # s
+
+        print(f'Recording duration set to {self.duration} s')
+
+        # Timing only during the discharge
+        # There is some error here because it includes the pre-ignitron firing samples, only a few ms though so it's okay
+        # This timing is to measure neutrons only when we have plasma
+        self.discharge_samples = int(samp_freq * (self.duration - post_dump_duration)) 
+
+        # Create time array for discharge
+        self.posttrigger_samples = int(samp_freq * self.duration) + 1 # Add one to include t=0
+        self.pretrigger_samples = int(samp_freq * pretrigger_duration) # Don't need to add one, otherwise would be double counting t=0
+        self.discharge_samps_per_chan = self.pretrigger_samples + self.posttrigger_samples
+        self.dischargeTime = np.linspace(-pretrigger_duration, self.duration, self.discharge_samps_per_chan)
+        if (max(np.abs(self.dischargeTime)) < 1e-3):
+            self.dischargeTime *= 1e6
+            self.tUnit = 'us'
+        elif (max(np.abs(self.dischargeTime)) < 1):
+            self.dischargeTime *= 1e3
+            self.tUnit = 'ms'
+        else:
+            self.tUnit = 's'
 
     def set_up_tasks(self):
         '''
@@ -94,23 +123,40 @@ class NI_DAQ():
 
     def reset_discharge_trigger(self):
         # Remove and close prior versions of trigger tasks
-        self.remove_tasks(self.trigger_task_names + self.dump_task_names)
+        self.remove_tasks(self.trigger_task_names + self.dump_task_names + self.counters_task_names)
 
         # Create tasks and add them to task list
-        self.add_tasks(self.trigger_task_names + self.dump_task_names)
+        self.add_tasks(self.trigger_task_names + self.dump_task_names + self.counters_task_names)
                                                  
         '''
-        COUNTER TASK
+        COUNTER OUT TASK
         '''
         freq = 1 / pulse_period
         duty_cycle = pulse_width / pulse_period
         # Normally send as many pulses as possible
         if self.n_pulses == None:
-            self.n_pulses = int(duration / pulse_period)
+            self.n_pulses = int(self.duration / pulse_period)
         self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr0', freq=freq, duty_cycle=duty_cycle, initial_delay=spectrometer_delay)
         self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
         self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
         self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+
+        '''
+        COUNTER IN TASKS
+        '''
+        # Set up dummy trigger task
+        self.task_ci_trigger.ai_channels.add_ai_voltage_chan(f'{self.output_name}/ai1')
+        self.task_ci_trigger.timing.cfg_samp_clk_timing(samp_freq, source=f'OnboardClock', sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samples)
+        self.task_ci_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+
+        for name, counter in self.counters.items():
+            self.task_ci.ci_channels.add_ci_count_edges_chan(counter, name_to_assign_to_channel=name)
+            
+        # Must specify external sample clock source, triggering off dummy ai task
+        self.task_ci.timing.cfg_samp_clk_timing(samp_freq, source=f'/{self.output_name}/ai/SampleClock', sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samples)
+        # Need to configure an arm start trigger for counter input tasks
+        # According to X-series manual, you can't use start_trigger for counter input tasks
+        # self.task_ci.triggers.arm_start_trigger.dig_edge_src = f'/{self.diagnostics_name}/PFI0'  
 
         '''
         DIGITAL OUTPUT TASKS
@@ -136,35 +182,19 @@ class NI_DAQ():
 
         '''
         DIAGNOSTICS TASK
-        '''
+        '''        
+        n_channels = len(self.diagnostics)
         for name, diagnostic in self.diagnostics.items():
             self.task_diagnostics.ai_channels.add_ai_voltage_chan(f'{diagnostic}',
                                                                   min_val=-10.0, max_val=10.0,
                                                                   name_to_assign_to_channel=name)
 
-        # Create time array for discharge
-        n_channels = len(self.diagnostics)
-        pretrigger_fraction = 0.1
-        posttrigger_samples = int(samp_freq * duration) + 1 # Add one to include t=0
-        pretrigger_samples = int(posttrigger_samples * pretrigger_fraction) 
-        pretrigger_duration = duration * pretrigger_fraction
-        discharge_samps_per_chan = pretrigger_samples + posttrigger_samples
-        self.dischargeTime = np.linspace(-pretrigger_duration, duration, discharge_samps_per_chan)
-        if (max(np.abs(self.dischargeTime)) < 1e-3):
-            self.dischargeTime *= 1e6
-            self.tUnit = 'us'
-        elif (max(np.abs(self.dischargeTime)) < 1):
-            self.dischargeTime *= 1e3
-            self.tUnit = 'ms'
-        else:
-            self.tUnit = 's'
+        self.dischargeData = np.zeros((n_channels, self.discharge_samps_per_chan))
 
-        self.dischargeData = np.zeros((n_channels, discharge_samps_per_chan))
-
-        self.task_diagnostics.timing.cfg_samp_clk_timing(samp_freq, sample_mode=AcquisitionType.FINITE, samps_per_chan=discharge_samps_per_chan)
+        self.task_diagnostics.timing.cfg_samp_clk_timing(samp_freq, sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samps_per_chan)
 
         # Add analog signal trigger
-        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.diagnostics_name}/PFI0', pretrigger_samples=pretrigger_samples)
+        self.task_diagnostics.triggers.reference_trigger.cfg_dig_edge_ref_trig(f'/{self.diagnostics_name}/PFI0', pretrigger_samples=self.pretrigger_samples)
         
         # Specify a minimum pulse width (in sec) to avoid false trigger
         # self.task_diagnostics.triggers.reference_trigger.anlg_edge_dig_fltr_enable = True
@@ -177,7 +207,7 @@ class NI_DAQ():
         self.dischargeTriggered = False
 
         '''START TASKS'''
-        for task in self.trigger_task_names + self.dump_task_names:
+        for task in self.trigger_task_names + self.dump_task_names + self.counters_task_names:
             task = getattr(self, task)
             if len(task.channel_names) != 0:
                 task.start()
@@ -235,10 +265,6 @@ class NI_DAQ():
             task.start()
 
         return 0
-
-    def set_dumpDelay(self, dumpDelay):
-        self.dumpDelay = dumpDelay
-        print(f'Set dump delay to {self.dumpDelay} s')
 
     def remove_switch_tasks(self, task_handle, status, callback_data):
         self.remove_tasks(self.switch_task_names)

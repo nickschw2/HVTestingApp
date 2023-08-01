@@ -152,6 +152,20 @@ class CMFX_App(TestingApp):
 
         self.chargeStateLabel.pack(side='top', expand=True, pady=(labelPadding, 0))
 
+        # Conditionals depending on the power supply in use
+        if POWER_SUPPLY == 'PLEIADES':
+            # Frame for power supply status
+            self.powerSupplyStatusFrame = ttk.Frame(self.chargingStatusFrame)
+            self.powerSupplyStatusFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+
+            powerSupplyStatusIndicators = {}
+            for indicator_label in indicator_labels[POWER_SUPPLY]:
+                indicator = Indicator(self.powerSupplyStatusFrame, text=indicator_label)
+                indicator.pack(side='top', anchor='w', pady=(0, labelPadding))
+                powerSupplyStatusIndicators[indicator_label] = indicator 
+
+            powerSupplyStatusIndicators['HV On'].set(True)
+
         # Plot of charge
         self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
 
@@ -195,14 +209,21 @@ class CMFX_App(TestingApp):
         # Button definitions and placement
         self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
                                     command=self.checklist, bootstyle='success')
+        self.enableHVButton = ttk.Button(self.buttons, text='Enable HV',
+                                    command=self.enableHV, bootstyle='warning')
         self.chargeButton = ttk.Button(self.buttons, text='Charge',
                                     command=self.charge, bootstyle='warning')
         self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
                                     command=self.discharge, bootstyle='danger')
 
         self.checklistButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
+        # Conditionals depending on the power supply in use
+        if POWER_SUPPLY == 'PLEIADES':
+            self.enableHVButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
         self.chargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
         self.dischargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
+
+        
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
@@ -213,6 +234,16 @@ class CMFX_App(TestingApp):
                                 'Diode': {'twinx': False, 'ylabel': 'Diode (V)', 'lines': DIODELines}}
         
         self.resultsPlotViewer = PlotViewer(self.notebookFrames['Results'], self.resultsPlotData)
+
+        # Row for diagnostics on the bottom
+        self.misc_diagnostics = ttk.LabelFrame(self.notebookFrames['Results'], text='Misc. Diagnostics', bootstyle='primary')
+        self.misc_diagnostics.pack(side='bottom', expand=True, pady=(0, framePadding))
+
+        # Diagnostic definitions and placement
+        self.HE3DET01Text = ttk.StringVar()
+        self.HE3DET01Text.set(f'HE3DET01: N/A neutrons')
+        self.HE3DET01Label = ttk.Label(self.misc_diagnostics, textvariable=self.HE3DET01Text)
+        self.HE3DET01Label.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
 
         #### ANALYSIS SECTION ####
         # Initialize the data structure to hold results plot
@@ -367,6 +398,10 @@ class CMFX_App(TestingApp):
                 # self.scope.setScale(self.chargeVoltage)
                 self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + ignitronDelay)
 
+                # Reset the timing on the daq
+                self.NI_DAQ.set_timing(self.dumpDelay / 1000)
+                self.NI_DAQ.reset_discharge_trigger()
+
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
                 self.checklistButton.configure(state='normal')
@@ -425,6 +460,9 @@ class CMFX_App(TestingApp):
 
                 # Once the save thread has finished, then we can replot the discharge results
                 if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
+                    # Update the misc diagnostics
+                    self.HE3DET01Text.set(f'HE3DET01: {self.HE3DET01} neutrons')
+
                     # Show results tab once finished plotting
                     self.notebook.select(2)
                     self.resultsSaved = True
@@ -496,6 +534,9 @@ class CMFX_App(TestingApp):
                 if hasattr(self, variable):
                     data_dict[plotOption]['lines'][variable].data = getattr(self, variable)
 
+    def enableHV(self):
+        return 0
+
     def performAnalysis(self):
         print('Performing analysis...')
         analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent)
@@ -543,6 +584,9 @@ class CMFX_App(TestingApp):
 
             for i, variable in enumerate(self.diagnostics_Pins):
                 setattr(self, variable, self.NI_DAQ.dischargeData[i,:])
+
+            for i, variable in enumerate(self.counters_Pins):
+                setattr(self, variable, self.NI_DAQ.task_ci.channels.ci_count)
             
             self.dischargeCurrent /= pearsonCoilDischarge
             self.dumpCurrent /= dumpResistance

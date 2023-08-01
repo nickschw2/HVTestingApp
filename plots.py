@@ -174,26 +174,12 @@ class PlotViewer(ttk.Frame):
         self.master = master
         self.plotData = plotData
 
-        # Frame for displaying the plots
-        self.plotFrame = ttk.Frame(self.master)
-        self.plotFrame.pack(side='right', expand=True, padx=plotPadding)
-
-        # Add plot and toolbar to frame
-        # There are currently two viewing modes, one with single plots and one with subplots
-        self.plotSingle = CanvasPlot(self.plotFrame, figsize=(10, 4))
-        nrows_subplots = int(np.ceil(len(self.plotData) / 2))
-        self.plotSubplots = CanvasPlot(self.plotFrame, nrows=nrows_subplots, ncols=2, figsize=(12, 6))
-
-        self.plotToolbar = CustomToolbar(self.plotSingle.canvas, self.plotFrame)
-        self.plotSubplotsToolbar = CustomToolbar(self.plotSubplots.canvas, self.plotFrame)
-        self.plotToolbar.update()
-        self.plotSubplotsToolbar.update()
-
-        self.plotSingle.pack(side='top', expand=True)
-        self.plotSubplots.pack(side='top', expand=True)
+        # Frame to hold the plot and plot adjustment
+        self.parentPlotFrame = ttk.Frame(self.master)
+        self.parentPlotFrame.pack(side='top', expand=True)
 
         # Frame for adjusting all aspects of the plot view
-        self.viewFrame = ttk.Frame(self.master)
+        self.viewFrame = ttk.Frame(self.parentPlotFrame)
         self.viewFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
         # Add frame for run number
@@ -240,6 +226,24 @@ class PlotViewer(ttk.Frame):
                 checkbutton.invoke() # Initialize it to be turned on
                 checkbutton.bind('<Button>', self.replot)
                 self.checkbuttons[plotOption][line.label] = checkbutton
+
+        # Frame for displaying the plots
+        self.plotFrame = ttk.Frame(self.parentPlotFrame)
+        self.plotFrame.pack(side='left', expand=True, padx=plotPadding)
+
+        # Add plot and toolbar to frame
+        # There are currently two viewing modes, one with single plots and one with subplots
+        self.plotSingle = CanvasPlot(self.plotFrame, figsize=(10, 4))
+        nrows_subplots = int(np.ceil(len(self.plotData) / 2))
+        self.plotSubplots = CanvasPlot(self.plotFrame, nrows=nrows_subplots, ncols=2, figsize=(12, 6))
+
+        self.plotToolbar = CustomToolbar(self.plotSingle.canvas, self.plotFrame)
+        self.plotSubplotsToolbar = CustomToolbar(self.plotSubplots.canvas, self.plotFrame)
+        self.plotToolbar.update()
+        self.plotSubplotsToolbar.update()
+
+        self.plotSingle.pack(side='top', expand=True)
+        self.plotSubplots.pack(side='top', expand=True)
         
         # Preset discharge timing
         self.dischargeTime = []

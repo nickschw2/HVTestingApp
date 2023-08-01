@@ -1,7 +1,11 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = False
+DEBUG_MODE = True
 ADMIN_MODE = True
 SHOT_MODE = True
+POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV']
+
+# Power supply indicators
+indicator_labels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault']}
 
 # Power supply constants
 maxVoltagePowerSupply = 20e3 # V
@@ -64,11 +68,13 @@ diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai0',
                         'DIODE00': f'{diagnostics2_name}/ai5',
                         'DIODE01': f'{diagnostics2_name}/ai6',
                         'dischargeVoltage': f'{diagnostics2_name}/ai7'}
+counters_defaults = {'HE3DET01': f'{output_name}/ctr1'}
 charge_ao_options = [f'{output_name}/a0{i}' for i in list(range(2))]
 systemStatus_options = [f'{systemStatus_name}/ai{i}' for i in list(range(8))]
 do_options = [f'{output_name}/{digitalOutName}/line{8}' for i in list(range(16))]
 diagnostics_options = [f'{diagnostics_name}/ai{i}' for i in list(range(8))] + \
                       [f'{diagnostics2_name}/ai{i}' for i in list(range(8))]
+counters_options = [f'{output_name}/ctr{i}' for i in list(range(4))]
 samp_freq = 1000000 # Frequency for acquiring data [Hz]
 switch_samp_freq = 1000 # Frequency for triggering switches [Hz]
 
@@ -153,10 +159,11 @@ default_dumpDelay = 0.2 # s
 ignitronDelay = 0.01 # s
 gasPuffTime = 0.03 # s
 
-duration = 0.4 # s
+post_dump_duration = 0.1 # s
+pretrigger_duration = 0.02 # s
 pulse_period = 10.1e-3 # s
 pulse_width = 50e-4 # s
-spectrometer_delay = 0.0 # s
+spectrometer_delay = 0.05 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
 # Pulse generator channels SRS DG535

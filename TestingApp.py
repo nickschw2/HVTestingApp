@@ -21,6 +21,7 @@ from timer import *
 from gpib import *
 from console import *
 from analysis import *
+from indicator import *
 
 # Change nidaqmx read/write to this format? https://github.com/AppliedAcousticsChalmers/nidaqmxAio
 
@@ -57,6 +58,7 @@ class TestingApp(ttk.Window):
         self.systemStatus_Pins = systemStatus_defaults
         self.do_Pins = do_defaults
         self.diagnostics_Pins = diagnostics_defaults
+        self.counters_Pins = counters_defaults
 
     def center_app(self):
         self.update_idletasks()
@@ -78,7 +80,7 @@ class TestingApp(ttk.Window):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_channels=self.systemStatus_Pins,
                              charge_ao_channels=self.charge_ao_Pins, diagnostics=self.diagnostics_Pins,
-                             n_pulses=n_pulses)
+                             counters=self.counters_Pins, n_pulses=n_pulses)
 
         # Discharge the power supply on startup
         self.powerSupplyRamp(action='discharge')
@@ -249,6 +251,7 @@ class TestingApp(ttk.Window):
         systemStatus_PinsOptions = selectPins(systemStatus_defaults, systemStatus_options)
         do_PinsOptions = selectPins(do_defaults, do_options)
         diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
+        counter_PinsOptions = selectPins(counters_defaults, counters_options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -271,11 +274,15 @@ class TestingApp(ttk.Window):
             for channel in diagnostics_PinsOptions:
                 self.diagnostics_Pins[channel] = diagnostics_PinsOptions[channel].get()
 
+            for channel in counter_PinsOptions:
+                self.counter_Pins[channel] = counter_PinsOptions[channel].get()
+
             print(self.scopePins)
             print(self.charge_ao_Pins)
             print(self.systemStatus_Pins)
             print(self.do_Pins)
             print(self.diagnostics_Pins)
+            print(self.counter_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
