@@ -20,13 +20,14 @@ from config import *
 
 class NI_DAQ():
     def __init__(self, systemStatus_sample_rate, systemStatus_channels={},
-                 charge_ao_channels={}, diagnostics={}, counters={},
+                 charge_ao_channels={}, di_channels={}, diagnostics={}, counters={},
                  n_pulses=None, autostart=True):
         
         self.output_name = output_name
         self.diagnostics_name = diagnostics_name
         self.systemStatus_channels = systemStatus_channels
         self.charge_ao_channels = charge_ao_channels
+        self.di_channels = di_channels
         self.diagnostics = diagnostics
         self.counters = counters
         self.systemStatus_sample_rate = systemStatus_sample_rate
@@ -37,7 +38,7 @@ class NI_DAQ():
         self.tasks = []
         self.closed = False
 
-        self.status_task_names = ['task_systemStatus', 'task_charge_ao']
+        self.status_task_names = ['task_systemStatus', 'task_charge_ao', 'task_di']
         self.switch_task_names = ['task_switch_trigger', 'task_switch']
         self.dump_task_names = ['task_dump_trigger', 'task_dump']
         self.trigger_task_names = ['task_diagnostics', 'task_co']
@@ -103,6 +104,9 @@ class NI_DAQ():
             self.task_charge_ao.ao_channels.add_ao_voltage_chan(f'{charge_ao_chan}',
                                                                 min_val=0.0, max_val=10.0,
                                                                 name_to_assign_to_channel=name)
+            
+        for name, di_chan in self.di_channels.items():
+            self.task_di.di_channels.add_di_chan(f'{di_chan}', name_to_assign_to_lines=name)
 
         '''
         SET UP ANALOG INPUT
@@ -270,8 +274,8 @@ class NI_DAQ():
         self.remove_tasks(self.switch_task_names)
         return 0
 
-    def write_value(self, value):
-        self.task_charge_ao.write(value, timeout=2)
+    def write_value(self, voltageValue, currentValue):
+        self.task_charge_ao.write([voltageValue, currentValue], timeout=2)
 
     def read(self):
         points = self.task_systemStatus.read(number_of_samples_per_channel=self._points_to_plot)

@@ -1,20 +1,24 @@
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = True
+DEBUG_MODE = False
 ADMIN_MODE = True
 SHOT_MODE = True
+IGNITRON_MODE = True
+USING_SCOPE = False
 POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV']
 
 # Power supply indicators
-indicator_labels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault']}
+powerSupplyIndicatorLabels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault']}
+# All other indicators
+indicatorLabels = ['Door Closed 1', 'Door Closed 2']
 
 # Power supply constants
-maxVoltagePowerSupply = 20e3 # V
-maxCurrentPowerSupply = 15e-3 # A
-maxVoltageInput = 10 # V
+maxVoltagePowerSupply = 100e3 # V
+maxCurrentPowerSupply = 60e-3 # A
+maxAnalogInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'Discharge Voltage': '1', 'Trigger': '3'}
+scopeChannelDefaults = {'INT01': '1'}
 scopeChannelOptions = ['1', '2', '3', '4']
 
 # Pulse Generator parameters
@@ -26,6 +30,8 @@ systemStatus_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
 diagnostics_name = 'PXI1Slot4' # The name of the DAQ device as shown in MAX
 diagnostics2_name = 'PXI1Slot5' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
+PFIPort1Name = 'port1'
+PFIPort2Name = 'port2'
 
 # Channels
 ''' 
@@ -47,31 +53,44 @@ Units: Units of variable, i.e. (V) or (A)
 5. In constants.py, change the value of 'single_columns' to include your channel in the following format:
     'variable_name': {'name': 'description (units)', 'type': 'array'},
 '''
-charge_ao_defaults = {'Power Supply Output': f'{output_name}/ao0'} # analog outputs
+charge_ao_defaults = {'Voltage Set': f'{output_name}/ao0',
+                      'Current Set': f'{output_name}/ao1'} # analog outputs
 systemStatus_defaults = {'Power Supply Voltage': f'{systemStatus_name}/ai0',
                          'Power Supply Current': f'{systemStatus_name}/ai1',
                          'Capacitor Voltage': f'{systemStatus_name}/ai2'} # analog inputs
-do_defaults = {'Load Switch': f'{output_name}/{digitalOutName}/line0',
-               'Dump Switch': f'{output_name}/{digitalOutName}/line1',
-               'Power Supply Switch': f'{output_name}/{digitalOutName}/line2'}
+do_defaults = {'Dump Switch': f'{output_name}/{digitalOutName}/line0',
+               'Power Supply Switch': f'{output_name}/{digitalOutName}/line1',
+               'Load Switch': f'{output_name}/{digitalOutName}/line2',
+               'Enable HV': f'{output_name}/{digitalOutName}/line3'}
+di_defaults = {'HV On': f'{output_name}/{PFIPort1Name}/line1',
+               'CONST HV Mode': f'{output_name}/{PFIPort1Name}/line2',
+               'CONST mA Mode': f'{output_name}/{PFIPort1Name}/line3',
+               'Interlock Closed': f'{output_name}/{PFIPort1Name}/line4',
+               'Spark': f'{output_name}/{PFIPort1Name}/line5',
+               'Over Temp Fault': f'{output_name}/{PFIPort1Name}/line6',
+               'AC Fault': f'{output_name}/{PFIPort1Name}/line7',
+               'Door Closed 1': f'{output_name}/{PFIPort2Name}/line0',
+               'Door Closed 2': f'{output_name}/{PFIPort2Name}/line1'}
 diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai0',
                         'DIA01': f'{diagnostics_name}/ai2',
                         'DIA02': f'{diagnostics_name}/ai3',
                         'DIA03': f'{diagnostics_name}/ai4',
                         'DIA04': f'{diagnostics_name}/ai6',
-                        'DIODE02': f'{diagnostics_name}/ai7',
+                        'dumpCurrent': f'{diagnostics_name}/ai7',
                         'BR01': f'{diagnostics2_name}/ai0',
                         'BR02': f'{diagnostics2_name}/ai1',
                         'BR03': f'{diagnostics2_name}/ai2',
                         'BR04': f'{diagnostics2_name}/ai3',
-                        'dumpCurrent': f'{diagnostics2_name}/ai4',
+                        'chamberProtectionCurrent': f'{diagnostics2_name}/ai4',
                         'DIODE00': f'{diagnostics2_name}/ai5',
                         'DIODE01': f'{diagnostics2_name}/ai6',
                         'dischargeVoltage': f'{diagnostics2_name}/ai7'}
 counters_defaults = {'HE3DET01': f'{output_name}/ctr1'}
 charge_ao_options = [f'{output_name}/a0{i}' for i in list(range(2))]
 systemStatus_options = [f'{systemStatus_name}/ai{i}' for i in list(range(8))]
-do_options = [f'{output_name}/{digitalOutName}/line{8}' for i in list(range(16))]
+do_options = [f'{output_name}/{digitalOutName}/line{i}' for i in list(range(8))]
+di_options = [f'{output_name}/{PFIPort1Name}/line{i}' for i in list(range(8))] + \
+             [f'{output_name}/{PFIPort2Name}/line{i}' for i in list(range(8))]
 diagnostics_options = [f'{diagnostics_name}/ai{i}' for i in list(range(8))] + \
                       [f'{diagnostics2_name}/ai{i}' for i in list(range(8))]
 counters_options = [f'{output_name}/ctr{i}' for i in list(range(4))]
@@ -147,7 +166,8 @@ ignitronInstalled = True
 maxVoltage = {'LBL': 5, 'BLU': 50, 'GRA': 10, '': 'N/A'}
 capacitance = 144 # uF
 ballastResistance = 500 # Ohms
-dumpResistance = 0.29 / 7 # Ohms
+dumpResistance = 0.0105 / 6 # Ohms
+chamberProtectionResistance = 0.029 / 6 # Ohms
 
 # User input validation
 maxValidVoltage = min([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV

@@ -7,17 +7,13 @@ class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
 
-        # Change circuit parameters in config.py    
-        self.capacitance = capacitance
-        self.ballastResistance = ballastResistance
-        self.dumpResistance = dumpResistance
-
         # Create and show user interface
         self.configure_ui()
         self.init_ui()
 
         # Connect to instruments
         if not DEBUG_MODE:
+            print('test')
             self.init_DAQ()
             self.init_PulseGenerator()
 
@@ -45,7 +41,7 @@ class CMFX_App(TestingApp):
         self.textStatusFrame = ttk.Frame(self.notebookFrames['System Status'])
         self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', width=systemStatusFrameWidth, height=150, bootstyle='primary')
         self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', width=systemStatusFrameWidth, height=110, bootstyle='primary')
-        self.circuitValuesFrame = ttk.LabelFrame(self.textStatusFrame, text='Circuit Values', width=systemStatusFrameWidth, height=150, bootstyle='primary')
+        self.circuitValuesFrame = ttk.LabelFrame(self.textStatusFrame, text='Circuit Values', width=systemStatusFrameWidth, height=200, bootstyle='primary')
 
         self.textStatusFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
         self.HVStatusFrame.pack(side='top', expand=True)
@@ -69,9 +65,10 @@ class CMFX_App(TestingApp):
         self.capacitorVoltageLabel = ttk.Label(self.HVStatusFrame, textvariable=self.capacitorVoltageText)
         self.chamberPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.chamberPressureText)
         self.pumpPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pumpPressureText)
-        self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {self.capacitance} uF')
-        self.ballastResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Ballast Resistance: {self.ballastResistance} {Omega}')
-        self.dumpResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Dump Resistance: {self.dumpResistance:.2f} {Omega}')
+        self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {capacitance} uF')
+        self.ballastResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Ballast Resistance: {ballastResistance} {Omega}')
+        self.dumpResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Dump Resistance: {int(dumpResistance * 1000)} m{Omega}')
+        self.chamberProtectionResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Chamb. Prot. Resistance: {int(chamberProtectionResistance * 1000)} m{Omega}')
 
         self.voltagePSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
@@ -81,6 +78,7 @@ class CMFX_App(TestingApp):
         self.bankCapacitanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.ballastResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.dumpResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+        self.chamberProtectionResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
 
         # Add textboxes for adding notes about a given shot
         self.userNotesFrame = ttk.Frame(self.notebookFrames['System Status'])
@@ -158,13 +156,12 @@ class CMFX_App(TestingApp):
             self.powerSupplyStatusFrame = ttk.Frame(self.chargingStatusFrame)
             self.powerSupplyStatusFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
-            powerSupplyStatusIndicators = {}
-            for indicator_label in indicator_labels[POWER_SUPPLY]:
+            self.booleanIndicators = {}
+            # Specific indicators for a certain power supply AND all other indicators
+            for indicator_label in powerSupplyIndicatorLabels[POWER_SUPPLY] + indicatorLabels:
                 indicator = Indicator(self.powerSupplyStatusFrame, text=indicator_label)
                 indicator.pack(side='top', anchor='w', pady=(0, labelPadding))
-                powerSupplyStatusIndicators[indicator_label] = indicator 
-
-            powerSupplyStatusIndicators['HV On'].set(True)
+                self.booleanIndicators[indicator_label] = indicator
 
         # Plot of charge
         self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
@@ -394,8 +391,9 @@ class CMFX_App(TestingApp):
 
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
-                # self.NI_DAQ.set_dumpDelay(self.dumpDelay / 1000)
-                # self.scope.setScale(self.chargeVoltage)
+                if USING_SCOPE:
+                    self.scope.setScale(self.chargeVoltage)
+
                 self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + ignitronDelay)
 
                 # Reset the timing on the daq
@@ -419,7 +417,7 @@ class CMFX_App(TestingApp):
             capacitorVoltagePoint = np.nan
 
             # not applicable on startup	
-            if hasattr(self, 'NI_DAQ'):	
+            if hasattr(self, 'NI_DAQ'):
                 if not DEBUG_MODE:	
                     voltages = self.NI_DAQ.systemStatusData	
                 else:	
@@ -427,8 +425,8 @@ class CMFX_App(TestingApp):
 
                 # Update charging values in object while not discharged
                 if self.charging:
-                    self.chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxVoltageInput	
-                    self.chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason	
+                    self.chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxAnalogInput	
+                    self.chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxAnalogInput # +10 because theres an offset for whatever reason	
                     self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider	
                     
                     voltagePSPoint = self.chargeVoltagePS[-1]
@@ -436,8 +434,8 @@ class CMFX_App(TestingApp):
                     capacitorVoltagePoint = self.capacitorVoltage[-1]
                 
                 else:
-                    chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxVoltageInput	
-                    chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxVoltageInput # +10 because theres an offset for whatever reason	
+                    chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxAnalogInput	
+                    chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxAnalogInput # +10 because theres an offset for whatever reason	
                     capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider
                     	
                     voltagePSPoint = chargeVoltagePS[-1]
@@ -518,9 +516,42 @@ class CMFX_App(TestingApp):
             pumpPressure = 2e-4
             self.chamberPressureText.set(f'Chamber Press.: {chamberPressure:.1e} Torr')
             self.pumpPressureText.set(f'Pump Press.: {pumpPressure:.1e} Torr')
+
+        def updatePowerSupplyStatus():
+            # Not applicable on startup
+            if hasattr(self, 'NI_DAQ'):
+                # Set the states for all boolean indicators
+                for (name, state) in zip(self.NI_DAQ.task_di.di_channels.channel_names, self.NI_DAQ.task_di.read()):
+                    # Power supply indicators work off reverse boolean logic, hence the "not"
+                    if name in powerSupplyIndicatorLabels[POWER_SUPPLY]:
+                        self.booleanIndicators[name].set(not state)
+                    else:
+                        self.booleanIndicators[name].set(state)
+
+                # Stop charging and generate fault message if there has been a change in state
+                if self.charging and any([not self.booleanIndicators['HV On'].state,
+                        not self.booleanIndicators['Interlock Closed'].state,
+                        self.booleanIndicators['Spark'].state,
+                        self.booleanIndicators['Over Temp Fault'].state,
+                        self.booleanIndicators['AC Fault'].state,
+                        not self.booleanIndicators['Door Closed 1'].state,
+                        not self.booleanIndicators['Door Closed 2'].state]):
+                    
+                    if not any([self.booleanIndicators['Door Closed 1'].state,
+                            self.booleanIndicators['Door Closed 2'].state]):
+                        name = 'Door Open Fault'
+                        text = 'The door to the lab has been left open. Discharging now.'
+                    else:
+                        name = 'Power Supply Fault'
+                        text = 'There has been a fault in the power supply. Discharging now.'
+
+                    faultWindow = MessageWindow(self, name, text)
+                    faultWindow.wait_window()
+                    self.discharge()
         
         updateHVStatus()
         updatePressureStatus()
+        updatePowerSupplyStatus()
 
         self.after(int(1000 / refreshRate), self.updateSystemStatus)
 
@@ -533,9 +564,6 @@ class CMFX_App(TestingApp):
             for variable in plotProperties['lines'].keys():
                 if hasattr(self, variable):
                     data_dict[plotOption]['lines'][variable].data = getattr(self, variable)
-
-    def enableHV(self):
-        return 0
 
     def performAnalysis(self):
         print('Performing analysis...')
@@ -557,30 +585,18 @@ class CMFX_App(TestingApp):
 
     def saveDischarge(self):
             print('Saving discharge...')
-            # Read from the load
-            # if not DEBUG_MODE:
-            #     print('Sleeping for 5 seconds to give scope its "me time"')	
-            #     time.sleep(5)
-            #     dischargeVoltage = self.scope.get_data(self.scopePins['Discharge Voltage']) * voltageDivider
-            #     # diamagneticAxial = self.scope.get_data(self.scopePins['diamagneticAxial'])
-            #     # dischargeCurrent = self.scope.get_data(self.scopePins['Discharge Current']) / pearsonCoilDischarge
-            #     # interferometer = self.scope.get_data(self.scopePins['Interferometer'])
-            #     # trigger = self.scope.get_data(self.scopePins['Trigger'])
-            #     dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
-                
-            # else:
-            #     dischargeVoltage, dischargeCurrentLoad, dischargeTimeScope, dischargeTimeScopeUnit = self.getDischargeTestValues()
+            # Read from the scope
+            if USING_SCOPE:
+                print('Sleeping for 5 seconds to give scope its "me time"')	
+                time.sleep(5)
+                INT01 = self.scope.get_data(self.scopePins['INT01'])
+                dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
 
-            # if len(dischargeTimeScope) != 0:
-            #     # Plot results on the discharge graph and save them
-            #     # The only time results are saved is when there is a discharge that is preceded by charge
-            #     self.replotCharge()
-            #     self.replotDischarge()
+                # Transform scope data to be on same timebase as daq
+                self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, INT01, left=np.nan, right=np.nan)
 
-            #     self.saveResults()
-
-            # else:
-            #     print('Oscilloscope was not triggered successfully')
+                if len(dischargeTimeScope) == 0:
+                    print('Oscilloscope was not triggered successfully')
 
             for i, variable in enumerate(self.diagnostics_Pins):
                 setattr(self, variable, self.NI_DAQ.dischargeData[i,:])
@@ -590,16 +606,8 @@ class CMFX_App(TestingApp):
             
             self.dischargeCurrent /= pearsonCoilDischarge
             self.dumpCurrent /= dumpResistance
+            self.chamberProtectionCurrent /= chamberProtectionResistance
             self.dischargeVoltage *= voltageDivider
-
-            # Transform scope data to be on same timebase as daq
-            # self.dischargeVoltage = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeVoltage, left=np.nan, right=np.nan)
-            # self.diamagneticAxial = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, diamagneticAxial, left=np.nan, right=np.nan)
-            # self.dischargeCurrent = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, dischargeCurrent, left=np.nan, right=np.nan)
-            # self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, interferometer, left=np.nan, right=np.nan)
-            # self.trigger = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, trigger, left=np.nan, right=np.nan)
-            # self.interferometer = self.diamagneticRadial
-            # self.dischargeVoltage = self.diamagneticRadial
 
             self.setData(self.resultsPlotData)
 
@@ -616,10 +624,11 @@ class CMFX_App(TestingApp):
             self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
         # Open power supply and load and close dump
+        self.operateSwitch('Enable HV', False)
         self.operateSwitch('Power Supply Switch', False)	
-        time.sleep(switchWaitTime)
-        # self.operateSwitch('Load Switch', False)	
+        time.sleep(switchWaitTime)	
         self.operateSwitch('Dump Switch', False)
+        self.operateSwitch('Load Switch', False)
 
         # Clear user inputs
         self.chargeVoltageEntry.delete(0, 'end')
@@ -686,5 +695,5 @@ class CMFX_App(TestingApp):
         # Reset progress bar
         self.progressBar.configure(amountused = 0)
 
-        # if hasattr(self, 'scope'):
-        #     self.scope.reset() # Reset the scope
+        if hasattr(self, 'scope'):
+            self.scope.reset() # Reset the scope

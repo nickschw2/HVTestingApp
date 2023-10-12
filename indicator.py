@@ -12,6 +12,7 @@ class Indicator(ttk.Frame):
         self.text = text
         self.on_color = on_color
         self.off_color = off_color
+        self.state = False
 
         self.indicatorFrame = ttk.Frame(self.master)
         self.indicatorFrame.pack(anchor='w')
@@ -25,7 +26,8 @@ class Indicator(ttk.Frame):
         self.label.pack(side='left')
 
     def set(self, state):
-        if state == True:
+        self.state = state
+        if self.state:
             self.canvas.itemconfig(self.indicator, fill=self.on_color)
         else:
             self.canvas.itemconfig(self.indicator, fill=self.off_color)

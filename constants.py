@@ -33,7 +33,7 @@ setPinsPaddingX = 15 #pixels
 setPinsPaddingY = 3 #pixels
 labelPadding = 10 #pixels
 buttonPadding = 50 #pixels
-framePadding = 20 #pixels
+framePadding = 15 #pixels
 plotPadding = 30 #pixels
 displaySetTextTime = 1000 # ms
 topLevelWidth = 30
@@ -90,6 +90,7 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'capacitance': {'name': 'Capacitance (uF)', 'type': 'scalar'},
     'ballastResistance': {'name': 'Ballast Resistance (Ohms)', 'type': 'scalar'},
     'dumpResistance': {'name': 'Dump Resistance (Ohms)', 'type': 'scalar'},
+    'chamberProtectionResistance': {'name': 'Chamber Protection Resistance (Ohms)', 'type': 'scalar'},
     'gasPuffTime': {'name': 'Gas Puff Time (ms)', 'type': 'scalar'},
     'ignitronDelay': {'name': 'Ignitron Delay (s)', 'type': 'scalar'},
     'dumpDelay': {'name': 'Dump Delay (ms)', 'type': 'scalar'},
@@ -112,6 +113,7 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'dischargeVoltage': {'name': 'Discharge Voltage (V)', 'type': 'array'},
     'dischargeCurrent': {'name': 'Discharge Current (A)', 'type': 'array'},
     'dumpCurrent': {'name': 'Dump Current (A)', 'type': 'array'},
+    'chamberProtectionCurrent': {'name': 'Chamber Protection Current (A)', 'type': 'array'},
     'groundCurrent': {'name': 'Ground Current (A)', 'type': 'array'},
     'INT01': {'name': 'INT01 (V)', 'type': 'array'},
     'INT02': {'name': 'INT01 (V)', 'type': 'array'},

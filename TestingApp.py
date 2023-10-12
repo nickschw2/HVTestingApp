@@ -57,6 +57,7 @@ class TestingApp(ttk.Window):
         self.charge_ao_Pins = charge_ao_defaults
         self.systemStatus_Pins = systemStatus_defaults
         self.do_Pins = do_defaults
+        self.di_Pins = di_defaults
         self.diagnostics_Pins = diagnostics_defaults
         self.counters_Pins = counters_defaults
 
@@ -79,25 +80,26 @@ class TestingApp(ttk.Window):
     def init_DAQ(self):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_channels=self.systemStatus_Pins,
-                             charge_ao_channels=self.charge_ao_Pins, diagnostics=self.diagnostics_Pins,
+                             charge_ao_channels=self.charge_ao_Pins, di_channels=self.di_Pins, diagnostics=self.diagnostics_Pins,
                              counters=self.counters_Pins, n_pulses=n_pulses)
 
         # Discharge the power supply on startup
         self.powerSupplyRamp(action='discharge')
 
         # Initialize the scope over ethernet
-        # try:
-        #     self.scope = Oscilloscope()
-        # except visa.errors.VisaIOError:
-        #     scopeErrorName = 'Oscilloscope Connection'
-        #     scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
-        #     scopeErrorWindow = MessageWindow(self, scopeErrorName, scopeErrorText)
+        if USING_SCOPE:
+            try:
+                self.scope = Oscilloscope()
+            except visa.errors.VisaIOError:
+                scopeErrorName = 'Oscilloscope Connection'
+                scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
+                scopeErrorWindow = MessageWindow(self, scopeErrorName, scopeErrorText)
 
-        #     scopeErrorWindow.wait_window()
+                scopeErrorWindow.wait_window()
 
-        #     # If the user presses the Okay button, charging begins
-        #     if scopeErrorWindow.OKPress:
-        #         self.on_closing()
+                # If the user presses the Okay button, charging begins
+                if scopeErrorWindow.OKPress:
+                    self.on_closing()
 
     def init_PulseGenerator(self):
         self.pulseGenerator = PulseGenerator()
@@ -250,6 +252,7 @@ class TestingApp(ttk.Window):
         charge_ao_PinsOptions = selectPins(charge_ao_defaults, charge_ao_options)
         systemStatus_PinsOptions = selectPins(systemStatus_defaults, systemStatus_options)
         do_PinsOptions = selectPins(do_defaults, do_options)
+        di_PinsOptions = selectPins(di_defaults, di_options)
         diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
         counter_PinsOptions = selectPins(counters_defaults, counters_options)
 
@@ -271,18 +274,22 @@ class TestingApp(ttk.Window):
             for channel in do_PinsOptions:
                 self.do_Pins[channel] = do_PinsOptions[channel].get()
 
+            for channel in di_PinsOptions:
+                self.di_Pins[channel] = di_PinsOptions[channel].get()
+
             for channel in diagnostics_PinsOptions:
                 self.diagnostics_Pins[channel] = diagnostics_PinsOptions[channel].get()
 
             for channel in counter_PinsOptions:
-                self.counter_Pins[channel] = counter_PinsOptions[channel].get()
+                self.counters_Pins[channel] = counter_PinsOptions[channel].get()
 
             print(self.scopePins)
             print(self.charge_ao_Pins)
             print(self.systemStatus_Pins)
             print(self.do_Pins)
+            print(self.di_Pins)
             print(self.diagnostics_Pins)
-            print(self.counter_Pins)
+            print(self.counters_Pins)
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
@@ -321,6 +328,21 @@ class TestingApp(ttk.Window):
         if checklistWindow.OKPress and self.userInputsSet:
             self.enableButtons()
 
+    def enableHV(self):
+        # Popup window appears to confirm
+        name = 'Enable HV?'
+        text = 'Are you sure you want to enable HV?'
+        enableHVWindow = MessageWindow(self, name, text)
+
+        enableHVWindow.OKButton['text'] = 'Yes'
+        cancelButton = ttk.Button(enableHVWindow.bottomFrame, text='Cancel', command=enableHVWindow.destroy, bootstyle='danger')
+        cancelButton.pack(side='left')
+
+        enableHVWindow.wait_window()
+
+        if enableHVWindow.OKPress:
+            self.operateSwitch('Enable HV', True)
+
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
         # If state is true, power supply switch closes and load switch opens
@@ -337,19 +359,33 @@ class TestingApp(ttk.Window):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge'):
+        breakpoint()
         if action == 'charge':
-            value = self.chargeVoltage / maxVoltagePowerSupply * maxVoltageInput * 1000
+            voltageValue = self.chargeVoltage / maxVoltagePowerSupply * maxAnalogInput * 1000
+            currentValue = maxCurrentPowerSupply / maxCurrentPowerSupply * maxAnalogInput # Charge with maximum current
         else:
-            value = 0
+            voltageValue = 0
+            currentValue = 0
 
         if not DEBUG_MODE:
-            self.NI_DAQ.write_value(value)
+            self.NI_DAQ.write_value(voltageValue, currentValue)
 
     def charge(self):
+        # Determine whether there are any faults in the HV supply
+        if any([not self.booleanIndicators['HV On'].state,
+                not self.booleanIndicators['Interlock Closed'].state,
+                self.booleanIndicators['Spark'].state,
+                self.booleanIndicators['Over Temp Fault'].state,
+                self.booleanIndicators['AC Fault'].state]):
+            name = 'Power Supply Fault'
+            text = 'Please evaluate power supply status. HV may not be enabled, interlock may be open, or there may be a fault.'
+
+        else:
+            name = 'Begin charging'
+            text = 'Are you sure you want to begin charging?'
+
         # Popup window appears to confirm charging
-        chargeConfirmName = 'Begin charging'
-        chargeConfirmText = 'Are you sure you want to begin charging?'
-        chargeConfirmWindow = MessageWindow(self, chargeConfirmName, chargeConfirmText)
+        chargeConfirmWindow = MessageWindow(self, name, text)
 
         cancelButton = ttk.Button(chargeConfirmWindow.bottomFrame, text='Cancel', command=chargeConfirmWindow.destroy, bootstyle='danger')
         cancelButton.pack(side='left')
@@ -362,10 +398,8 @@ class TestingApp(ttk.Window):
 
             self.idleMode = False
 
-            # Operate switches
-            # Send trigger signal to open dump switch
-            # self.operateSwitch('Dump Trigger', True)
-            # self.operateSwitch('Dump Trigger', False)
+            ### Operate switches ###
+            # Open dump switch
             self.operateSwitch('Dump Switch', True)
             time.sleep(switchWaitTime)
 
@@ -385,6 +419,28 @@ class TestingApp(ttk.Window):
                 self.recordPressure()
 
     def discharge(self):
+        def discharge_switch():
+            if not IGNITRON_MODE:
+                self.operateSwitch('Load Switch', True)
+                time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
+
+            # Start the pulse generator
+            self.pulseGenerator.triggerStart()
+
+            # Read from DAQ
+            self.NI_DAQ.read_discharge()
+
+            # Wait a while before closing the mechanical dump switch
+            time.sleep(hardCloseWaitTime)	
+            self.operateSwitch('Dump Switch', False)
+
+            self.charging = False
+            self.discharged = True
+
+            # Save discharge on a separate thread
+            self.saveDischarge_thread = Thread(target=self.saveDischarge)
+            self.saveDischarge_thread.start()
+
         def popup():
             # Popup window to confirm discharge
             dischargeConfirmName = 'Discharge'
@@ -405,46 +461,14 @@ class TestingApp(ttk.Window):
                 # Operate switches
                 self.operateSwitch('Power Supply Switch', False)
                 time.sleep(switchWaitTime)
-                self.operateSwitch('Dump Switch', False)
 
-                self.charging = False
-                self.discharged = True
-
-                self.pulseGenerator.triggerStart()
-
-                # Read from DAQ
-                self.NI_DAQ.read_discharge()
-
-                # Save discharge on a separate thread
-                self.saveDischarge_thread = Thread(target=self.saveDischarge)
-                self.saveDischarge_thread.start()
+                discharge_switch()
 
         if not self.idleMode:
             if not self.charged:
                 popup()
-
             else:
-                # self.operateSwitch('Load Switch', True)
-                # time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
-                self.pulseGenerator.triggerStart()
-
-                # time.sleep(self.dumpDelay / 1000)
-                # self.operateSwitch('Dump Switch', False)
-
-                # Read from DAQ
-                self.NI_DAQ.read_discharge()
-
-                # Wait a while before closing the mechanical dump switch
-                time.sleep(hardCloseWaitTime)	
-                self.operateSwitch('Dump Switch', False)
-                
-                self.charging = False
-                self.discharged = True
-
-                # Save discharge on a separate thread	
-                self.saveDischarge_thread = Thread(target=self.saveDischarge)
-                self.saveDischarge_thread.start()
-
+                discharge_switch()
         else:
             popup()
 
@@ -454,7 +478,7 @@ class TestingApp(ttk.Window):
             self.resetButton.configure(state='normal')
 
     def replotCharge(self):
-        self.chargeVoltageLine.set_data(self.chargeTime, self.chargeVoltagePS / 1000)
+        self.chargeVoltageLine.set_data(self.chargeTime, np.abs(self.chargeVoltagePS) / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 
         # If the capacitor is only being read every so often, only plot non nan values
@@ -491,10 +515,11 @@ class TestingApp(ttk.Window):
             self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
         # Operate switches
+        self.operateSwitch('Enable HV', False)
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
-        # self.operateSwitch('Load Switch', False)
         self.operateSwitch('Dump Switch', False)
+        self.operateSwitch('Load Switch', False)
 
         self.charging = False
         self.discharged = True
@@ -560,10 +585,11 @@ class TestingApp(ttk.Window):
             self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
         # Open power supply and Cap Switch and close load switch
+        self.operateSwitch('Enable HV', False)
         self.operateSwitch('Power Supply Switch', False)
         time.sleep(switchWaitTime)
         self.operateSwitch('Dump Switch', False)
-        # self.operateSwitch('Load Switch', False)
+        self.operateSwitch('Load Switch', False)
 
         if not DEBUG_MODE:
             # Stop NI communication
@@ -585,42 +611,6 @@ class TestingApp(ttk.Window):
 
         self.quit()
         self.destroy()
-
-    def readScope(self, channel):
-        try:
-            pin = self.scopePins[channel]
-            dataarray = self.scope.get_data(pin)
-            if channel == 'Load Voltage':
-                dataarray *= voltageDivider
-            elif channel == 'Load Current':
-                dataarray /= pearsonCoilDischarge
-            else:
-                print('Incorrect channel chosen')
-
-        except:
-            dataarray = np.nan
-            print('Not connected to the scope')
-
-
-        return dataarray
-
-    def readNI(self, channel):
-        try:
-            values = self.NI_DAQ.read()
-            value = values[channel]
-            if channel == 'Power Supply Voltage':
-                value *= maxVoltagePowerSupply / maxVoltageInput
-            elif channel == 'Power Supply Current':
-                value *= maxCurrentPowerSupply / maxVoltageInput
-            else:
-                print('Incorrect channel chosen')
-
-        except Exception as e:
-            value = np.nan
-            print('Not connected to the NI DAQ')
-            print(e)
-
-        return value
 
     def getChargingTestVoltages(self):
         if hasattr(self, 'waveform') and not self.discharged and len(self.waveform) != 0:
