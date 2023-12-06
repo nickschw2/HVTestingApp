@@ -17,6 +17,7 @@ from nidaqmx.constants import (AcquisitionType, Edge, TriggerType, Level, LineGr
 from nidaqmx.stream_readers import (AnalogMultiChannelReader)
 import numpy as np
 from config import *
+import time
 
 class NI_DAQ():
     def __init__(self, systemStatus_sample_rate, systemStatus_channels={},
@@ -45,7 +46,10 @@ class NI_DAQ():
         self.counters_task_names = ['task_ci_trigger', 'task_ci']
 
         # Set default duration
-        self.set_timing(default_dumpDelay)
+        self.set_timing(userInputs['dumpDelay']['default'] / 1000,
+                        userInputs['ignitronDelay']['default'] / 1000,
+                        userInputs['spectrometerDelay']['default'] / 1000,
+                        userInputs['secondaryGasTime']['default'] / 1000)
         
         self.set_up_tasks()
         print('NI DAQ has been successfully initialized')
@@ -53,12 +57,16 @@ class NI_DAQ():
         if autostart:
             self.start_acquisition()
 
-    def set_timing(self, dumpDelay):
+    def set_timing(self, dumpDelay, ignitronDelay, spectrometerDelay, secondaryGasTime):
+        # Set variables for delays
+        self.spectrometerDelay = spectrometerDelay
+        self.secondaryGasTime = secondaryGasTime
+
         # Dump delay in seconds
         self.dumpDelay = dumpDelay
         self.duration = self.dumpDelay + post_dump_duration + ignitronDelay # s
 
-        print(f'Recording duration set to {self.duration} s')
+        print(f'Recording duration set to {self.duration:.3f} s')
 
         # Timing only during the discharge
         # There is some error here because it includes the pre-ignitron firing samples, only a few ms though so it's okay
@@ -123,7 +131,7 @@ class NI_DAQ():
         '''
         SET UP DISCHARGE TRIGGER
         '''
-        self.reset_discharge_trigger()
+        # self.reset_discharge_trigger()
 
     def reset_discharge_trigger(self):
         # Remove and close prior versions of trigger tasks
@@ -140,10 +148,23 @@ class NI_DAQ():
         # Normally send as many pulses as possible
         if self.n_pulses == None:
             self.n_pulses = int(self.duration / pulse_period)
-        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr0', freq=freq, duty_cycle=duty_cycle, initial_delay=spectrometer_delay)
-        self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
+
+        # Spectrometer is on ctr2 (PFI0)
+        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr2', freq=freq, duty_cycle=duty_cycle, initial_delay=self.spectrometerDelay)
+        # Seconday gas puff stop is on ctr1 (PFI3)
+        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr1', freq=freq, duty_cycle=duty_cycle, initial_delay=self.secondaryGasTime)
+        # self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
         self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
         self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+        self.task_co.register_done_event(self.time_callback)
+
+        '''
+        SECOND GAS PUFF TASK
+        '''
+        # self.task_puff.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr1', freq=1000, duty_cycle=0.5, initial_delay=heliumPuffTime)
+        # self.task_puff.channels.co_pulse_term = f'/{self.output_name}/PFI15'
+        # self.task_puff.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=1)        
+        # self.task_puff.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
 
         '''
         COUNTER IN TASKS
@@ -211,10 +232,17 @@ class NI_DAQ():
         self.dischargeTriggered = False
 
         '''START TASKS'''
-        for task in self.trigger_task_names + self.dump_task_names + self.counters_task_names:
-            task = getattr(self, task)
+        for task_name in self.trigger_task_names + self.dump_task_names + self.counters_task_names:
+            task = getattr(self, task_name)
             if len(task.channel_names) != 0:
-                task.start()
+                try:
+                    task.start()
+                except:
+                    print(task_name)
+
+    def time_callback(self, task_handle, status, callback_data):
+        print(f'DAQ has been triggered')
+        return 0
 
     def set_switch_trigger(self, task_handle, status, callback_data):
         # Remove the old dump switch tasks

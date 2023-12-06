@@ -7,7 +7,7 @@ from config import *
 from messages import *
 
 class Oscilloscope():
-    def __init__(self, nPoints=None, memoryDepth='1M', auto_reset=True):
+    def __init__(self, nPoints=None, memoryDepth='10M', auto_reset=True):
         self.nPoints = nPoints
         self.memoryDepth = memoryDepth
         self.data = {}
@@ -35,43 +35,43 @@ class Oscilloscope():
         return resources[0]
 
     def setScale(self, chargeVoltage):
-        timeScale = duration / 5 
+        timeScale = 10e-3 
         voltageScale = chargeVoltage / 8
         currentScale = chargeVoltage * 1000 / 500 * 0.01 / 10
         diamagneticScale = 1 # Volts
-        interferometerScale = 0.01 # Volts
+        interferometerScale = 0.1 # Volts
         triggerScale = 1 # Volts
 
         # Initialize the scope view
         self.inst.write(f':TIM:SCAL {timeScale}')
-        self.inst.write(f':TIM:OFFS {4 * timeScale}')
+        self.inst.write(f':TIM:OFFS {3 * timeScale}')
 
         self.inst.write(':CHAN1:DISP 1')
         # self.inst.write(':CHAN2:DISP 1')
         self.inst.write(':CHAN3:DISP 1')
         # self.inst.write(':CHAN4:DISP 1')
 
-        self.inst.write(f':CHAN1:SCAL {voltageScale}')
-        self.inst.write(f':CHAN1:OFFS {-4 * voltageScale}')
-        self.inst.write(f':CHAN2:SCAL {currentScale}')
-        self.inst.write(f':CHAN2:OFFS {0}')
+        self.inst.write(f':CHAN1:SCAL {interferometerScale}')
+        self.inst.write(f':CHAN1:OFFS {-4 * interferometerScale}')
+        # self.inst.write(f':CHAN2:SCAL {currentScale}')
+        # self.inst.write(f':CHAN2:OFFS {0}')
         self.inst.write(f':CHAN3:SCAL {triggerScale}')
-        self.inst.write(f':CHAN3:OFFS {0}')
+        self.inst.write(f':CHAN3:OFFS {-3 * triggerScale}')
         # self.inst.write(f':CHAN4:SCAL {currentScale}')
         # self.inst.write(f':CHAN4:OFFS {0}')
 
         # Set up triggering
         self.inst.write(':TRIG:MODE:EDGE')
-        self.inst.write(':TRIG:EDGE:SOUR CHAN1')
+        self.inst.write(':TRIG:EDGE:SOUR CHAN3')
         self.inst.write(':TRIG:EDGE:SLOP POS')
-        self.inst.write(f':TRIG:EDGE:LEV {1}')
+        self.inst.write(f':TRIG:EDGE:LEV {triggerScale}')
 
     # stop reading data
     def reset(self):
         # Reset the internal memory depth
         self.inst.write(':RUN')
-        # self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
-        self.inst.write(f'ACQ:MDEP AUTO')
+        self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
+        # self.inst.write(f'ACQ:MDEP AUTO')
 
         self.inst.write(':CLE') # clear all waveforms from screen
         self.inst.write(':STOP') # stop running scope
@@ -153,7 +153,7 @@ class Oscilloscope():
                     # Progress bar
                     j = (i + 1) / loopcount
                     print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
-                    # print(f'', end='\r')
+                    # sys.stdout.flush()
                 print()
 
             # Convert from binary to actual voltages

@@ -52,7 +52,7 @@ class TestingApp(ttk.Window):
         style.map('bigRed.TButton', background=[('active', '#e74c3c')])
         style.map('bigOrange.TButton', background=[('active', '#f39c12')])
 
-        # Initialize pins to default values
+        # # Initialize pins to default values
         self.scopePins = scopeChannelDefaults
         self.charge_ao_Pins = charge_ao_defaults
         self.systemStatus_Pins = systemStatus_defaults
@@ -181,18 +181,9 @@ class TestingApp(ttk.Window):
 
             # Place values for all user inputs and plots
             if SHOT_MODE:
-                self.gasPuffEntry.delete(0, 'end')
-                self.dumpDelayEntry.delete(0, 'end')
-                self.gasPuffEntry.insert(0, self.gasPuffTime)
-                self.dumpDelayEntry.insert(0, self.dumpDelay)
-            else:
-                self.serialNumberEntry.delete(0, 'end')
-                self.holdChargeTimeEntry.delete(0, 'end')
-                self.serialNumberEntry.insert(0, self.serialNumber)
-                self.holdChargeTimeEntry.insert(0, self.holdChargeTime)
-
-            self.chargeVoltageEntry.delete(0, 'end')
-            self.chargeVoltageEntry.insert(0, self.chargeVoltage)
+                for variable, entry in self.userEntries.items():
+                    entry.delete(0, 'end')
+                    entry.insert(0, getattr(self, variable))
 
             # Load pre- and post-shot notes
             self.preShotNotesEntry.text.delete('1.0', 'end')
@@ -341,7 +332,7 @@ class TestingApp(ttk.Window):
         enableHVWindow.wait_window()
 
         if enableHVWindow.OKPress:
-            self.operateSwitch('Enable HV', True)
+            print('Enabled HV')
 
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
@@ -359,10 +350,14 @@ class TestingApp(ttk.Window):
 
     # Sends signal from NI analog output to charge or discharge the capacitor
     def powerSupplyRamp(self, action='discharge'):
-        breakpoint()
         if action == 'charge':
-            voltageValue = self.chargeVoltage / maxVoltagePowerSupply * maxAnalogInput * 1000
-            currentValue = maxCurrentPowerSupply / maxCurrentPowerSupply * maxAnalogInput # Charge with maximum current
+            voltageValue = self.chargeVoltage / maxVoltagePowerSupply[POWER_SUPPLY] * maxAnalogInput * 1000
+
+            # The PLEIADES power supply requires that a current be prescribed in addition to voltage
+            if POWER_SUPPLY == 'PLEIADES':
+                currentValue = maxAnalogInput # Charge with maximum current
+            else:
+                currentValue = 0
         else:
             voltageValue = 0
             currentValue = 0
@@ -372,13 +367,16 @@ class TestingApp(ttk.Window):
 
     def charge(self):
         # Determine whether there are any faults in the HV supply
-        if any([not self.booleanIndicators['HV On'].state,
-                not self.booleanIndicators['Interlock Closed'].state,
-                self.booleanIndicators['Spark'].state,
-                self.booleanIndicators['Over Temp Fault'].state,
-                self.booleanIndicators['AC Fault'].state]):
+        # if any([not self.booleanIndicators['HV On'].state,
+        #         self.booleanIndicators['Interlock Closed'].state,
+        #         self.booleanIndicators['Spark'].state,
+        #         self.booleanIndicators['Over Temp Fault'].state,
+        #         self.booleanIndicators['AC Fault'].state,
+        #         not self.booleanIndicators['Door Closed 1'].state,
+        #         not self.booleanIndicators['Door Closed 2'].state]):
+        if False:
             name = 'Power Supply Fault'
-            text = 'Please evaluate power supply status. HV may not be enabled, interlock may be open, or there may be a fault.'
+            text = 'Please evaluate power supply status. HV may not be enabled, interlock may be open, the door to the lab may be open, or there may be a fault.'
 
         else:
             name = 'Begin charging'
@@ -399,16 +397,19 @@ class TestingApp(ttk.Window):
             self.idleMode = False
 
             ### Operate switches ###
-            # Open dump switch
-            self.operateSwitch('Dump Switch', True)
-            time.sleep(switchWaitTime)
-
             # Close power supply switch
             self.operateSwitch('Power Supply Switch', True)
             time.sleep(switchWaitTime)
 
+            # Open dump switch
+            self.operateSwitch('Dump Switch', True)
+            time.sleep(switchWaitTime)
+
             # Actually begin charging power supply
             self.powerSupplyRamp(action='charge')
+
+            # Enable HV only AFTER writing charge values
+            self.operateSwitch('Enable HV', True)
 
             # Begin tracking time
             self.beginChargeTime = time.time()
@@ -424,15 +425,26 @@ class TestingApp(ttk.Window):
                 self.operateSwitch('Load Switch', True)
                 time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
 
-            # Start the pulse generator
-            self.pulseGenerator.triggerStart()
+                # Start the pulse generator
+                self.pulseGenerator.triggerStart()
 
-            # Read from DAQ
-            self.NI_DAQ.read_discharge()
+                # Wait a while before closing the mechanical dump switch
+                time.sleep(hardCloseWaitTime)
+                self.operateSwitch('Dump Switch', False)
 
-            # Wait a while before closing the mechanical dump switch
-            time.sleep(hardCloseWaitTime)	
-            self.operateSwitch('Dump Switch', False)
+                # Read from DAQ
+                self.NI_DAQ.read_discharge()
+
+            else:
+                # Start the pulse generator
+                self.pulseGenerator.triggerStart()
+
+                # Read from DAQ
+                self.NI_DAQ.read_discharge()
+
+                # Wait a while before closing the mechanical dump switch
+                time.sleep(hardCloseWaitTime)	
+                self.operateSwitch('Dump Switch', False)
 
             self.charging = False
             self.discharged = True
@@ -453,6 +465,9 @@ class TestingApp(ttk.Window):
             dischargeConfirmWindow.wait_window()
 
             if dischargeConfirmWindow.OKPress:
+                # Reset the trigger just before discharging
+                self.NI_DAQ.reset_discharge_trigger()
+
                 # Force power supply to discharge
                 self.powerSupplyRamp(action='discharge')
 
@@ -493,8 +508,12 @@ class TestingApp(ttk.Window):
         else:
             self.chargePlot.ax.set_xlim(0, plotTimeLimit)
 
-        if len(self.capacitorVoltage) != 0 and 1.2 * max(self.capacitorVoltage) / 1000 > voltageYLim:
-            self.chargePlot.ax.set_ylim(0, 1.2 * max(self.capacitorVoltage) / 1000)
+        if len(self.capacitorVoltage) != 0:
+            if 1.2 * max(np.abs(self.capacitorVoltage)) / 1000 > voltageYLim:
+                self.chargePlot.ax.set_ylim(0, 1.2 * max(np.abs(self.capacitorVoltage)) / 1000)
+            
+            if 1.2 * max(np.abs(self.chargeCurrentPS)) * 1000 > currentYLim:
+                self.chargeCurrentAxis.set_ylim(0, 1.2 * max(np.abs(self.chargeCurrentPS)) * 1000)
 
         try:
             self.bm.update()

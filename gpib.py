@@ -21,7 +21,7 @@ class PulseGenerator():
         # if chan == 6:
         #     delay += 4e-3
         self.inst.write(f'DT {chan},{pulseGeneratorChans["T0"]},{delay}')
-        print(f'Delay on pulse generator channel {chan} has been set to {delay} s.')
+        print(f'Delay on pulse generator channel {chan} has been set to {delay:.3f} s.')
 
     def reset(self):
         return 0

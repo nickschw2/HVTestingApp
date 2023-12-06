@@ -7,13 +7,19 @@ class CMFX_App(TestingApp):
     def __init__(self):
         super().__init__()
 
+        # Change circuit parameters in config.py    
+        self.capacitance = capacitance
+        self.ballastResistance = ballastResistance
+        self.dumpResistance = dumpResistance
+        self.chamberProtectionResistance = chamberProtectionResistance
+        self.polarity = POLARITY
+
         # Create and show user interface
         self.configure_ui()
         self.init_ui()
 
         # Connect to instruments
         if not DEBUG_MODE:
-            print('test')
             self.init_DAQ()
             self.init_PulseGenerator()
 
@@ -28,7 +34,7 @@ class CMFX_App(TestingApp):
         self.notebook = ttk.Notebook(self, takefocus=False, bootstyle='primary')
         self.notebook.pack(expand=True, side='top', padx=framePadding, pady=framePadding)
 
-        tabNames = ['System Status', 'Charging', 'Results', 'Analysis']
+        tabNames = ['System Status', 'User Inputs', 'Charging', 'Results', 'Analysis']
         self.notebookFrames = {}
         for tabName in tabNames:
             frame = ttk.Frame(self.notebook)
@@ -41,7 +47,7 @@ class CMFX_App(TestingApp):
         self.textStatusFrame = ttk.Frame(self.notebookFrames['System Status'])
         self.HVStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='High Voltage Status', width=systemStatusFrameWidth, height=150, bootstyle='primary')
         self.pressureStatusFrame = ttk.LabelFrame(self.textStatusFrame, text='Pressure Status', width=systemStatusFrameWidth, height=110, bootstyle='primary')
-        self.circuitValuesFrame = ttk.LabelFrame(self.textStatusFrame, text='Circuit Values', width=systemStatusFrameWidth, height=200, bootstyle='primary')
+        self.circuitValuesFrame = ttk.LabelFrame(self.textStatusFrame, text='Circuit Values', width=systemStatusFrameWidth, height=230, bootstyle='primary')
 
         self.textStatusFrame.pack(side='left', expand=True, fill='both', padx=framePadding, pady=framePadding)
         self.HVStatusFrame.pack(side='top', expand=True)
@@ -65,10 +71,11 @@ class CMFX_App(TestingApp):
         self.capacitorVoltageLabel = ttk.Label(self.HVStatusFrame, textvariable=self.capacitorVoltageText)
         self.chamberPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.chamberPressureText)
         self.pumpPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pumpPressureText)
-        self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {capacitance} uF')
-        self.ballastResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Ballast Resistance: {ballastResistance} {Omega}')
-        self.dumpResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Dump Resistance: {int(dumpResistance * 1000)} m{Omega}')
-        self.chamberProtectionResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Chamb. Prot. Resistance: {int(chamberProtectionResistance * 1000)} m{Omega}')
+        self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {self.capacitance} uF')
+        self.ballastResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Ballast Resistance: {self.ballastResistance} {Omega}')
+        self.dumpResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Dump Resistance: {int(self.dumpResistance * 1000)} m{Omega}')
+        self.chamberProtectionResistanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Chamb. Prot. Resistance: {int(self.chamberProtectionResistance * 1000)} m{Omega}')
+        self.polarityLabel = ttk.Label(self.circuitValuesFrame, text=f'Polarity: {self.polarity}')
 
         self.voltagePSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
@@ -79,6 +86,7 @@ class CMFX_App(TestingApp):
         self.ballastResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.dumpResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.chamberProtectionResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+        self.polarityLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
 
         # Add textboxes for adding notes about a given shot
         self.userNotesFrame = ttk.Frame(self.notebookFrames['System Status'])
@@ -101,34 +109,54 @@ class CMFX_App(TestingApp):
         self.preShotNotesButton.pack(side='right', expand=True, padx=labelPadding)
         self.postShotNotesButton.pack(side='right', expand=True, padx=labelPadding)
 
+        ### USER INPUTS SECTION ###
+        # There are two columns of user inputs
+        n_rows = int(np.ceil(len(userInputs) / 2))
+        self.userEntries = {}
+        userInputFrame = ttk.Frame(self.notebookFrames['User Inputs'])
+        userInputFrame.grid(sticky='nsew')
+        self.notebookFrames['User Inputs'].grid_rowconfigure(0, weight=1)
+        self.notebookFrames['User Inputs'].grid_columnconfigure(0, weight=1)
+
+        for i, (variable, description) in enumerate(userInputs.items()):
+            label = ttk.Label(userInputFrame, text=f'{description["label"]}:')
+            entry = ttk.Entry(userInputFrame, width=userInputWidth, font=('Helvetica', 12))
+
+            self.userEntries[variable] = entry
+
+            label.grid(row=i % n_rows, column=2 * int(i / n_rows), sticky='e', padx=labelPadding)
+            entry.grid(row=i % n_rows, column=2 * int(i / n_rows) + 1, sticky='w', padx=labelPadding)
+            validation.add_range_validation(entry, description['min'], description['max'], when='focus')
+
+            userInputFrame.grid_rowconfigure(i % n_rows, weight=1)
+            userInputFrame.grid_columnconfigure(2 * int(i / n_rows), weight=1)
+            userInputFrame.grid_columnconfigure(2 * int(i / n_rows) + 1, weight=1)
+
+        okayButton = ttk.Button(userInputFrame, text='Set', bootstyle='primary', command=self.setUserInputs)
+        okayButton.grid(row=n_rows+1, column=0, columnspan=4, pady=buttonPadding)
+
+        # Selection of gases
+        gasSelectionFrame = ttk.LabelFrame(self.notebookFrames['User Inputs'], text='Gas Selection', bootstyle='primary')
+        gasSelectionFrame.grid(row=0, column=4, rowspan=n_rows, padx=framePadding)
+
+        primaryGasLabel = ttk.Label(gasSelectionFrame, text='Primary Gas')
+        secondaryGasLabel = ttk.Label(gasSelectionFrame, text='Secondary Gas')
+        self.primaryGasComboBox = ttk.Combobox(gasSelectionFrame, value=gasOptions, state='readonly', bootstyle='primary', **text_opts)
+        self.secondaryGasComboBox = ttk.Combobox(gasSelectionFrame, value=gasOptions, state='readonly', bootstyle='primary', **text_opts)
+
+        self.primaryGasComboBox.current(gasOptions.index(primaryGasDefault))
+        self.secondaryGasComboBox.current(gasOptions.index(secondaryGasDefault))
+
+        self.primaryGasComboBox.bind('<<ComboboxSelected>>', self.setGases)
+        self.secondaryGasComboBox.bind('<<ComboboxSelected>>', self.setGases)
+
+        primaryGasLabel.pack(side='top', padx=framePadding, anchor='w')
+        self.primaryGasComboBox.pack(side='top', padx=framePadding, pady=(0, framePadding))
+        secondaryGasLabel.pack(side='top', padx=framePadding, anchor='w')
+        self.secondaryGasComboBox.pack(side='top', padx=framePadding, pady=(0, framePadding))
+
         #### CHARGING SECTION ####
         # Add charging input to notebook
-        self.userInputs = ttk.LabelFrame(self.notebookFrames['Charging'], text='User Inputs', bootstyle='primary')
-        self.userInputs.pack(side='top', expand=True, pady=(framePadding, 0))
-
-        self.chargeVoltageLabel = ttk.Label(self.userInputs, text='Charge (kV):')
-        self.gasPuffLabel = ttk.Label(self.userInputs, text='Gas Puff Time (ms):')
-        self.dumpDelayLabel = ttk.Label(self.userInputs, text='Dump Delay (ms):')
-
-        self.chargeVoltageEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
-        self.gasPuffEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
-        self.dumpDelayEntry = ttk.Entry(self.userInputs, width=userInputWidth, font=('Helvetica', 12))
-
-        self.userInputOkayButton = ttk.Button(self.userInputs, text='Set', command=self.setUserInputs, bootstyle='primary')
-
-        self.chargeVoltageLabel.pack(side='left', expand=True, padx=(labelPadding, 0), pady=labelPadding)
-        self.chargeVoltageEntry.pack(side='left', expand=True, padx=(0, userInputPadding), pady=labelPadding)
-        self.gasPuffLabel.pack(side='left', expand=True, pady=labelPadding)
-        self.gasPuffEntry.pack(side='left', expand=True, padx=(0, userInputPadding), pady=labelPadding)
-        self.dumpDelayLabel.pack(side='left', expand=True, pady=labelPadding)
-        self.dumpDelayEntry.pack(side='left', expand=True, padx=(0, userInputPadding), pady=labelPadding)
-        self.userInputOkayButton.pack(side='left', expand=True, padx=(0, labelPadding), pady=labelPadding)
-
-        # Add validation to user inputs
-        validation.add_range_validation(self.chargeVoltageEntry, 0, maxValidVoltage, when='focus')
-        validation.add_range_validation(self.gasPuffEntry, 0, maxValidGasPuff, when='focus')
-        validation.add_range_validation(self.dumpDelayEntry, 0, maxValidDumpDelay, when='focus')
-
         # New frame for plot and other indicators in one row
         self.chargingStatusFrame = ttk.Frame(self.notebookFrames['Charging'])
         self.chargingStatusFrame.pack(side='top', expand=True, padx=framePadding, pady=framePadding)
@@ -150,18 +178,16 @@ class CMFX_App(TestingApp):
 
         self.chargeStateLabel.pack(side='top', expand=True, pady=(labelPadding, 0))
 
-        # Conditionals depending on the power supply in use
-        if POWER_SUPPLY == 'PLEIADES':
-            # Frame for power supply status
-            self.powerSupplyStatusFrame = ttk.Frame(self.chargingStatusFrame)
-            self.powerSupplyStatusFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
+        # Frame for power supply status
+        self.powerSupplyStatusFrame = ttk.Frame(self.chargingStatusFrame)
+        self.powerSupplyStatusFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
-            self.booleanIndicators = {}
-            # Specific indicators for a certain power supply AND all other indicators
-            for indicator_label in powerSupplyIndicatorLabels[POWER_SUPPLY] + indicatorLabels:
-                indicator = Indicator(self.powerSupplyStatusFrame, text=indicator_label)
-                indicator.pack(side='top', anchor='w', pady=(0, labelPadding))
-                self.booleanIndicators[indicator_label] = indicator
+        self.booleanIndicators = {}
+        # Specific indicators for a certain power supply AND all other indicators
+        for indicator_label in powerSupplyIndicatorLabels[POWER_SUPPLY] + indicatorLabels:
+            indicator = Indicator(self.powerSupplyStatusFrame, text=indicator_label)
+            indicator.pack(side='top', anchor='w', pady=(0, labelPadding))
+            self.booleanIndicators[indicator_label] = indicator
 
         # Plot of charge
         self.chargePlot = CanvasPlot(self.chargingStatusFrame, figsize=(10, 4))
@@ -187,7 +213,8 @@ class CMFX_App(TestingApp):
 
         # Add actors to blit manager
         # Blit manager speeds up plotting by redrawing only necessary items
-        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine, self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis])
+        self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine,
+                                                       self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis, self.chargeCurrentAxis.yaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
@@ -237,10 +264,15 @@ class CMFX_App(TestingApp):
         self.misc_diagnostics.pack(side='bottom', expand=True, pady=(0, framePadding))
 
         # Diagnostic definitions and placement
-        self.HE3DET01Text = ttk.StringVar()
-        self.HE3DET01Text.set(f'HE3DET01: N/A neutrons')
-        self.HE3DET01Label = ttk.Label(self.misc_diagnostics, textvariable=self.HE3DET01Text)
-        self.HE3DET01Label.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
+        # Creates a label for each He3 detector and stores the textvariable in a dictionary
+        self.HE3DETText_dict = {}
+        for HE3DET in self.counters_Pins:
+            setattr(self, f'{HE3DET}Text', ttk.StringVar())
+            text = getattr(self, f'{HE3DET}Text')
+            self.HE3DETText_dict[HE3DET] = text
+            text.set(f'{HE3DET}: N/A neutrons')
+            label = ttk.Label(self.misc_diagnostics, textvariable=text)
+            label.pack(side='top', expand=True, padx=buttonPadding, pady=labelPadding)
 
         #### ANALYSIS SECTION ####
         # Initialize the data structure to hold results plot
@@ -291,11 +323,13 @@ class CMFX_App(TestingApp):
 
         self.config(menu=self.menubar)
 
+        self.update()
+
     def init_ui(self):
         # Begin the operation of the program
 
         # center the app
-        self.center_app()      
+        self.center_app()
 
         # Reset all fields on startup
         self.loggedIn = False
@@ -311,10 +345,10 @@ class CMFX_App(TestingApp):
             self.validateLogin()
             self.setSaveLocation()
             self.pinSelector()
-
+        
         # If the user closes out of the application during a wait_window, no extra windows pop up
         self.update()
-
+        
         self.updateSystemStatus()
         
         self.safetyLights()
@@ -351,54 +385,41 @@ class CMFX_App(TestingApp):
 
         print('Post-shot notes recorded')
 
+    def setGases(self, event=None):
+        self.primaryGas = self.primaryGasComboBox.get()
+        self.secondaryGas = self.secondaryGasComboBox.get()
+
+        print(f'Primary gas: {self.primaryGas}, Secondary gas: {self.secondaryGas}')
+
     def setUserInputs(self):
-        def incorrectUserInput(text):
-                incorrectUserInputName = 'Invalid Input'
-                MessageWindow(self, incorrectUserInputName, text)
+        # Assume that the user inputs are all valid to begin with, and then check each one
+        validated = True
+        for variable, entry in self.userEntries.items():
+            # Check if the entry is within the range specified in the config file
+            if not entry.validate() or len(entry.get()) == 0:
+                validated = False
+                entry.delete(0, 'end')
 
-        if not self.chargeVoltageEntry.validate() or len(self.chargeVoltageEntry.get()) == 0:
-            self.chargeVoltageEntry.delete(0, 'end')
+                text = f'Please reenter a valid number for {userInputs[variable]["label"]}. The range for this variable is {userInputs[variable]["min"]} to {userInputs[variable]["max"]}.'
+                windowName = 'Invalid Input'
+                MessageWindow(self, windowName, text)
 
-            self.checklistButton.configure(state='disabled')
-
-            incorrectUserInputText = f'Please reenter a valid number for the charge voltage. The maximum voltage for this capacitor is {maxValidVoltage} kV.'
-            incorrectUserInput(incorrectUserInputText)
-
-        elif not self.gasPuffEntry.validate() or len(self.gasPuffEntry.get()) == 0:
-            self.gasPuffEntry.delete(0, 'end')
-
-            self.checklistButton.configure(state='disabled')
-
-            incorrectUserInputText = f'Please reenter a valid number for the gas puff time. The maximum time for the gas puff is {maxValidGasPuff} ms.'
-            incorrectUserInput(incorrectUserInputText)
-
-        elif not self.dumpDelayEntry.validate() or len(self.dumpDelayEntry.get()) == 0:
-            self.dumpDelayEntry.delete(0, 'end')
-
-            self.checklistButton.configure(state='disabled')
-
-            incorrectUserInputText = f'Please reenter a valid number for the dump delay time. The maximum time for the dump delay is {maxValidDumpDelay} ms.'
-            incorrectUserInput(incorrectUserInputText)
-            
-        else:
+        # If all user inputs are valid, set the variables to the values entered
+        if validated:
             self.userInputsSet = True
-            self.chargeVoltage = float(self.chargeVoltageEntry.get())
-            self.gasPuffTime = float(self.gasPuffEntry.get())
-            self.dumpDelay = float(self.dumpDelayEntry.get())
-
-            # Set the ignitron delay when in use
-            self.ignitronDelay = ignitronDelay
+            for variable, entry in self.userEntries.items():
+                setattr(self, variable, float(entry.get()))
 
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
                 if USING_SCOPE:
                     self.scope.setScale(self.chargeVoltage)
 
-                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + ignitronDelay)
+                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + self.ignitronDelay / 1000)
+                self.pulseGenerator.setDelay(pulseGeneratorOutputs['load_ign']['chan'], self.ignitronDelay / 1000)
 
                 # Reset the timing on the daq
-                self.NI_DAQ.set_timing(self.dumpDelay / 1000)
-                self.NI_DAQ.reset_discharge_trigger()
+                self.NI_DAQ.set_timing(self.dumpDelay / 1000, self.ignitronDelay / 1000, self.spectrometerDelay / 1000, self.secondaryGasTime / 1000)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -407,7 +428,7 @@ class CMFX_App(TestingApp):
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
-            MessageWindow(self, setUserInputName, setUserInputText)
+            MessageWindow(self, setUserInputName, setUserInputText)            
 
     def updateSystemStatus(self):
         # Updates HV Status Frame
@@ -425,8 +446,8 @@ class CMFX_App(TestingApp):
 
                 # Update charging values in object while not discharged
                 if self.charging:
-                    self.chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxAnalogInput	
-                    self.chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxAnalogInput # +10 because theres an offset for whatever reason	
+                    self.chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply[POWER_SUPPLY] / maxAnalogInput	
+                    self.chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply[POWER_SUPPLY] / maxAnalogInput # +10 because theres an offset for whatever reason	
                     self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider	
                     
                     voltagePSPoint = self.chargeVoltagePS[-1]
@@ -434,8 +455,8 @@ class CMFX_App(TestingApp):
                     capacitorVoltagePoint = self.capacitorVoltage[-1]
                 
                 else:
-                    chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply / maxAnalogInput	
-                    chargeCurrentPS = (voltages['Power Supply Current']) * maxCurrentPowerSupply / maxAnalogInput # +10 because theres an offset for whatever reason	
+                    chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply[POWER_SUPPLY] / maxAnalogInput	
+                    chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply[POWER_SUPPLY] / maxAnalogInput # +10 because theres an offset for whatever reason	
                     capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider
                     	
                     voltagePSPoint = chargeVoltagePS[-1]
@@ -447,7 +468,7 @@ class CMFX_App(TestingApp):
             self.capacitorVoltageText.set(f'Capacitor V: {capacitorVoltagePoint / 1000:.2f} kV')	
 
             if not self.idleMode:	
-                self.progressBar.configure(amountused = int(100 * capacitorVoltagePoint / 1000 / self.chargeVoltage))
+                self.progressBar.configure(amountused = np.abs(int(100 * capacitorVoltagePoint / 1000 / self.chargeVoltage)))
 
             # Logic heirarchy for charge state and countdown text
             if self.discharged:
@@ -458,24 +479,40 @@ class CMFX_App(TestingApp):
 
                 # Once the save thread has finished, then we can replot the discharge results
                 if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
-                    # Update the misc diagnostics
-                    self.HE3DET01Text.set(f'HE3DET01: {self.HE3DET01} neutrons')
+                    # Update the neutron diagnostics
+                    for HE3DET, textVariable in self.HE3DETText_dict.items():
+                        textVariable.set(f'{HE3DET}: {getattr(self, HE3DET)} neutrons')
 
                     # Show results tab once finished plotting
-                    self.notebook.select(2)
+                    self.notebook.select(4)
                     self.resultsSaved = True
 
                     print('Saving results to file and replotting...')
                     
                     # Start saving on separate threads
                     Thread(target=self.saveResults).start()
-
+                    
                     # Analyze results and plot those as well
                     self.performAnalysis()
 
                     # Can't replot results on a separate thread from the main because it throws run time error
                     self.resultsPlotViewer.replot()
                     self.analysisPlotViewer.replot()
+
+                # If using scope add the scope data to csv after it's already been saved
+                if USING_SCOPE and hasattr(self, 'saveScope_thread') and not self.saveScope_thread.is_alive() and self.resultsSaved:
+                    def add_scope_data():
+                        self.INT01 = self.scope.data[self.scopePins['INT01']]
+                        results_scope = pd.DataFrame({'INT01 (V)': self.INT01})
+                        print('Adding scope data to csv')
+                        results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', low_memory=False)
+                        results_df = pd.concat([results_df, results_scope], axis=1)
+                        results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
+                        print('Finished adding scope data to csv')
+
+                    if not self.scopeDataAdded:
+                        Thread(target=add_scope_data).start()
+                        self.scopeDataAdded = True
 
             elif self.charged:
                 self.chargeStateText.set('Charged')
@@ -499,12 +536,18 @@ class CMFX_App(TestingApp):
                 self.replotCharge()
 
                 # Voltage reaches a certain value of chargeVoltage to begin countown clock
-                if capacitorVoltagePoint >= chargeVoltageLimit * self.chargeVoltage * 1000 and not self.charged:
+                if np.abs(capacitorVoltagePoint) >= chargeVoltageLimit * self.chargeVoltage * 1000 and not self.charged:
+                    # Reset the trigger just before discharging
+                    self.NI_DAQ.reset_discharge_trigger()
+
                     # Actually begin discharging power supply before opening power supply switch so it doesnt overshoot
                     self.powerSupplyRamp(action='discharge')
 
                     # Open power supply switch
                     self.operateSwitch('Power Supply Switch', False)
+
+                    # Disable HV
+                    self.operateSwitch('Enable HV', False)
 
                     # Have to set charged to True before starting discharge thread
                     self.charged = True
@@ -529,25 +572,25 @@ class CMFX_App(TestingApp):
                         self.booleanIndicators[name].set(state)
 
                 # Stop charging and generate fault message if there has been a change in state
-                if self.charging and any([not self.booleanIndicators['HV On'].state,
-                        not self.booleanIndicators['Interlock Closed'].state,
-                        self.booleanIndicators['Spark'].state,
-                        self.booleanIndicators['Over Temp Fault'].state,
-                        self.booleanIndicators['AC Fault'].state,
-                        not self.booleanIndicators['Door Closed 1'].state,
-                        not self.booleanIndicators['Door Closed 2'].state]):
+                # if self.charging and any([not self.booleanIndicators['HV On'].state,
+                #         self.booleanIndicators['Interlock Closed'].state,
+                #         self.booleanIndicators['Spark'].state,
+                #         self.booleanIndicators['Over Temp Fault'].state,
+                #         self.booleanIndicators['AC Fault'].state,
+                #         not self.booleanIndicators['Door Closed 1'].state,
+                #         not self.booleanIndicators['Door Closed 2'].state]):
                     
-                    if not any([self.booleanIndicators['Door Closed 1'].state,
-                            self.booleanIndicators['Door Closed 2'].state]):
-                        name = 'Door Open Fault'
-                        text = 'The door to the lab has been left open. Discharging now.'
-                    else:
-                        name = 'Power Supply Fault'
-                        text = 'There has been a fault in the power supply. Discharging now.'
+                    # if not any([self.booleanIndicators['Door Closed 1'].state,
+                    #         self.booleanIndicators['Door Closed 2'].state]):
+                    #     name = 'Door Open Fault'
+                    #     text = 'The door to the lab has been left open. Discharging now.'
+                    # else:
+                    #     name = 'Power Supply Fault'
+                    #     text = 'There has been a fault in the power supply. Discharging now.'
 
-                    faultWindow = MessageWindow(self, name, text)
-                    faultWindow.wait_window()
-                    self.discharge()
+                    # faultWindow = MessageWindow(self, name, text)
+                    # faultWindow.wait_window()
+                    # self.discharge()
         
         updateHVStatus()
         updatePressureStatus()
@@ -571,6 +614,9 @@ class CMFX_App(TestingApp):
         self.dischargeVoltageFiltered = analysis.voltage / 1000
         self.dischargeCurrentFiltered = analysis.current
         self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent, cutoff_freq)
+        self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent, cutoff_freq)
+        self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage, cutoff_freq) * 10
+        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent, cutoff_freq) * 10
 
         # Diamagnetic loops
         for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
@@ -589,20 +635,24 @@ class CMFX_App(TestingApp):
             if USING_SCOPE:
                 print('Sleeping for 5 seconds to give scope its "me time"')	
                 time.sleep(5)
-                INT01 = self.scope.get_data(self.scopePins['INT01'])
-                dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
+                self.saveScope_thread = Thread(target=self.scope.get_data, args=[self.scopePins['INT01']])
+                self.saveScope_thread.start()
+                # dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
 
                 # Transform scope data to be on same timebase as daq
-                self.interferometer = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, INT01, left=np.nan, right=np.nan)
+                # self.INT01 = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, INT01, left=np.nan, right=np.nan)
 
-                if len(dischargeTimeScope) == 0:
-                    print('Oscilloscope was not triggered successfully')
+                # if len(dischargeTimeScope) == 0:
+                #     print('Oscilloscope was not triggered successfully')
 
             for i, variable in enumerate(self.diagnostics_Pins):
                 setattr(self, variable, self.NI_DAQ.dischargeData[i,:])
 
             for i, variable in enumerate(self.counters_Pins):
-                setattr(self, variable, self.NI_DAQ.task_ci.channels.ci_count)
+                try:
+                    setattr(self, variable, self.NI_DAQ.task_ci.channels.ci_count)
+                except:
+                    setattr(self, variable, 0)
             
             self.dischargeCurrent /= pearsonCoilDischarge
             self.dumpCurrent /= dumpResistance
@@ -619,6 +669,12 @@ class CMFX_App(TestingApp):
     def reset(self):
         print('Reset')
 
+        # Set gases to defaults
+        self.primaryGas = primaryGasDefault
+        self.secondaryGas = secondaryGasDefault
+        self.primaryGasComboBox.current(gasOptions.index(primaryGasDefault))
+        self.secondaryGasComboBox.current(gasOptions.index(secondaryGasDefault))
+
         # Close the switch tasks so we can close the switches with hardware instead of software
         if hasattr(self, 'NI_DAQ'):
             self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
@@ -631,9 +687,10 @@ class CMFX_App(TestingApp):
         self.operateSwitch('Load Switch', False)
 
         # Clear user inputs
-        self.chargeVoltageEntry.delete(0, 'end')
-        self.gasPuffEntry.delete(0, 'end')
-        self.dumpDelayEntry.delete(0, 'end')
+        for variable, entry in self.userEntries.items():
+            entry.delete(0, 'end')
+            if userInputs[variable]['default'] is not None:
+                entry.insert(0, userInputs[variable]['default'])
         self.preShotNotesEntry.text.delete('1.0', 'end')
         self.postShotNotesEntry.text.delete('1.0', 'end')
 
@@ -644,6 +701,7 @@ class CMFX_App(TestingApp):
         self.userInputsSet = False
         self.idleMode = True
         self.resultsSaved = False
+        self.scopeDataAdded = False
 
         # Reset the charging time point
         self.timePoint = 0.0
@@ -657,9 +715,6 @@ class CMFX_App(TestingApp):
 
         # This condition executes every time except for the initialization
         if self.loggedIn:
-            # Resets discharge trigger
-            self.NI_DAQ.reset_discharge_trigger()
-
             # Reset all plotted variables to empty array
             for variable, description in single_columns.items():
                 if description['type'] == 'array' and hasattr(self, variable):
@@ -673,7 +728,7 @@ class CMFX_App(TestingApp):
                 if description['type'] == 'array' and hasattr(self, variable):
                     setattr(self, variable, np.array([]))
 
-            #### NEED TO RESET THE ANAL YSIS DATA FOR THE RESET BUTTON TO WORK ####
+            #### NEED TO RESET THE ANALYSIS DATA FOR THE RESET BUTTON TO WORK ####
 
             self.setData(self.resultsPlotData)
             self.setData(self.analysisPlotData)
@@ -683,6 +738,7 @@ class CMFX_App(TestingApp):
 
             # Reset ylim on charge plot
             self.chargePlot.ax.set_ylim(0, voltageYLim)
+            self.chargeCurrentAxis.set_ylim(0, currentYLim)
 
             # Reset plots
             self.replotCharge()
@@ -693,7 +749,7 @@ class CMFX_App(TestingApp):
         self.disableButtons()
 
         # Reset progress bar
-        self.progressBar.configure(amountused = 0)
+        self.progressBar.configure(amountused=0)
 
         if hasattr(self, 'scope'):
             self.scope.reset() # Reset the scope

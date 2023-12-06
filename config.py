@@ -1,25 +1,72 @@
+from constants import *
+
 # Test mode for when we're not connected to the National Instruments hardware
 DEBUG_MODE = False
 ADMIN_MODE = True
 SHOT_MODE = True
+# Is the ignitron used for switching?
+# If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 IGNITRON_MODE = True
 USING_SCOPE = False
-POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV']
+POWER_SUPPLY = 'TDK' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
+POLARITY = 'Positive' # Options are ['Positive', 'Negative']
 
 # Power supply indicators
-powerSupplyIndicatorLabels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault']}
+powerSupplyIndicatorLabels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault'],
+                              'TDK': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault'],}
 # All other indicators
 indicatorLabels = ['Door Closed 1', 'Door Closed 2']
 
 # Power supply constants
-maxVoltagePowerSupply = 100e3 # V
-maxCurrentPowerSupply = 60e-3 # A
+maxVoltagePowerSupply = {'PLEIADES': 100e3, 'TDK': 50e3} # V
+maxCurrentPowerSupply = {'PLEIADES': 60e-3, 'TDK': 360e-3} # A
 maxAnalogInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'INT01': '1'}
+scopeChannelDefaults = {'INT01': '1', 'Trigger': '3'}
 scopeChannelOptions = ['1', '2', '3', '4']
+
+# Working gas options
+gasOptions = ['Hydrogen', 'Deuterium', 'Helium', 'Nitrogen', 'None']
+primaryGasDefault = 'Deuterium'
+secondaryGasDefault = 'Helium'
+
+# User Inputs
+userInputs = {'chargeVoltage': {'label': 'Charge Voltage (kV)',
+                            'default': 5,
+                            'max': maxVoltagePowerSupply[POWER_SUPPLY],
+                            'min': 0},
+          'primaryGasTime': {'label': 'Primary Gas Time (ms)',
+                                 'default': 20,
+                                 'max': 200,
+                                 'min': 0},
+          'secondaryGasTime': {'label': 'Secondary Gas Time (ms)',
+                                   'default': 20,
+                                   'max': 200,
+                                   'min': 0},
+          'ignitronDelay': {'label': 'Ignitron Delay (ms)',
+                            'default': 18,
+                            'max': 200,
+                            'min': 0},
+          'dumpDelay': {'label': 'Dump Delay (ms)',
+                        'default': 100,
+                        'max': 500,
+                        'min': 0},
+          'spectrometerDelay': {'label': 'Spectrometer Delay (ms)',
+                                'default': 40,
+                                'max': 500,
+                                'min': 0}}
+
+# Add inputs to saved data
+userInputColumns = {variable: {'name': description['label'], 'type': 'scalar'} for variable, description in userInputs.items()}
+single_columns.update(userInputColumns)
+
+# Columns to save to master lookup files
+master_columns = {}
+for variable, description in single_columns.items():
+    if description['type'] == 'scalar':
+        master_columns[variable] = description['name']
 
 # Pulse Generator parameters
 pulseGeneratorGPIBAddress = 15
@@ -71,21 +118,22 @@ di_defaults = {'HV On': f'{output_name}/{PFIPort1Name}/line1',
                'AC Fault': f'{output_name}/{PFIPort1Name}/line7',
                'Door Closed 1': f'{output_name}/{PFIPort2Name}/line0',
                'Door Closed 2': f'{output_name}/{PFIPort2Name}/line1'}
-diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai0',
-                        'DIA01': f'{diagnostics_name}/ai2',
+diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai2',
+                        'DIA01': f'{diagnostics_name}/ai0',
                         'DIA02': f'{diagnostics_name}/ai3',
-                        'DIA03': f'{diagnostics_name}/ai4',
-                        'DIA04': f'{diagnostics_name}/ai6',
-                        'dumpCurrent': f'{diagnostics_name}/ai7',
+                        'DIA03': f'{diagnostics_name}/ai6',
+                        'DIA04': f'{diagnostics_name}/ai7',
+                        'dumpCurrent': f'{diagnostics_name}/ai4',
                         'BR01': f'{diagnostics2_name}/ai0',
                         'BR02': f'{diagnostics2_name}/ai1',
                         'BR03': f'{diagnostics2_name}/ai2',
                         'BR04': f'{diagnostics2_name}/ai3',
                         'chamberProtectionCurrent': f'{diagnostics2_name}/ai4',
-                        'DIODE00': f'{diagnostics2_name}/ai5',
-                        'DIODE01': f'{diagnostics2_name}/ai6',
+                        'feedthroughVoltage': f'{diagnostics2_name}/ai5',
+                        'feedthroughCurrent': f'{diagnostics2_name}/ai6',
                         'dischargeVoltage': f'{diagnostics2_name}/ai7'}
-counters_defaults = {'HE3DET01': f'{output_name}/ctr1'}
+counters_defaults = {'HE3DET01': f'{output_name}/ctr0',
+                     'HE3DET02': f'{output_name}/ctr3'}
 charge_ao_options = [f'{output_name}/a0{i}' for i in list(range(2))]
 systemStatus_options = [f'{systemStatus_name}/ai{i}' for i in list(range(8))]
 do_options = [f'{output_name}/{digitalOutName}/line{i}' for i in list(range(8))]
@@ -106,9 +154,12 @@ class Line:
 
 # Structure for storing data to plot lines:
 # {variable_name: Line(legend_entry, [])}
-voltageLines = {'dischargeVoltage': Line('Voltage', [])}
+voltageLines = {'dischargeVoltage': Line('Voltage', []),
+                'feedthroughVoltage': Line('Feedthrough', [])}
 currentLines = {'dischargeCurrent': Line('Dis. Current', []),
-                'dumpCurrent': Line('Dump Current', [])}
+                'feedthroughCurrent': Line('Feedthrough', []),
+                'dumpCurrent': Line('Dump Current', []),
+                'chamberProtectionCurrent': Line('Cham. Prot. Current', [])}
 # interferometerLines = {'INT01': Line('INT01', [])}
 diamagneticLines = {'DIA01': Line('DIA01', []),
                     'DIA02': Line('DIA02', []),
@@ -122,9 +173,12 @@ DIODELines = {'DIODE00': Line('DIODE00', []),
               'DIODE01': Line('DIODE01', []),
               'DIODE02': Line('DIODE02', [])}
 
-voltageAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', [])}
+voltageAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', []),
+                        'feedthroughVoltageFiltered': Line('Feedthrough', [])}
 currentAnalysisLines = {'dischargeCurrentFiltered': Line('Dis. Current', []),
-                        'dumpCurrentFiltered': Line('Dump Current', [])}
+                        'feedthroughCurrentFiltered': Line('Feedthrough', []),
+                        'dumpCurrentFiltered': Line('Dump Current', []),
+                        'chamberProtectionCurrentFiltered': Line('Cham. Prot. Current', [])}
 diamagneticAnalysisLines = {'DIA01Density': Line('DIA01', []),
                             'DIA02Density': Line('DIA02', []),
                             'DIA03Density': Line('DIA03', []),
@@ -154,13 +208,9 @@ acceptablePasswords = ['plasma']
 refreshRate = 100.0 # Hz
 
 # Time between switch operations in seconds
-switchWaitTime = 0.1
+switchWaitTime = 0.2
 hardCloseWaitTime = 4
-gasPuffWaitTime = switchWaitTime
-
-# Is the ignitron used for switching?
-# If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
-ignitronInstalled = True
+gasPuffWaitTime = 0.2
 
 # Circuit constants
 maxVoltage = {'LBL': 5, 'BLU': 50, 'GRA': 10, '': 'N/A'}
@@ -169,21 +219,11 @@ ballastResistance = 500 # Ohms
 dumpResistance = 0.0105 / 6 # Ohms
 chamberProtectionResistance = 0.029 / 6 # Ohms
 
-# User input validation
-maxValidVoltage = min([maxVoltagePowerSupply / 1000, maxVoltage['BLU']]) # kV
-maxValidGasPuff = 500 # ms
-maxValidDumpDelay = maxValidGasPuff + 1000 # ms
-
-# Discharge timing
-default_dumpDelay = 0.2 # s
-ignitronDelay = 0.01 # s
-gasPuffTime = 0.03 # s
-
 post_dump_duration = 0.1 # s
 pretrigger_duration = 0.02 # s
 pulse_period = 10.1e-3 # s
 pulse_width = 50e-4 # s
-spectrometer_delay = 0.05 # s
+spectrometer_delay = 0.040 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
 # Pulse generator channels SRS DG535
@@ -199,6 +239,6 @@ pulseGeneratorChans = {'Trigger Input': 0,
 
 # Gas puff is on T0
 pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'gasPuffStop': {'chan': pulseGeneratorChans['B'], 'delay': gasPuffTime},
-                         'load_ign': {'chan': pulseGeneratorChans['C'], 'delay': ignitronDelay},
-                         'dump_ign': {'chan': pulseGeneratorChans['D'], 'delay': default_dumpDelay + ignitronDelay}}
+                         'gas_puff': {'chan': pulseGeneratorChans['B'], 'delay': 1e-4},
+                         'load_ign': {'chan': pulseGeneratorChans['C'], 'delay': userInputs['ignitronDelay']['default'] / 1000},
+                         'dump_ign': {'chan': pulseGeneratorChans['D'], 'delay': userInputs['dumpDelay']['default'] / 1000 + userInputs['ignitronDelay']['default'] / 1000}}
