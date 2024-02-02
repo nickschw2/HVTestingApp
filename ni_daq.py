@@ -43,7 +43,9 @@ class NI_DAQ():
         self.switch_task_names = ['task_switch_trigger', 'task_switch']
         self.dump_task_names = ['task_dump_trigger', 'task_dump']
         self.trigger_task_names = ['task_diagnostics', 'task_co']
-        self.counters_task_names = ['task_ci_trigger', 'task_ci']
+        self.counters_task_names = ['task_ci_trigger']
+        # Separate task for each counter input, as required by nidaqmx
+        self.counters_task_names += [f'task_{counter}' for counter in self.counters]
 
         # Set default duration
         self.set_timing(userInputs['dumpDelay']['default'] / 1000,
@@ -57,9 +59,12 @@ class NI_DAQ():
         if autostart:
             self.start_acquisition()
 
+        self.reset_discharge_trigger()
+
     def set_timing(self, dumpDelay, ignitronDelay, spectrometerDelay, secondaryGasTime):
         # Set variables for delays
-        self.spectrometerDelay = spectrometerDelay
+        # Set the spectrometer delay in relation to the ignitron, not the gas puff
+        self.spectrometerDelay = spectrometerDelay + ignitronDelay
         self.secondaryGasTime = secondaryGasTime
 
         # Dump delay in seconds
@@ -151,8 +156,6 @@ class NI_DAQ():
 
         # Spectrometer is on ctr2 (PFI0)
         self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr2', freq=freq, duty_cycle=duty_cycle, initial_delay=self.spectrometerDelay)
-        # Seconday gas puff stop is on ctr1 (PFI3)
-        self.task_co.co_channels.add_co_pulse_chan_freq(f'{self.output_name}/ctr1', freq=freq, duty_cycle=duty_cycle, initial_delay=self.secondaryGasTime)
         # self.task_co.channels.co_pulse_term = f'/{self.output_name}/PFI0'
         self.task_co.timing.cfg_implicit_timing(sample_mode=AcquisitionType.FINITE, samps_per_chan=self.n_pulses)        
         self.task_co.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
@@ -173,15 +176,19 @@ class NI_DAQ():
         self.task_ci_trigger.ai_channels.add_ai_voltage_chan(f'{self.output_name}/ai1')
         self.task_ci_trigger.timing.cfg_samp_clk_timing(samp_freq, source=f'OnboardClock', sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samples)
         self.task_ci_trigger.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
-
+        
+        # Need to create a separate task for each counter input
+        self.ci_tasks = {}
         for name, counter in self.counters.items():
-            self.task_ci.ci_channels.add_ci_count_edges_chan(counter, name_to_assign_to_channel=name)
+            task = getattr(self, f'task_{name}')
+            task.ci_channels.add_ci_count_edges_chan(counter, name_to_assign_to_channel=name)
+            self.ci_tasks[name] = task
             
-        # Must specify external sample clock source, triggering off dummy ai task
-        self.task_ci.timing.cfg_samp_clk_timing(samp_freq, source=f'/{self.output_name}/ai/SampleClock', sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samples)
-        # Need to configure an arm start trigger for counter input tasks
-        # According to X-series manual, you can't use start_trigger for counter input tasks
-        # self.task_ci.triggers.arm_start_trigger.dig_edge_src = f'/{self.diagnostics_name}/PFI0'  
+            # Must specify external sample clock source, triggering off dummy ai task
+            task.timing.cfg_samp_clk_timing(samp_freq, source=f'/{self.output_name}/ai/SampleClock', sample_mode=AcquisitionType.FINITE, samps_per_chan=self.discharge_samples)
+            # Need to configure an arm start trigger for counter input tasks
+            # According to X-series manual, you can't use start_trigger for counter input tasks
+            # task.triggers.arm_start_trigger.dig_edge_src = f'/{self.diagnostics_name}/PFI0'
 
         '''
         DIGITAL OUTPUT TASKS

@@ -1,15 +1,21 @@
 from constants import *
 
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = False
+DEBUG_MODE = True
 ADMIN_MODE = True
 SHOT_MODE = True
 # Is the ignitron used for switching?
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 IGNITRON_MODE = True
 USING_SCOPE = False
-POWER_SUPPLY = 'TDK' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
-POLARITY = 'Positive' # Options are ['Positive', 'Negative']
+POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
+if POWER_SUPPLY == 'PLEIADES':
+    POLARITY = 'Negative'
+elif POWER_SUPPLY == 'TDK':
+    POLARITY = 'Positive'
+else:
+    print('Wrong name of Power Supply')
+    POLARITY = None
 
 # Power supply indicators
 powerSupplyIndicatorLabels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault'],
@@ -29,8 +35,8 @@ scopeChannelOptions = ['1', '2', '3', '4']
 
 # Working gas options
 gasOptions = ['Hydrogen', 'Deuterium', 'Helium', 'Nitrogen', 'None']
-primaryGasDefault = 'Deuterium'
-secondaryGasDefault = 'Helium'
+primaryGasDefault = 'Helium'
+secondaryGasDefault = 'None'
 
 # User Inputs
 userInputs = {'chargeVoltage': {'label': 'Charge Voltage (kV)',
@@ -68,14 +74,12 @@ for variable, description in single_columns.items():
     if description['type'] == 'scalar':
         master_columns[variable] = description['name']
 
-# Pulse Generator parameters
-pulseGeneratorGPIBAddress = 15
-
 # NI DAQ parameters
 output_name = 'PXI1Slot3' # The name of the DAQ device as shown in MAX
 systemStatus_name = 'PXI1Slot2' # The name of the DAQ device as shown in MAX
 diagnostics_name = 'PXI1Slot4' # The name of the DAQ device as shown in MAX
 diagnostics2_name = 'PXI1Slot5' # The name of the DAQ device as shown in MAX
+misc_name = 'PXI1Slot8' # The name of the DAQ device as shown in MAX
 digitalOutName = 'port0'
 PFIPort1Name = 'port1'
 PFIPort2Name = 'port2'
@@ -111,13 +115,13 @@ do_defaults = {'Dump Switch': f'{output_name}/{digitalOutName}/line0',
                'Enable HV': f'{output_name}/{digitalOutName}/line3'}
 di_defaults = {'HV On': f'{output_name}/{PFIPort1Name}/line1',
                'CONST HV Mode': f'{output_name}/{PFIPort1Name}/line2',
-               'CONST mA Mode': f'{output_name}/{PFIPort1Name}/line3',
+               'CONST mA Mode': f'{output_name}/{PFIPort2Name}/line1',
                'Interlock Closed': f'{output_name}/{PFIPort1Name}/line4',
-               'Spark': f'{output_name}/{PFIPort1Name}/line5',
+               'Spark': f'{output_name}/{PFIPort2Name}/line2',
                'Over Temp Fault': f'{output_name}/{PFIPort1Name}/line6',
                'AC Fault': f'{output_name}/{PFIPort1Name}/line7',
-               'Door Closed 1': f'{output_name}/{PFIPort2Name}/line0',
-               'Door Closed 2': f'{output_name}/{PFIPort2Name}/line1'}
+               'Door Closed 1': f'{output_name}/{PFIPort2Name}/line6',
+               'Door Closed 2': f'{output_name}/{PFIPort2Name}/line7'}
 diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai2',
                         'DIA01': f'{diagnostics_name}/ai0',
                         'DIA02': f'{diagnostics_name}/ai3',
@@ -133,7 +137,11 @@ diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai2',
                         'feedthroughCurrent': f'{diagnostics2_name}/ai6',
                         'dischargeVoltage': f'{diagnostics2_name}/ai7'}
 counters_defaults = {'HE3DET01': f'{output_name}/ctr0',
-                     'HE3DET02': f'{output_name}/ctr3'}
+                     'HE3DET02': f'{output_name}/ctr3',
+                     'EXCDET01': f'{misc_name}/ctr0',
+                     'EXCDET02': f'{misc_name}/ctr1',
+                     'EXCDET03': f'{misc_name}/ctr2',
+                     'EXCDET04': f'{misc_name}/ctr3'}
 charge_ao_options = [f'{output_name}/a0{i}' for i in list(range(2))]
 systemStatus_options = [f'{systemStatus_name}/ai{i}' for i in list(range(8))]
 do_options = [f'{output_name}/{digitalOutName}/line{i}' for i in list(range(8))]
@@ -141,9 +149,16 @@ di_options = [f'{output_name}/{PFIPort1Name}/line{i}' for i in list(range(8))] +
              [f'{output_name}/{PFIPort2Name}/line{i}' for i in list(range(8))]
 diagnostics_options = [f'{diagnostics_name}/ai{i}' for i in list(range(8))] + \
                       [f'{diagnostics2_name}/ai{i}' for i in list(range(8))]
-counters_options = [f'{output_name}/ctr{i}' for i in list(range(4))]
+counters_options = [f'{output_name}/ctr{i}' for i in list(range(4))] + \
+                   [f'{misc_name}/ctr{i}' for i in list(range(4))]
 samp_freq = 1000000 # Frequency for acquiring data [Hz]
 switch_samp_freq = 1000 # Frequency for triggering switches [Hz]
+
+analysisVariables = {'decayTime': {'label': 'Decay Time (ms)', 'factor': 1e3},
+                     'stored_energy': {'label': 'Plasma Energy (J)', 'factor': 1},
+                     'capacitance': {'label': 'Plasma Cap. (uF)', 'factor': 1e6},
+                     'tau_M': {'label': 'RC Time (ms)', 'factor': 1e3},
+                     'dumpVelocity': {'label': 'Avg. Vel. (km/s)', 'factor': 1e-3}}
 
 # Results plot
 # Create a small class to store line label and data so that the data is mutable (unlike namedtuple, for example)
@@ -201,14 +216,14 @@ epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that w
 chargeVoltageLimit = 0.95 # fraction above which the capacitor will be considered charged to the desired charge
 
 # Usernames
-acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'rschnei4']
+acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'neschbac']
 acceptablePasswords = ['plasma']
 
 # Plotting constants
 refreshRate = 100.0 # Hz
 
 # Time between switch operations in seconds
-switchWaitTime = 0.2
+switchWaitTime = 0.5
 hardCloseWaitTime = 4
 gasPuffWaitTime = 0.2
 
@@ -226,16 +241,39 @@ pulse_width = 50e-4 # s
 spectrometer_delay = 0.040 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
-# Pulse generator channels SRS DG535
-# Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
-pulseGeneratorChans = {'Trigger Input': 0,
-                          'T0': 1,
-                          'A': 2,
-                          'B': 3,
-                          'AB': 4,
-                          'C': 5,
-                          'D': 6,
-                          'CD': 7}
+iotaOneCOMPort = 6
+
+pulseWidth = 1e-4 # s
+pulseGeneratorModel = 'DG645'
+if pulseGeneratorModel == 'DG535':
+    # Pulse generator channels SRS DG535
+    # Channel layout found on page ix of https://www.thinksrs.com/downloads/pdfs/manuals/DG535m.pdf
+    pulseGeneratorChans = {'Trigger Input': 0,
+                           'T0': 1,
+                           'A': 2,
+                           'B': 3,
+                           'AB': 4,
+                           'C': 5,
+                           'D': 6,
+                           'CD': 7}
+    
+    pulseGeneratorAddress = 15
+
+elif pulseGeneratorModel == 'DG645':
+    # Pulse generator channels SRS DG645
+    # Channel layout found on page 56 of https://www.thinksrs.com/downloads/pdfs/manuals/DG645m.pdf
+    pulseGeneratorChans = {'T0': 0,
+                           'T1': 1,
+                           'A': 2,
+                           'B': 3,
+                           'C': 4,
+                           'D': 5,
+                           'E': 6,
+                           'F': 7,
+                           'G': 8,
+                           'H': 9}
+    
+    pulseGeneratorAddress = 12
 
 # Gas puff is on T0
 pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},

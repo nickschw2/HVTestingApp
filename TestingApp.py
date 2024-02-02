@@ -18,7 +18,7 @@ from config import *
 from scope import *
 from ni_daq import *
 from timer import *
-from gpib import *
+from visa_comms import *
 from console import *
 from analysis import *
 from indicator import *
@@ -101,7 +101,7 @@ class TestingApp(ttk.Window):
                 if scopeErrorWindow.OKPress:
                     self.on_closing()
 
-    def init_PulseGenerator(self):
+    def init_visaInstruments(self):
         self.pulseGenerator = PulseGenerator()
 
         # Setup delays
@@ -109,6 +109,10 @@ class TestingApp(ttk.Window):
             chan = trigger_values['chan']
             delay = trigger_values['delay']
             self.pulseGenerator.setDelay(chan, delay)
+
+        # Set up Iota One and write the default settings
+        # self.iotaOne = IotaOne()
+        # self.iotaOne.setGasPuffTime(self.userInputs['primaryGasTime']['default'])
 
     def saveResults(self):
         '''MASTER FILE SAVE'''

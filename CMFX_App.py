@@ -13,6 +13,9 @@ class CMFX_App(TestingApp):
         self.dumpResistance = dumpResistance
         self.chamberProtectionResistance = chamberProtectionResistance
         self.polarity = POLARITY
+        self.userInputs = userInputs
+        self.primaryGasDefault = primaryGasDefault
+        self.secondaryGasDefault = secondaryGasDefault
 
         # Create and show user interface
         self.configure_ui()
@@ -21,7 +24,7 @@ class CMFX_App(TestingApp):
         # Connect to instruments
         if not DEBUG_MODE:
             self.init_DAQ()
-            self.init_PulseGenerator()
+            self.init_visaInstruments()
 
     def configure_ui(self):
         # set title
@@ -111,14 +114,14 @@ class CMFX_App(TestingApp):
 
         ### USER INPUTS SECTION ###
         # There are two columns of user inputs
-        n_rows = int(np.ceil(len(userInputs) / 2))
+        n_rows = int(np.ceil(len(self.userInputs) / 2))
         self.userEntries = {}
-        userInputFrame = ttk.Frame(self.notebookFrames['User Inputs'])
-        userInputFrame.grid(sticky='nsew')
+        userInputFrame = ttk.LabelFrame(self.notebookFrames['User Inputs'], text='Value Input', bootstyle='primary')
+        userInputFrame.grid(row=0, column=0, columnspan=3, sticky='nsew', padx=(framePadding, 0), pady=framePadding)
         self.notebookFrames['User Inputs'].grid_rowconfigure(0, weight=1)
         self.notebookFrames['User Inputs'].grid_columnconfigure(0, weight=1)
 
-        for i, (variable, description) in enumerate(userInputs.items()):
+        for i, (variable, description) in enumerate(self.userInputs.items()):
             label = ttk.Label(userInputFrame, text=f'{description["label"]}:')
             entry = ttk.Entry(userInputFrame, width=userInputWidth, font=('Helvetica', 12))
 
@@ -132,20 +135,24 @@ class CMFX_App(TestingApp):
             userInputFrame.grid_columnconfigure(2 * int(i / n_rows), weight=1)
             userInputFrame.grid_columnconfigure(2 * int(i / n_rows) + 1, weight=1)
 
-        okayButton = ttk.Button(userInputFrame, text='Set', bootstyle='primary', command=self.setUserInputs)
-        okayButton.grid(row=n_rows+1, column=0, columnspan=4, pady=buttonPadding)
+
+        setButton = ttk.Button(self.notebookFrames['User Inputs'], text='Set', bootstyle='primary', command=self.setUserInputs)
+        setButton.grid(row=1, column=0, columnspan=2, pady=buttonPadding)
+
+        makeDefaultButton = ttk.Button(self.notebookFrames['User Inputs'], text='Make Default', bootstyle='primary', command=self.setUserInputsDefault)
+        makeDefaultButton.grid(row=1, column=1, columnspan=2, pady=buttonPadding)
 
         # Selection of gases
         gasSelectionFrame = ttk.LabelFrame(self.notebookFrames['User Inputs'], text='Gas Selection', bootstyle='primary')
-        gasSelectionFrame.grid(row=0, column=4, rowspan=n_rows, padx=framePadding)
+        gasSelectionFrame.grid(row=0, column=3, rowspan=n_rows, padx=framePadding)
 
         primaryGasLabel = ttk.Label(gasSelectionFrame, text='Primary Gas')
         secondaryGasLabel = ttk.Label(gasSelectionFrame, text='Secondary Gas')
         self.primaryGasComboBox = ttk.Combobox(gasSelectionFrame, value=gasOptions, state='readonly', bootstyle='primary', **text_opts)
         self.secondaryGasComboBox = ttk.Combobox(gasSelectionFrame, value=gasOptions, state='readonly', bootstyle='primary', **text_opts)
 
-        self.primaryGasComboBox.current(gasOptions.index(primaryGasDefault))
-        self.secondaryGasComboBox.current(gasOptions.index(secondaryGasDefault))
+        self.primaryGasComboBox.current(gasOptions.index(self.primaryGasDefault))
+        self.secondaryGasComboBox.current(gasOptions.index(self.secondaryGasDefault))
 
         self.primaryGasComboBox.bind('<<ComboboxSelected>>', self.setGases)
         self.secondaryGasComboBox.bind('<<ComboboxSelected>>', self.setGases)
@@ -260,19 +267,21 @@ class CMFX_App(TestingApp):
         self.resultsPlotViewer = PlotViewer(self.notebookFrames['Results'], self.resultsPlotData)
 
         # Row for diagnostics on the bottom
-        self.misc_diagnostics = ttk.LabelFrame(self.notebookFrames['Results'], text='Misc. Diagnostics', bootstyle='primary')
-        self.misc_diagnostics.pack(side='bottom', expand=True, pady=(0, framePadding))
+        misc_diagnostics = ttk.LabelFrame(self.notebookFrames['Results'], text='Misc. Diagnostics', bootstyle='primary')
+        misc_diagnostics.pack(side='bottom', expand=True, pady=(0, framePadding))
 
         # Diagnostic definitions and placement
         # Creates a label for each He3 detector and stores the textvariable in a dictionary
-        self.HE3DETText_dict = {}
-        for HE3DET in self.counters_Pins:
-            setattr(self, f'{HE3DET}Text', ttk.StringVar())
-            text = getattr(self, f'{HE3DET}Text')
-            self.HE3DETText_dict[HE3DET] = text
-            text.set(f'{HE3DET}: N/A neutrons')
-            label = ttk.Label(self.misc_diagnostics, textvariable=text)
-            label.pack(side='top', expand=True, padx=buttonPadding, pady=labelPadding)
+        # Set the number of rows
+        n_rows = 3
+        self.counterText_dict = {}
+        for i, counter in enumerate(self.counters_Pins):
+            setattr(self, f'{counter}Text', ttk.StringVar())
+            text = getattr(self, f'{counter}Text')
+            self.counterText_dict[counter] = text
+            text.set(f'{counter}: N/A')
+            label = ttk.Label(misc_diagnostics, textvariable=text)
+            label.grid(row=int(i / n_rows), column=int(i % n_rows), sticky='nsew', padx=buttonPadding, pady=labelPadding)
 
         #### ANALYSIS SECTION ####
         # Initialize the data structure to hold results plot
@@ -281,6 +290,21 @@ class CMFX_App(TestingApp):
                                  'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines}}
         
         self.analysisPlotViewer = PlotViewer(self.notebookFrames['Analysis'], self.analysisPlotData)
+
+        # Row for diagnostics on the bottom
+        misc_analysis = ttk.LabelFrame(self.notebookFrames['Analysis'], text='Misc. Analysis', bootstyle='primary')
+        misc_analysis.pack(side='bottom', expand=True, pady=(0, framePadding))
+
+        # Analysis definitions and placement
+        # Creates a label for each analysis variable and stores the textvariable in a dictionary
+        self.analysisText_dict = {}
+        for variable in analysisVariables:
+            setattr(self, f'{variable}Text', ttk.StringVar())
+            text = getattr(self, f'{variable}Text')
+            self.analysisText_dict[variable] = text
+            text.set(f'{analysisVariables[variable]["label"]}: N/A')
+            label = ttk.Label(misc_analysis, textvariable=text)
+            label.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
 
         #### STATIC SECTION ####
         self.staticFrame = ttk.Frame(self)
@@ -400,7 +424,9 @@ class CMFX_App(TestingApp):
                 validated = False
                 entry.delete(0, 'end')
 
-                text = f'Please reenter a valid number for {userInputs[variable]["label"]}. The range for this variable is {userInputs[variable]["min"]} to {userInputs[variable]["max"]}.'
+                text = f'''Please reenter a valid number for {self.userInputs[variable]["label"]}.
+                           The range for this variable is {self.userInputs[variable]["min"]} to
+                           {self.userInputs[variable]["max"]}.'''
                 windowName = 'Invalid Input'
                 MessageWindow(self, windowName, text)
 
@@ -415,8 +441,10 @@ class CMFX_App(TestingApp):
                 if USING_SCOPE:
                     self.scope.setScale(self.chargeVoltage)
 
+                # Settings on visa instruments
                 self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + self.ignitronDelay / 1000)
                 self.pulseGenerator.setDelay(pulseGeneratorOutputs['load_ign']['chan'], self.ignitronDelay / 1000)
+                # self.iotaOne.setGasPuffTime(self.primaryGasTime)
 
                 # Reset the timing on the daq
                 self.NI_DAQ.set_timing(self.dumpDelay / 1000, self.ignitronDelay / 1000, self.spectrometerDelay / 1000, self.secondaryGasTime / 1000)
@@ -428,7 +456,15 @@ class CMFX_App(TestingApp):
             # Display pop up window to let user know that values have been set
             setUserInputName = 'User Inputs Set!'
             setUserInputText = 'User inputs have been set. They may be changed at any time for any subsequent run.'
-            MessageWindow(self, setUserInputName, setUserInputText)            
+            MessageWindow(self, setUserInputName, setUserInputText)
+
+    def setUserInputsDefault(self):
+        for variable, entry in self.userEntries.items():
+            self.userInputs[variable]['default'] = entry.get()
+        
+        self.primaryGasDefault = self.primaryGas
+        self.secondaryGasDefault = self.secondaryGas
+        print('Set the new default values for the User Inputs')
 
     def updateSystemStatus(self):
         # Updates HV Status Frame
@@ -480,8 +516,8 @@ class CMFX_App(TestingApp):
                 # Once the save thread has finished, then we can replot the discharge results
                 if hasattr(self, 'saveDischarge_thread') and not self.saveDischarge_thread.is_alive() and not self.resultsSaved:
                     # Update the neutron diagnostics
-                    for HE3DET, textVariable in self.HE3DETText_dict.items():
-                        textVariable.set(f'{HE3DET}: {getattr(self, HE3DET)} neutrons')
+                    for counter, textVariable in self.counterText_dict.items():
+                        textVariable.set(f'{counter}: {getattr(self, counter)}')
 
                     # Show results tab once finished plotting
                     self.notebook.select(4)
@@ -610,13 +646,19 @@ class CMFX_App(TestingApp):
 
     def performAnalysis(self):
         print('Performing analysis...')
-        analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent)
-        self.dischargeVoltageFiltered = analysis.voltage / 1000
-        self.dischargeCurrentFiltered = analysis.current
-        self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent, cutoff_freq)
-        self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent, cutoff_freq)
-        self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage, cutoff_freq) * 10
-        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent, cutoff_freq) * 10
+        analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent,
+                            self.dumpDelay, self.ignitronDelay, self.polarity)
+        self.dischargeVoltageFiltered = analysis.voltage_filtered / 1000
+        self.dischargeCurrentFiltered = analysis.current_filtered
+        self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent)
+        self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent)
+        self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage) * 10
+        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent) * 10
+
+        # Update the misc analysis text variables
+        if analysis.success:
+            for variable, textVariable in self.analysisText_dict.items():
+                textVariable.set(f'{analysisVariables[variable]["label"]}: {getattr(analysis, variable) * analysisVariables[variable]["factor"]:.1f}')
 
         # Diamagnetic loops
         for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
@@ -649,8 +691,12 @@ class CMFX_App(TestingApp):
                 setattr(self, variable, self.NI_DAQ.dischargeData[i,:])
 
             for i, variable in enumerate(self.counters_Pins):
+                setattr(self, variable, 0)
                 try:
-                    setattr(self, variable, self.NI_DAQ.task_ci.channels.ci_count)
+                    # print(self.NI_DAQ.task_ci.channels.ci_count)
+                    # print(self.NI_DAQ.ci_channels[variable].ci_count)
+                    # setattr(self, variable, self.NI_DAQ.ci_channels[variable].ci_count)
+                    setattr(self, variable, self.NI_DAQ.ci_tasks[variable].channels.ci_count)
                 except:
                     setattr(self, variable, 0)
             
@@ -670,10 +716,10 @@ class CMFX_App(TestingApp):
         print('Reset')
 
         # Set gases to defaults
-        self.primaryGas = primaryGasDefault
-        self.secondaryGas = secondaryGasDefault
-        self.primaryGasComboBox.current(gasOptions.index(primaryGasDefault))
-        self.secondaryGasComboBox.current(gasOptions.index(secondaryGasDefault))
+        self.primaryGas = self.primaryGasDefault
+        self.secondaryGas = self.secondaryGasDefault
+        self.primaryGasComboBox.current(gasOptions.index(self.primaryGasDefault))
+        self.secondaryGasComboBox.current(gasOptions.index(self.secondaryGasDefault))
 
         # Close the switch tasks so we can close the switches with hardware instead of software
         if hasattr(self, 'NI_DAQ'):
@@ -689,8 +735,8 @@ class CMFX_App(TestingApp):
         # Clear user inputs
         for variable, entry in self.userEntries.items():
             entry.delete(0, 'end')
-            if userInputs[variable]['default'] is not None:
-                entry.insert(0, userInputs[variable]['default'])
+            if self.userInputs[variable]['default'] is not None:
+                entry.insert(0, self.userInputs[variable]['default'])
         self.preShotNotesEntry.text.delete('1.0', 'end')
         self.postShotNotesEntry.text.delete('1.0', 'end')
 
@@ -710,7 +756,10 @@ class CMFX_App(TestingApp):
         self.dischargeTime = []
         self.dischargeTimeUnit = 's'
 
-        # Reset the charge plot time axis
+        # Reset the charge plot
+        self.chargeVoltagePS = []
+        self.chargeCurrentPS = []
+        self.capacitorVoltage = []
         self.chargeTime = []
 
         # This condition executes every time except for the initialization
@@ -727,8 +776,6 @@ class CMFX_App(TestingApp):
 
                 if description['type'] == 'array' and hasattr(self, variable):
                     setattr(self, variable, np.array([]))
-
-            #### NEED TO RESET THE ANALYSIS DATA FOR THE RESET BUTTON TO WORK ####
 
             self.setData(self.resultsPlotData)
             self.setData(self.analysisPlotData)

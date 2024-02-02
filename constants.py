@@ -17,6 +17,7 @@ loadSuperscript = '\u02E1\u1D52\u1D43\u1D48'
 PSSuperscript = '\u1D56\u02E2'
 CapacitorSuperscript = '\u1D9C\u1D43\u1D56'
 Omega = '\u03A9'
+tau = '\u03c4'
 
 # Colors
 # Taken from https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data
@@ -65,14 +66,14 @@ chargeHandles = [voltageLine, capacitorLine, currentLine]
 dischargeHandles = [voltageLine, currentLine]
 
 # Analysis of data
-cutoff_freq = 10000 # Hz
+cutoff_freq = 1000 # Hz
 m_p = 1.673e-27 # proton mass (kg)
 A = 1 # Atomic mass number
 m_i = m_p * A 
 
 # Diamagnetic constants
 N_turns = 16
-B0 = 3.0 # background magnetic field (T)
+B0 = 0.34 # background magnetic field (T)
 d_r = 0.05 # distance of magnetic shift (m)
 chamber_radius = 0.3513 # Inner radius of chamber (m)
 plasma_radius_outer = 0.2363 # Plasma radius (m)\
@@ -104,6 +105,7 @@ single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'holdChargeTime': {'name': 'Hold Charge Time (s)', 'type': 'scalar'},
     'HE3DET01': {'name': 'HE3DET01 (count)', 'type': 'scalar'},
     'HE3DET02': {'name': 'HE3DET02 (count)', 'type': 'scalar'},
+    'EXCDET01': {'name': 'EXCDET01 (count)', 'type': 'scalar'},
     'chargeTime': {'name': 'Charge Time (s)', 'type': 'array'},
     'chargeVoltagePS': {'name': 'Charge Voltage PS (V)', 'type': 'array'},
     'chargeCurrentPS': {'name': 'Charge Current PS (A)', 'type': 'array'},
