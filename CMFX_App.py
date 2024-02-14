@@ -653,7 +653,7 @@ class CMFX_App(TestingApp):
         self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent)
         self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent)
         self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage) * 10
-        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent) * 10
+        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent) / 10
 
         # Update the misc analysis text variables
         if analysis.success:
@@ -701,8 +701,8 @@ class CMFX_App(TestingApp):
                     setattr(self, variable, 0)
             
             self.dischargeCurrent /= pearsonCoilDischarge
-            self.dumpCurrent /= dumpResistance
-            self.chamberProtectionCurrent /= chamberProtectionResistance
+            # self.dumpCurrent /= dumpResistance
+            # self.chamberProtectionCurrent /= chamberProtectionResistance
             self.dischargeVoltage *= voltageDivider
 
             self.setData(self.resultsPlotData)

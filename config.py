@@ -1,14 +1,14 @@
 from constants import *
 
 # Test mode for when we're not connected to the National Instruments hardware
-DEBUG_MODE = True
+DEBUG_MODE = False
 ADMIN_MODE = True
 SHOT_MODE = True
 # Is the ignitron used for switching?
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 IGNITRON_MODE = True
 USING_SCOPE = False
-POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
+POWER_SUPPLY = 'TDK' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
 if POWER_SUPPLY == 'PLEIADES':
     POLARITY = 'Negative'
 elif POWER_SUPPLY == 'TDK':
@@ -237,13 +237,12 @@ chamberProtectionResistance = 0.029 / 6 # Ohms
 post_dump_duration = 0.1 # s
 pretrigger_duration = 0.02 # s
 pulse_period = 10.1e-3 # s
-pulse_width = 50e-4 # s
+pulse_width = 50e-6 # s
 spectrometer_delay = 0.040 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
 iotaOneCOMPort = 6
 
-pulseWidth = 1e-4 # s
 pulseGeneratorModel = 'DG645'
 if pulseGeneratorModel == 'DG535':
     # Pulse generator channels SRS DG535
@@ -276,7 +275,7 @@ elif pulseGeneratorModel == 'DG645':
     pulseGeneratorAddress = 12
 
 # Gas puff is on T0
-pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'gas_puff': {'chan': pulseGeneratorChans['B'], 'delay': 1e-4},
+pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['T0'], 'delay': 0},
+                         'gas_puff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
                          'load_ign': {'chan': pulseGeneratorChans['C'], 'delay': userInputs['ignitronDelay']['default'] / 1000},
-                         'dump_ign': {'chan': pulseGeneratorChans['D'], 'delay': userInputs['dumpDelay']['default'] / 1000 + userInputs['ignitronDelay']['default'] / 1000}}
+                         'dump_ign': {'chan': pulseGeneratorChans['E'], 'delay': userInputs['dumpDelay']['default'] / 1000 + userInputs['ignitronDelay']['default'] / 1000}}
