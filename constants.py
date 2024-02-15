@@ -84,6 +84,14 @@ plasma_radius_inner = 0.05 # Plasma radius (m)
 # Physics constants
 mu0 = 1.2566e-6 # Vaccum permeability (H/m)
 
+scope_columns = {'runNumber': {'name': 'Run Number', 'type': 'scalar'},
+                 'tUnit': {'name': 'Time Unit', 'type': 'scalar'},
+                 'time': {'name': 'Time (V)', 'type': 'array'},
+                 'INT01': {'name': 'INT01 (V)', 'type': 'array'},
+                 'INT01': {'name': 'INT02 (V)', 'type': 'array'},
+                 'ACC01': {'name': 'ACC01 (V)', 'type': 'array'},
+                 'ACC02': {'name': 'ACC02 (V)', 'type': 'array'}}
+
 single_columns = {'serialNumber': {'name': 'Serial Number', 'type': 'scalar'},
     'runNumber': {'name': 'Run Number', 'type': 'scalar'},
     'runDate': {'name': 'Run Date', 'type': 'scalar'},

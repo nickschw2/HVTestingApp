@@ -535,20 +535,11 @@ class CMFX_App(TestingApp):
                     self.resultsPlotViewer.replot()
                     self.analysisPlotViewer.replot()
 
-                # If using scope add the scope data to csv after it's already been saved
-                if USING_SCOPE and hasattr(self, 'saveScope_thread') and not self.saveScope_thread.is_alive() and self.resultsSaved:
-                    def add_scope_data():
-                        self.INT01 = self.scope.data[self.scopePins['INT01']]
-                        results_scope = pd.DataFrame({'INT01 (V)': self.INT01})
-                        print('Adding scope data to csv')
-                        results_df = pd.read_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', low_memory=False)
-                        results_df = pd.concat([results_df, results_scope], axis=1)
-                        results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
-                        print('Finished adding scope data to csv')
-
-                    if not self.scopeDataAdded:
-                        Thread(target=add_scope_data).start()
-                        self.scopeDataAdded = True
+                # If using scope add new file for the scope data
+                if USING_SCOPE and hasattr(self, 'saveScope_thread') and not self.saveScope_thread.is_alive() and not self.scopeDataSaved:
+                    # Start saving on separate threads
+                    self.scopeDataSaved = True
+                    Thread(target=self.saveScopeResults).start()
 
             elif self.charged:
                 self.chargeStateText.set('Charged')
@@ -677,15 +668,8 @@ class CMFX_App(TestingApp):
             if USING_SCOPE:
                 print('Sleeping for 5 seconds to give scope its "me time"')	
                 time.sleep(5)
-                self.saveScope_thread = Thread(target=self.scope.get_data, args=[self.scopePins['INT01']])
+                self.saveScope_thread = Thread(target=self.scope.read_scope)
                 self.saveScope_thread.start()
-                # dischargeTimeScope, dischargeTimeScopeUnit  = self.scope.get_time()
-
-                # Transform scope data to be on same timebase as daq
-                # self.INT01 = np.interp(self.NI_DAQ.dischargeTime, dischargeTimeScope, INT01, left=np.nan, right=np.nan)
-
-                # if len(dischargeTimeScope) == 0:
-                #     print('Oscilloscope was not triggered successfully')
 
             for i, variable in enumerate(self.diagnostics_Pins):
                 setattr(self, variable, self.NI_DAQ.dischargeData[i,:])
@@ -693,9 +677,6 @@ class CMFX_App(TestingApp):
             for i, variable in enumerate(self.counters_Pins):
                 setattr(self, variable, 0)
                 try:
-                    # print(self.NI_DAQ.task_ci.channels.ci_count)
-                    # print(self.NI_DAQ.ci_channels[variable].ci_count)
-                    # setattr(self, variable, self.NI_DAQ.ci_channels[variable].ci_count)
                     setattr(self, variable, self.NI_DAQ.ci_tasks[variable].channels.ci_count)
                 except:
                     setattr(self, variable, 0)
@@ -747,7 +728,7 @@ class CMFX_App(TestingApp):
         self.userInputsSet = False
         self.idleMode = True
         self.resultsSaved = False
-        self.scopeDataAdded = False
+        self.scopeDataSaved = False
 
         # Reset the charging time point
         self.timePoint = 0.0

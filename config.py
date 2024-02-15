@@ -30,8 +30,9 @@ maxAnalogInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'INT01': '1', 'Trigger': '3'}
+scopeChannelDefaults = {'INT01': '1', 'ACC01': '3'}
 scopeChannelOptions = ['1', '2', '3', '4']
+scopeColumns = [key for key in scopeChannelDefaults]
 
 # Working gas options
 gasOptions = ['Hydrogen', 'Deuterium', 'Helium', 'Nitrogen', 'None']

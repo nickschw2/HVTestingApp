@@ -89,7 +89,7 @@ class TestingApp(ttk.Window):
         # Initialize the scope over ethernet
         if USING_SCOPE:
             try:
-                self.scope = Oscilloscope()
+                self.scope = Oscilloscope(self.scopePins)
             except visa.errors.VisaIOError:
                 scopeErrorName = 'Oscilloscope Connection'
                 scopeErrorText = 'Cannot connect to oscilloscope because IP address is either incorrect or not present. Please make sure instrument is on and has IP address. The IP can be found on the instrument or NI MAX.'
@@ -163,6 +163,20 @@ class TestingApp(ttk.Window):
         results_df = pd.DataFrame([pd.Series(val, dtype='object') for val in results]).T
         results_df.columns = [single_columns[variable]['name'] for variable in single_columns if hasattr(self, variable)]
         results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{self.filename}', index=False)
+    
+    def saveScopeResults(self):
+        '''OSCILLOSCOPE FILE SAVE'''
+        scope_filename = f'CMFX_{self.runNumber}_scope.csv'
+        self.scope.set_runNumber(self.runNumber)
+
+        # These results are listed in accordance with the 'columns' variable in constants.py
+        # If the user would like to add or remove fields please make those changes in constant.py
+        results = [getattr(self, variable) for variable in scope_columns if hasattr(self, variable)]
+
+        # Creates a data frame which is easier to save to csv formats
+        results_df = pd.DataFrame([pd.Series(val, dtype='object') for val in results]).T
+        results_df.columns = [scope_columns[variable]['name'] for variable in scope_columns if hasattr(self, variable)]
+        results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{scope_filename}', index=False)
 
     # Read in a csv file and plot those results
     def readResults(self):

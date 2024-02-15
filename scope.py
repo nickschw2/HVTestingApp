@@ -7,7 +7,8 @@ from config import *
 from messages import *
 
 class Oscilloscope():
-    def __init__(self, nPoints=None, memoryDepth='10M', auto_reset=True):
+    def __init__(self, channels, nPoints=None, memoryDepth='10M', auto_reset=True):
+        self.channels = channels
         self.nPoints = nPoints
         self.memoryDepth = memoryDepth
         self.data = {}
@@ -79,8 +80,16 @@ class Oscilloscope():
 
         self.readSuccess = False
 
+    def set_runNumber(self, runNumber):
+        self.runNumber = runNumber
+
+    def read_scope(self):
+        for channel_name in self.channels:
+            self.get_data(channel_name)
+
     # pull waveform from screen
-    def get_data(self, channel):
+    def get_data(self, channel_name):
+        channel = self.channels[channel_name]
         try:
             # # active = bool(self.inst.query(f':CHAN{channel}:DISP?').strip())
             # # print(active)
@@ -134,7 +143,7 @@ class Oscilloscope():
 
             # Initialize array to hold read data
             values = np.zeros(stop)
-            print(f'Loading data from scope channel {channel}')
+            print(f'Loading data from scope channel: {channel_name}')
             if active:
                 # loop through all the packets
                 for i in range(0, loopcount):
@@ -167,9 +176,9 @@ class Oscilloscope():
             # Determine how often to subsample so that the saved file is a reasonable size
             if self.nPoints is not None:
                 self.nSkip = int(np.round(stop / self.nPoints))
-                self.data[channel] = dataarray[::self.nSkip]
+                self.data[channel_name] = dataarray[::self.nSkip]
             else:
-                self.data[channel] = dataarray
+                self.data[channel_name] = dataarray
 
             self.readSuccess = True
 
@@ -178,10 +187,9 @@ class Oscilloscope():
             print(e)
             self.data[channel] = np.array([]) # return empty array
 
+        setattr(self, channel_name, self.data[channel])
 
         self.data_size = len(self.data[channel])
-        
-        return self.data[channel]
 
     def get_parameters(self, wav_pre_list):
         self.format = int(wav_pre_list[0])
