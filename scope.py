@@ -3,6 +3,7 @@ import numpy as np
 import time
 import sys
 import traceback as tb
+from tqdm import tqdm
 from config import *
 from messages import *
 
@@ -36,10 +37,7 @@ class Oscilloscope():
         return resources[0]
 
     def setScale(self, chargeVoltage):
-        timeScale = 10e-3 
-        voltageScale = chargeVoltage / 8
-        currentScale = chargeVoltage * 1000 / 500 * 0.01 / 10
-        diamagneticScale = 1 # Volts
+        timeScale = 10e-3
         interferometerScale = 0.1 # Volts
         triggerScale = 1 # Volts
 
@@ -71,7 +69,7 @@ class Oscilloscope():
     def reset(self):
         # Reset the internal memory depth
         self.inst.write(':RUN')
-        self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
+        # self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
         # self.inst.write(f'ACQ:MDEP AUTO')
 
         self.inst.write(':CLE') # clear all waveforms from screen
@@ -86,6 +84,8 @@ class Oscilloscope():
     def read_scope(self):
         for channel_name in self.channels:
             self.get_data(channel_name)
+        if self.readSuccess:
+            self.get_time()
 
     # pull waveform from screen
     def get_data(self, channel_name):
@@ -143,10 +143,10 @@ class Oscilloscope():
 
             # Initialize array to hold read data
             values = np.zeros(stop)
-            print(f'Loading data from scope channel: {channel_name}')
+            print(f'Loading data packets from scope channel: {channel_name}')
             if active:
                 # loop through all the packets
-                for i in range(0, loopcount):
+                for i in tqdm(range(0, loopcount)):
                     values[i * packetLength:(i + 1) * packetLength] = self.inst.query_binary_values(':WAV:DATA?', datatype='B')
                     # set the next loop to jump a packet length
                     if i < loopcount - 2:
@@ -160,8 +160,8 @@ class Oscilloscope():
                     self.inst.write(f':WAV:STOP {stopnum}')
 
                     # Progress bar
-                    j = (i + 1) / loopcount
-                    print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
+                    # j = (i + 1) / loopcount
+                    # print('[%-20s] %d%%' % ('='*int(20 * j), 100*j), end='\r')
                     # sys.stdout.flush()
                 print()
 
@@ -185,11 +185,11 @@ class Oscilloscope():
         except Exception as e:
             # tb.print_tb(sys.exc_info()[2])
             print(e)
-            self.data[channel] = np.array([]) # return empty array
+            self.data[channel_name] = np.array([]) # return empty array
 
-        setattr(self, channel_name, self.data[channel])
+        setattr(self, channel_name, self.data[channel_name])
 
-        self.data_size = len(self.data[channel])
+        self.data_size = len(self.data[channel_name])
 
     def get_parameters(self, wav_pre_list):
         self.format = int(wav_pre_list[0])

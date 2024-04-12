@@ -149,7 +149,7 @@ class NI_DAQ():
         COUNTER OUT TASK
         '''
         freq = 1 / pulse_period
-        duty_cycle = pulse_width / pulse_period
+        duty_cycle = default_pulse_width / pulse_period
         # Normally send as many pulses as possible
         if self.n_pulses == None:
             self.n_pulses = int(self.duration / pulse_period)

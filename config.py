@@ -8,8 +8,8 @@ SHOT_MODE = True
 # If so, it will stop conducting when the current becomes too low, meaning that there is a steep drop to zero voltage when the switch reopens
 IGNITRON_MODE = True
 USING_SCOPE = False
-POWER_SUPPLY = 'TDK' # Options are ['PLEIADES', 'EB100', '20KV', TDK]
-if POWER_SUPPLY == 'PLEIADES':
+POWER_SUPPLY = 'PLEIADES' # Options are ['PLEIADES', 'EB100', '20KV', 'TDK']
+if POWER_SUPPLY == 'PLEIADES' or POWER_SUPPLY == 'EB-100':
     POLARITY = 'Negative'
 elif POWER_SUPPLY == 'TDK':
     POLARITY = 'Positive'
@@ -19,49 +19,58 @@ else:
 
 # Power supply indicators
 powerSupplyIndicatorLabels = {'PLEIADES': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault'],
-                              'TDK': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault'],}
+                              'EB-100': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Oil Over Temp', 'Inverter Over Temp', 'Emergency Stop', 'Short Circuit', 'Inverter Over Current', 'IGBT Fault', 'VBus Low', 'HV Switch', 'HV Fault'],
+                              'TDK': ['HV On', 'CONST HV Mode', 'CONST mA Mode', 'Interlock Closed', 'Spark', 'Over Temp Fault', 'AC Fault']}
 # All other indicators
 indicatorLabels = ['Door Closed 1', 'Door Closed 2']
 
 # Power supply constants
-maxVoltagePowerSupply = {'PLEIADES': 100e3, 'TDK': 50e3} # V
-maxCurrentPowerSupply = {'PLEIADES': 60e-3, 'TDK': 360e-3} # A
+maxVoltagePowerSupply = {'PLEIADES': 100e3, 'EB-100': 100e3, 'TDK': 50e3} # V
+maxCurrentPowerSupply = {'PLEIADES': 60e-3, 'EB-100': 1.0, 'TDK': 360e-3} # A
 maxAnalogInput = 10 # V
 systemStatus_sample_rate = 100 # Hz, rate at which the NI hardware updates the voltage
 
 # Oscilloscope parameters
-scopeChannelDefaults = {'INT01': '1', 'ACC01': '3'}
+scopeChannelDefaults = {'INT01_DRIVER': '2', 'INT01': '1'}
 scopeChannelOptions = ['1', '2', '3', '4']
 scopeColumns = [key for key in scopeChannelDefaults]
 
 # Working gas options
 gasOptions = ['Hydrogen', 'Deuterium', 'Helium', 'Nitrogen', 'None']
-primaryGasDefault = 'Helium'
+primaryGasDefault = 'Deuterium'
 secondaryGasDefault = 'None'
 
 # User Inputs
 userInputs = {'chargeVoltage': {'label': 'Charge Voltage (kV)',
-                            'default': 5,
+                            'default': 20,
                             'max': maxVoltagePowerSupply[POWER_SUPPLY],
                             'min': 0},
-          'primaryGasTime': {'label': 'Primary Gas Time (ms)',
-                                 'default': 20,
+            'primaryGasStart': {'label': 'Primary Gas Start (ms)',
+                                 'default': 0,
                                  'max': 200,
                                  'min': 0},
-          'secondaryGasTime': {'label': 'Secondary Gas Time (ms)',
-                                   'default': 20,
+            'primaryGasTime': {'label': 'Primary Gas Time (ms)',
+                                 'default': 1,
+                                 'max': 200,
+                                 'min': 0},
+            'secondaryGasStart': {'label': 'Secondary Gas Start (ms)',
+                                 'default': 0,
+                                 'max': 200,
+                                 'min': 0},
+            'secondaryGasTime': {'label': 'Secondary Gas Time (ms)',
+                                   'default': 0,
                                    'max': 200,
                                    'min': 0},
-          'ignitronDelay': {'label': 'Ignitron Delay (ms)',
-                            'default': 18,
+            'ignitronDelay': {'label': 'Ignitron Delay (ms)',
+                            'default': 5,
                             'max': 200,
                             'min': 0},
-          'dumpDelay': {'label': 'Dump Delay (ms)',
-                        'default': 100,
+            'dumpDelay': {'label': 'Dump Delay (ms)',
+                        'default': 50,
                         'max': 500,
                         'min': 0},
-          'spectrometerDelay': {'label': 'Spectrometer Delay (ms)',
-                                'default': 40,
+            'spectrometerDelay': {'label': 'Spectrometer Delay (ms)',
+                                'default': 25,
                                 'max': 500,
                                 'min': 0}}
 
@@ -124,19 +133,18 @@ di_defaults = {'HV On': f'{output_name}/{PFIPort1Name}/line1',
                'Door Closed 1': f'{output_name}/{PFIPort2Name}/line6',
                'Door Closed 2': f'{output_name}/{PFIPort2Name}/line7'}
 diagnostics_defaults = {'dischargeCurrent': f'{diagnostics_name}/ai2',
-                        'DIA01': f'{diagnostics_name}/ai0',
-                        'DIA02': f'{diagnostics_name}/ai3',
+                        'DIODE02': f'{diagnostics_name}/ai0',
+                        'DIODE01': f'{diagnostics_name}/ai3',
                         'DIA03': f'{diagnostics_name}/ai6',
                         'DIA04': f'{diagnostics_name}/ai7',
                         'dumpCurrent': f'{diagnostics_name}/ai4',
-                        'BR01': f'{diagnostics2_name}/ai0',
-                        'BR02': f'{diagnostics2_name}/ai1',
                         'BR03': f'{diagnostics2_name}/ai2',
-                        'BR04': f'{diagnostics2_name}/ai3',
                         'chamberProtectionCurrent': f'{diagnostics2_name}/ai4',
                         'feedthroughVoltage': f'{diagnostics2_name}/ai5',
                         'feedthroughCurrent': f'{diagnostics2_name}/ai6',
-                        'dischargeVoltage': f'{diagnostics2_name}/ai7'}
+                        'dischargeVoltage': f'{diagnostics2_name}/ai7',
+                        'ACC01': f'{diagnostics2_name}/ai0',
+                        'ACC02': f'{diagnostics2_name}/ai1'}
 counters_defaults = {'HE3DET01': f'{output_name}/ctr0',
                      'HE3DET02': f'{output_name}/ctr3',
                      'EXCDET01': f'{misc_name}/ctr0',
@@ -149,7 +157,8 @@ do_options = [f'{output_name}/{digitalOutName}/line{i}' for i in list(range(8))]
 di_options = [f'{output_name}/{PFIPort1Name}/line{i}' for i in list(range(8))] + \
              [f'{output_name}/{PFIPort2Name}/line{i}' for i in list(range(8))]
 diagnostics_options = [f'{diagnostics_name}/ai{i}' for i in list(range(8))] + \
-                      [f'{diagnostics2_name}/ai{i}' for i in list(range(8))]
+                      [f'{diagnostics2_name}/ai{i}' for i in list(range(8))] + \
+                      [f'{misc_name}/ai{i}' for i in list(range(8))]
 counters_options = [f'{output_name}/ctr{i}' for i in list(range(4))] + \
                    [f'{misc_name}/ctr{i}' for i in list(range(4))]
 samp_freq = 1000000 # Frequency for acquiring data [Hz]
@@ -185,9 +194,10 @@ BRLines = {'BR01': Line('BR01', []),
            'BR02': Line('BR02', []),
            'BR03': Line('BR03', []),
            'BR04': Line('BR04', [])}
-DIODELines = {'DIODE00': Line('DIODE00', []),
-              'DIODE01': Line('DIODE01', []),
+DIODELines = {'DIODE01': Line('DIODE01', []),
               'DIODE02': Line('DIODE02', [])}
+ACCLines = {'ACC01': Line('ACC01', []),
+            'ACC02': Line('ACC02', [])}
 
 voltageAnalysisLines = {'dischargeVoltageFiltered': Line('Voltage', []),
                         'feedthroughVoltageFiltered': Line('Feedthrough', [])}
@@ -199,6 +209,10 @@ diamagneticAnalysisLines = {'DIA01Density': Line('DIA01', []),
                             'DIA02Density': Line('DIA02', []),
                             'DIA03Density': Line('DIA03', []),
                             'DIA04Density': Line('DIA04', [])}
+DIODEAnalysisLines = {'DIODE01Filtered': Line('DIODE01', []),
+                      'DIODE02Filtered': Line('DIODE02', [])}
+ACCAnalysisLines = {'ACC01Filtered': Line('ACC01', []),
+                    'ACC02Filtered': Line('ACC02', [])}
 
 # Diagnostic hardware
 voltageDivider = 10000 # voltage ratio in:out
@@ -215,6 +229,7 @@ RCTime = 0.2 # seconds
 chargeTimeLimit = 10 # seconds
 epsilonDesiredChargeVoltage = 0.05 # Unitless, fraction of desired charge that will trigger a discharge if the capacitor is not charging
 chargeVoltageLimit = 0.95 # fraction above which the capacitor will be considered charged to the desired charge
+cameraRecordVoltageLimit = 0.90 # fraction above which we will begin recording on remote cameras
 
 # Usernames
 acceptableUsernames = ['nickschw', 'koeth', 'beaudoin', 'romero', 'neschbac']
@@ -238,7 +253,7 @@ chamberProtectionResistance = 0.029 / 6 # Ohms
 post_dump_duration = 0.1 # s
 pretrigger_duration = 0.02 # s
 pulse_period = 10.1e-3 # s
-pulse_width = 50e-6 # s
+default_pulse_width = 50e-6 # s
 spectrometer_delay = 0.040 # s
 n_pulses = 1 # pulses sent to the spectrometer
 
@@ -276,7 +291,12 @@ elif pulseGeneratorModel == 'DG645':
     pulseGeneratorAddress = 12
 
 # Gas puff is on T0
-pulseGeneratorOutputs = {'daq': {'chan': pulseGeneratorChans['T0'], 'delay': 0},
-                         'gas_puff': {'chan': pulseGeneratorChans['A'], 'delay': 0},
-                         'load_ign': {'chan': pulseGeneratorChans['C'], 'delay': userInputs['ignitronDelay']['default'] / 1000},
-                         'dump_ign': {'chan': pulseGeneratorChans['E'], 'delay': userInputs['dumpDelay']['default'] / 1000 + userInputs['ignitronDelay']['default'] / 1000}}
+pulseGeneratorOutputs = {'daq': {'chan': 'T0', 'ref': 'T0', 'delay': 0},
+                         'primaryGasStart': {'chan': 'A', 'ref': 'T0', 'delay': 0},
+                         'primaryGasTime': {'chan': 'B', 'ref': 'A', 'delay': userInputs['primaryGasTime']['default'] / 1000},
+                         'secondaryGasStart': {'chan': 'C', 'ref': 'T0', 'delay': 0},
+                         'secondaryGasTime': {'chan': 'D', 'ref': 'C', 'delay': userInputs['secondaryGasTime']['default'] / 1000},
+                         'ignitronDelay': {'chan': 'E', 'ref': 'T0', 'delay': userInputs['ignitronDelay']['default'] / 1000},
+                         'ignitronDelayPulse': {'chan': 'F', 'ref': 'E', 'delay': default_pulse_width},
+                         'dumpDelay': {'chan': 'G', 'ref': 'T0', 'delay': userInputs['dumpDelay']['default'] / 1000 + userInputs['ignitronDelay']['default'] / 1000},
+                         'dumpDelayPulse': {'chan': 'H', 'ref': 'G', 'delay': default_pulse_width},}

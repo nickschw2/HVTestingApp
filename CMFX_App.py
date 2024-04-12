@@ -1,3 +1,4 @@
+from sys import thread_info
 from TestingApp import *
 
 # SAVE RESULTS EVEN WHEN THERE'S NO DISCHARGE
@@ -240,17 +241,12 @@ class CMFX_App(TestingApp):
         # Button definitions and placement
         self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
                                     command=self.checklist, bootstyle='success')
-        self.enableHVButton = ttk.Button(self.buttons, text='Enable HV',
-                                    command=self.enableHV, bootstyle='warning')
         self.chargeButton = ttk.Button(self.buttons, text='Charge',
                                     command=self.charge, bootstyle='warning')
         self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
                                     command=self.discharge, bootstyle='danger')
 
         self.checklistButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
-        # Conditionals depending on the power supply in use
-        if POWER_SUPPLY == 'PLEIADES':
-            self.enableHVButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
         self.chargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
         self.dischargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
 
@@ -262,6 +258,7 @@ class CMFX_App(TestingApp):
                                 'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentLines},
                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Diamagnetic (V)', 'lines': diamagneticLines},
                                 'B-Radial': {'twinx': False, 'ylabel': 'B$_R$ (V)', 'lines': BRLines},
+                                'Accelerometer': {'twinx': False, 'ylabel': 'Accelerometer (V)', 'lines': ACCLines},
                                 'Diode': {'twinx': False, 'ylabel': 'Diode (V)', 'lines': DIODELines}}
         
         self.resultsPlotViewer = PlotViewer(self.notebookFrames['Results'], self.resultsPlotData)
@@ -287,7 +284,9 @@ class CMFX_App(TestingApp):
         # Initialize the data structure to hold results plot
         self.analysisPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (kV)', 'lines': voltageAnalysisLines},
                                  'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentAnalysisLines},
-                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines}}
+                                 'Diamagnetic': {'twinx': False, 'ylabel': 'Density ($10^{18}$ m$^{-3}$)', 'lines': diamagneticAnalysisLines},
+                                 'Accelerometer': {'twinx': False, 'ylabel': 'Accelerometer (V)', 'lines': ACCAnalysisLines},
+                                 'Diode': {'twinx': False, 'ylabel': 'Diode (V)', 'lines': DIODEAnalysisLines}}
         
         self.analysisPlotViewer = PlotViewer(self.notebookFrames['Analysis'], self.analysisPlotData)
 
@@ -357,7 +356,6 @@ class CMFX_App(TestingApp):
 
         # Reset all fields on startup
         self.loggedIn = False
-        self.reset()
 
         if ADMIN_MODE:
             self.loggedIn = True
@@ -369,6 +367,8 @@ class CMFX_App(TestingApp):
             self.validateLogin()
             self.setSaveLocation()
             self.pinSelector()
+
+        self.reset()
         
         # If the user closes out of the application during a wait_window, no extra windows pop up
         self.update()
@@ -438,13 +438,16 @@ class CMFX_App(TestingApp):
 
             # Set the scale on the oscilloscope based on inputs
             if not DEBUG_MODE:
-                if USING_SCOPE:
-                    self.scope.setScale(self.chargeVoltage)
+                # if USING_SCOPE:
+                #     self.scope.setScale(self.chargeVoltage)
 
                 # Settings on visa instruments
-                self.pulseGenerator.setDelay(pulseGeneratorOutputs['dump_ign']['chan'], self.dumpDelay / 1000 + self.ignitronDelay / 1000)
-                self.pulseGenerator.setDelay(pulseGeneratorOutputs['load_ign']['chan'], self.ignitronDelay / 1000)
-                # self.iotaOne.setGasPuffTime(self.primaryGasTime)
+                self.pulseGenerator.setDelay('dumpDelay', self.dumpDelay / 1000 + self.ignitronDelay / 1000)
+                self.pulseGenerator.setDelay('ignitronDelay', self.ignitronDelay / 1000)
+                self.pulseGenerator.setDelay('primaryGasStart', self.primaryGasStart / 1000)
+                self.pulseGenerator.setDelay('primaryGasTime', self.primaryGasTime / 1000, ref_chan=pulseGeneratorOutputs['primaryGasTime']['ref'])
+                self.pulseGenerator.setDelay('secondaryGasStart', self.secondaryGasStart / 1000)
+                self.pulseGenerator.setDelay('secondaryGasTime', self.secondaryGasTime / 1000, ref_chan=pulseGeneratorOutputs['secondaryGasTime']['ref'])
 
                 # Reset the timing on the daq
                 self.NI_DAQ.set_timing(self.dumpDelay / 1000, self.ignitronDelay / 1000, self.spectrometerDelay / 1000, self.secondaryGasTime / 1000)
@@ -562,24 +565,33 @@ class CMFX_App(TestingApp):
                 # Plot the new data
                 self.replotCharge()
 
-                # Voltage reaches a certain value of chargeVoltage to begin countown clock
+                # Voltage reaches a certain value of chargeVoltage to discharge
                 if np.abs(capacitorVoltagePoint) >= chargeVoltageLimit * self.chargeVoltage * 1000 and not self.charged:
                     # Reset the trigger just before discharging
                     self.NI_DAQ.reset_discharge_trigger()
 
-                    # Actually begin discharging power supply before opening power supply switch so it doesnt overshoot
+                    # Disable HV
+                    self.operateSwitch('Enable HV', False)
+
+                    # Actually begin discharging power supply before opening power supply switch
                     self.powerSupplyRamp(action='discharge')
 
                     # Open power supply switch
                     self.operateSwitch('Power Supply Switch', False)
 
-                    # Disable HV
-                    self.operateSwitch('Enable HV', False)
-
                     # Have to set charged to True before starting discharge thread
                     self.charged = True
                     thread = Thread(target=self.discharge)	
                     thread.start()
+
+                # Voltage reaches a certain value of chargeVoltage to discharge
+                if np.abs(capacitorVoltagePoint) >= cameraRecordVoltageLimit * self.chargeVoltage * 1000 and not self.cameraRecording:
+                    self.cameraRecording = True
+
+                    # Send a request to remote computer to begin recording
+                    # Run it on a separate thread because otherwise it will wait for response until it's done recording
+                    Thread(target=requests.get, args=(f'http://169.254.146.121/record_cameras?n={self.runNumber}&dsc=1',)).start()
+                    Thread(target=requests.get, args=(f'http://169.254.146.131/record_cameras?n={self.runNumber}&dsc=1',)).start()
 
         def updatePressureStatus():
             chamberPressure = 8e-4
@@ -659,6 +671,22 @@ class CMFX_App(TestingApp):
                 density = analysis.get_diamagneticDensity(signal)
                 setattr(self, densityVariable, density)
 
+        # Accelerometer Data
+        for variable, line in self.resultsPlotData['Accelerometer']['lines'].items():
+            if hasattr(self, variable):
+                filteredVariable = f'{variable}Filtered'
+                signal = line.data
+                filteredSignal = analysis.lowPassFilter(signal)
+                setattr(self, filteredVariable, filteredSignal)
+
+        # Diode Data
+        for variable, line in self.resultsPlotData['Diode']['lines'].items():
+            if hasattr(self, variable):
+                filteredVariable = f'{variable}Filtered'
+                signal = line.data
+                filteredSignal = analysis.lowPassFilter(signal)
+                setattr(self, filteredVariable, filteredSignal)
+
         self.setData(self.analysisPlotData)
         print('Analysis complete!')
 
@@ -729,6 +757,7 @@ class CMFX_App(TestingApp):
         self.idleMode = True
         self.resultsSaved = False
         self.scopeDataSaved = False
+        self.cameraRecording = False
 
         # Reset the charging time point
         self.timePoint = 0.0
@@ -778,6 +807,9 @@ class CMFX_App(TestingApp):
 
         # Reset progress bar
         self.progressBar.configure(amountused=0)
+
+        # Set the run number
+        self.setRunNumber()
 
         if hasattr(self, 'scope'):
             self.scope.reset() # Reset the scope

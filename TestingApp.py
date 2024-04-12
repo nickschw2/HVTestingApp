@@ -10,6 +10,7 @@ import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
 import datetime
+import requests
 from threading import Thread
 from constants import *
 from plots import *
@@ -105,19 +106,26 @@ class TestingApp(ttk.Window):
         self.pulseGenerator = PulseGenerator()
 
         # Setup delays
-        for trigger_values in pulseGeneratorOutputs.values():
-            chan = trigger_values['chan']
+        for variable, trigger_values in pulseGeneratorOutputs.items():
+            ref = trigger_values['ref']
             delay = trigger_values['delay']
-            self.pulseGenerator.setDelay(chan, delay)
+            self.pulseGenerator.setDelay(variable, delay, ref_chan=ref)
 
         # Set up Iota One and write the default settings
         # self.iotaOne = IotaOne()
         # self.iotaOne.setGasPuffTime(self.userInputs['primaryGasTime']['default'])
+            
+    def setRunNumber(self):
+         # Create master file if it does not already exist
+        self.runNumber = f'{0:05d}'
+        if resultsMasterName in os.listdir(self.saveFolder):
+            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+            runNumbers = resultsMaster_df[master_columns['runNumber']]
+            runNumber = int(max(runNumbers)) + 1
+            self.runNumber = f'{runNumber:05d}'
 
     def saveResults(self):
         '''MASTER FILE SAVE'''
-        # Create master file if it does not already exist
-        self.runNumber = f'{0:05d}'
         # Date
         now = datetime.datetime.now()
         self.runDate = now.date().strftime('%Y_%m_%d')
@@ -125,14 +133,12 @@ class TestingApp(ttk.Window):
         
         master_columnsNames = [master_columns[variable] for variable in master_columns if hasattr(self, variable)]
 
+        # Create master file if it does not already exist
         if resultsMasterName not in os.listdir(self.saveFolder):
             resultsMaster_df = pd.DataFrame(columns=master_columnsNames)
             resultsMaster_df.to_csv(f'{self.saveFolder}/{resultsMasterName}', index=False)
         else:
             resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
-            runNumbers = resultsMaster_df[master_columns['runNumber']]
-            runNumber = int(max(runNumbers)) + 1
-            self.runNumber = f'{runNumber:05d}'
 
         # Save master results
         resultMaster = []
@@ -171,12 +177,13 @@ class TestingApp(ttk.Window):
 
         # These results are listed in accordance with the 'columns' variable in constants.py
         # If the user would like to add or remove fields please make those changes in constant.py
-        results = [getattr(self, variable) for variable in scope_columns if hasattr(self, variable)]
+        results = [getattr(self.scope, variable) for variable in scope_columns if hasattr(self.scope, variable)]
 
         # Creates a data frame which is easier to save to csv formats
-        results_df = pd.DataFrame([pd.Series(val, dtype='object') for val in results]).T
-        results_df.columns = [scope_columns[variable]['name'] for variable in scope_columns if hasattr(self, variable)]
+        results_df = pd.concat([pd.Series(val) for val in results], axis=1)
+        results_df.columns = [scope_columns[variable]['name'] for variable in scope_columns if hasattr(self.scope, variable)]
         results_df.to_csv(f'{self.saveFolder}/{self.runDate}/{scope_filename}', index=False)
+        print('Done saving scope!')
 
     # Read in a csv file and plot those results
     def readResults(self):
@@ -218,6 +225,9 @@ class TestingApp(ttk.Window):
             # Load the analysis plots
             self.performAnalysis()
             self.analysisPlotViewer.replot()
+
+            self.resultsSaved = True
+            self.filename = readFile.split('/')[-1]
 
     def openSite(self):
         webbrowser.open(githubSite)
@@ -337,21 +347,6 @@ class TestingApp(ttk.Window):
         if checklistWindow.OKPress and self.userInputsSet:
             self.enableButtons()
 
-    def enableHV(self):
-        # Popup window appears to confirm
-        name = 'Enable HV?'
-        text = 'Are you sure you want to enable HV?'
-        enableHVWindow = MessageWindow(self, name, text)
-
-        enableHVWindow.OKButton['text'] = 'Yes'
-        cancelButton = ttk.Button(enableHVWindow.bottomFrame, text='Cancel', command=enableHVWindow.destroy, bootstyle='danger')
-        cancelButton.pack(side='left')
-
-        enableHVWindow.wait_window()
-
-        if enableHVWindow.OKPress:
-            print('Enabled HV')
-
     def operateSwitch(self, switchName, state):
         # If state is false, power supply switch opens and load switch closes
         # If state is true, power supply switch closes and load switch opens
@@ -413,6 +408,9 @@ class TestingApp(ttk.Window):
             self.NI_DAQ.reset_systemStatus() # Only start gathering data when beginning to charge
 
             self.idleMode = False
+
+            # Send packet to local computer
+            Thread(target=requests.get, args=(f'http://169.254.146.111/record_cameras?n={self.runNumber}&dsc=1',)).start()
 
             ### Operate switches ###
             # Close power supply switch
