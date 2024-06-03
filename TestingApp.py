@@ -9,7 +9,6 @@ import os
 import webbrowser
 import nidaqmx
 import scipy.optimize, scipy.signal
-import datetime
 import requests
 from threading import Thread
 from constants import *
@@ -61,6 +60,7 @@ class TestingApp(ttk.Window):
         self.di_Pins = di_defaults
         self.diagnostics_Pins = diagnostics_defaults
         self.counters_Pins = counters_defaults
+        self.enableHV_Pins = enableHV_defaults
 
     def center_app(self):
         self.update_idletasks()
@@ -82,7 +82,7 @@ class TestingApp(ttk.Window):
         # We need both an analog input and output
         self.NI_DAQ = NI_DAQ(systemStatus_sample_rate, systemStatus_channels=self.systemStatus_Pins,
                              charge_ao_channels=self.charge_ao_Pins, di_channels=self.di_Pins, diagnostics=self.diagnostics_Pins,
-                             counters=self.counters_Pins, n_pulses=n_pulses)
+                             enableHV_channels=self.enableHV_Pins, counters=self.counters_Pins, n_pulses=n_pulses)
 
         # Discharge the power supply on startup
         self.powerSupplyRamp(action='discharge')
@@ -119,18 +119,13 @@ class TestingApp(ttk.Window):
          # Create master file if it does not already exist
         self.runNumber = f'{0:05d}'
         if resultsMasterName in os.listdir(self.saveFolder):
-            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}')
+            resultsMaster_df = pd.read_csv(f'{self.saveFolder}/{resultsMasterName}', low_memory=False)
             runNumbers = resultsMaster_df[master_columns['runNumber']]
             runNumber = int(max(runNumbers)) + 1
             self.runNumber = f'{runNumber:05d}'
 
     def saveResults(self):
-        '''MASTER FILE SAVE'''
-        # Date
-        now = datetime.datetime.now()
-        self.runDate = now.date().strftime('%Y_%m_%d')
-        self.runTime = now.time().strftime('%H:%M:%S')
-        
+        '''MASTER FILE SAVE'''        
         master_columnsNames = [master_columns[variable] for variable in master_columns if hasattr(self, variable)]
 
         # Create master file if it does not already exist
@@ -274,6 +269,7 @@ class TestingApp(ttk.Window):
         di_PinsOptions = selectPins(di_defaults, di_options)
         diagnostics_PinsOptions = selectPins(diagnostics_defaults, diagnostics_options)
         counter_PinsOptions = selectPins(counters_defaults, counters_options)
+        enableHV_PinsOptions = selectPins(enableHV_defaults, enableHV_options)
 
         # Button on the bottom
         nCols, nRows = self.setPinWindow.grid_size()
@@ -302,6 +298,9 @@ class TestingApp(ttk.Window):
             for channel in counter_PinsOptions:
                 self.counters_Pins[channel] = counter_PinsOptions[channel].get()
 
+            for channel in di_PinsOptions:
+                self.enableHV_Pins[channel] = enableHV_PinsOptions[channel].get()
+
             print(self.scopePins)
             print(self.charge_ao_Pins)
             print(self.systemStatus_Pins)
@@ -309,6 +308,8 @@ class TestingApp(ttk.Window):
             print(self.di_Pins)
             print(self.diagnostics_Pins)
             print(self.counters_Pins)
+            print(self.enableHV_Pins)
+
             self.setPinWindow.destroy()
 
         okayButton = ttk.Button(buttonFrame, text='Set Pins', command=assignPins, bootstyle='success')
@@ -366,8 +367,8 @@ class TestingApp(ttk.Window):
         if action == 'charge':
             voltageValue = self.chargeVoltage / maxVoltagePowerSupply[POWER_SUPPLY] * maxAnalogInput * 1000
 
-            # The PLEIADES power supply requires that a current be prescribed in addition to voltage
-            if POWER_SUPPLY == 'PLEIADES':
+            # The Genvolt power supplies requires that a current be prescribed in addition to voltage
+            if POWER_SUPPLY == 'PLEIADES' or POWER_SUPPLY == 'EB-100':
                 currentValue = maxAnalogInput # Charge with maximum current
             else:
                 currentValue = 0
@@ -409,8 +410,8 @@ class TestingApp(ttk.Window):
 
             self.idleMode = False
 
-            # Send packet to local computer
-            Thread(target=requests.get, args=(f'http://169.254.146.111/record_cameras?n={self.runNumber}&dsc=1',)).start()
+            # Arm lab computers over http
+            self.arm_http()
 
             ### Operate switches ###
             # Close power supply switch
@@ -426,9 +427,6 @@ class TestingApp(ttk.Window):
 
             # Enable HV only AFTER writing charge values
             self.operateSwitch('Enable HV', True)
-
-            # Begin tracking time
-            self.beginChargeTime = time.time()
             self.charging = True
 
             if SHOT_MODE:
@@ -442,7 +440,7 @@ class TestingApp(ttk.Window):
                 time.sleep(gasPuffWaitTime)	# Hold central conductor at high voltage for a while to avoid bouncing switch until gas puff starts
 
                 # Start the pulse generator
-                self.pulseGenerator.triggerStart()
+                self.runDate, self.runTime = self.pulseGenerator.triggerStart()
 
                 # Wait a while before closing the mechanical dump switch
                 time.sleep(hardCloseWaitTime)
@@ -453,7 +451,7 @@ class TestingApp(ttk.Window):
 
             else:
                 # Start the pulse generator
-                self.pulseGenerator.triggerStart()
+                self.runDate, self.runTime = self.pulseGenerator.triggerStart()
 
                 # Read from DAQ
                 self.NI_DAQ.read_discharge()
@@ -508,7 +506,220 @@ class TestingApp(ttk.Window):
         if self.loggedIn:
             self.resetButton.configure(state='normal')
 
+    def startDirectDrive(self):
+        # Determine whether there are any faults in the HV supply
+        # if any([not self.booleanIndicators['HV On'].state,
+        #         self.booleanIndicators['Interlock Closed'].state,
+        #         self.booleanIndicators['Spark'].state,
+        #         self.booleanIndicators['Over Temp Fault'].state,
+        #         self.booleanIndicators['AC Fault'].state,
+        #         not self.booleanIndicators['Door Closed 1'].state,
+        #         not self.booleanIndicators['Door Closed 2'].state]):
+        if False:
+            name = 'Power Supply Fault'
+            text = 'Please evaluate power supply status. HV may not be enabled, interlock may be open, the door to the lab may be open, or there may be a fault.'
+
+        else:
+            name = 'Begin Run'
+            text = 'Are you sure you want to begin the run?'
+
+        # Popup window appears to confirm charging
+        confirmWindow = MessageWindow(self, name, text)
+
+        cancelButton = ttk.Button(confirmWindow.bottomFrame, text='Cancel', command=confirmWindow.destroy, bootstyle='danger')
+        cancelButton.pack(side='left')
+
+        confirmWindow.wait_window()
+
+        # If the user presses the Okay button, charging begins
+        if confirmWindow.OKPress:
+            self.NI_DAQ.reset_systemStatus() # Only start gathering data when beginning to charge
+
+            # Reset the trigger just before discharging
+            self.NI_DAQ.reset_discharge_trigger()
+
+            self.idleMode = False
+
+            # Arming lab computers over http
+            self.arm_http()
+            self.countdownStart = time.time()
+            print(f'Starting countdown for {countdownTime} seconds')
+            time.sleep(10)
+
+            ### Operate charging ###
+            print('Charging')
+            if SHOT_MODE:
+                # Record base pressures when charging begins
+                self.recordPressure()
+            
+            # Close the load switch
+            self.operateSwitch('Load Switch', True)
+            time.sleep(switchWaitTime)
+
+            # Actually begin charging power supply
+            self.powerSupplyRamp(action='charge')
+
+            # Start the pulse generator
+            self.runDate, self.runTime = self.pulseGenerator.triggerStart()
+
+            # Read from DAQ
+            self.NI_DAQ.read_discharge()
+
+            # Actually begin discharging power supply before opening load switch
+            self.powerSupplyRamp(action='discharge')
+
+            # Wait a while before closing the mechanical dump switch
+            time.sleep(hardCloseWaitTime)
+            self.operateSwitch('Load Switch', False)
+
+            self.discharged = True
+
+            # Save discharge on a separate thread
+            self.saveDischarge_thread = Thread(target=self.saveDischarge)
+            self.saveDischarge_thread.start()
+
+    def dischargeDirectDrive(self):
+        def discharge_switch():
+             ### Operate charging ###
+            print('Charging')
+            if SHOT_MODE:
+                # Record base pressures when charging begins
+                self.recordPressure()
+            
+            # Close the load switch
+            self.operateSwitch('Load Switch', True)
+            time.sleep(switchWaitTime)
+
+            # Actually begin charging power supply
+            self.powerSupplyRamp(action='charge')
+
+            # Start the pulse generator
+            self.charging = True
+            self.runDate, self.runTime = self.pulseGenerator.triggerStart()
+
+            # Read from DAQ
+            self.NI_DAQ.read_discharge()
+
+            # Actually begin discharging power supply before opening load switch
+            self.powerSupplyRamp(action='discharge')
+
+            # Wait a while before closing the mechanical dump switch
+            time.sleep(hardCloseWaitTime)
+            self.operateSwitch('Load Switch', False)
+
+            self.charging = False
+            self.discharged = True
+
+            # Save discharge on a separate thread
+            self.saveDischarge_thread = Thread(target=self.saveDischarge)
+            self.saveDischarge_thread.start()
+
+        def popup():
+            # Popup window to confirm discharge
+            dischargeConfirmName = 'Discharge'
+            dischargeConfirmText = 'Are you sure you want to discharge?'
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, bootstyle='danger')
+            cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
+
+            if dischargeConfirmWindow.OKPress:
+                # Reset the trigger just before discharging
+                self.NI_DAQ.reset_discharge_trigger()
+
+                # Force power supply to discharge
+                self.powerSupplyRamp(action='discharge')
+
+                self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
+
+                # Operate switches
+                self.operateSwitch('Power Supply Switch', False)
+                time.sleep(switchWaitTime)
+
+                discharge_switch()
+
+        if not self.idleMode:
+            if not self.charged:
+                popup()
+            else:
+                discharge_switch()
+        else:
+            popup()
+
+        # Disable all buttons except for reset, if logged in
+        self.disableButtons()
+        if self.loggedIn:
+            self.resetButton.configure(state='normal')
+    
+    def stopDirectDrive(self):
+        def discharge_switch():
+            # Start the pulse generator
+            self.runDate, self.runTime = self.pulseGenerator.triggerStart()
+
+            # Read from DAQ
+            self.NI_DAQ.read_discharge()
+
+            # Actually begin discharging power supply before opening load switch
+            self.powerSupplyRamp(action='discharge')
+
+            # Wait a while before closing the mechanical dump switch
+            time.sleep(hardCloseWaitTime)	
+            self.operateSwitch('Load Switch', False)
+
+            self.charging = False
+            self.discharged = True
+
+            # Save discharge on a separate thread
+            self.saveDischarge_thread = Thread(target=self.saveDischarge)
+            self.saveDischarge_thread.start()
+
+        def popup():
+            # Popup window to confirm discharge
+            dischargeConfirmName = 'Discharge'
+            dischargeConfirmText = 'Are you sure you want to discharge?'
+            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
+
+            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, bootstyle='danger')
+            cancelButton.pack(side='left')
+
+            dischargeConfirmWindow.wait_window()
+
+            if dischargeConfirmWindow.OKPress:
+                # Reset the trigger just before discharging
+                self.NI_DAQ.reset_discharge_trigger()
+
+                # Force power supply to discharge
+                self.powerSupplyRamp(action='discharge')
+
+                self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
+
+                discharge_switch()
+
+        if not self.idleMode:
+            if not self.charged:
+                popup()
+            else:
+                discharge_switch()
+        else:
+            popup()
+
+        # Disable all buttons except for reset, if logged in
+        self.disableButtons()
+        if self.loggedIn:
+            self.resetButton.configure(state='normal')
+
+    def arm_http(self):
+        print('Arming lab computers over local network...')
+        # Send packet to local computer
+        Thread(target=requests.get, args=(f'http://169.254.146.111/arm_diagnostics?n={self.runNumber}&dsc=1',)).start()
+        Thread(target=requests.get, args=(f'http://169.254.146.131/arm_diagnostics?n={self.runNumber}&dsc=1',)).start()
+
     def replotCharge(self):
+        # Don't execute if using direct drive power supply
+        if POWER_SUPPLY == 'EB-100':
+            return
         self.chargeVoltageLine.set_data(self.chargeTime, np.abs(self.chargeVoltagePS) / 1000)
         self.chargeCurrentLine.set_data(self.chargeTime, self.chargeCurrentPS * 1000)
 

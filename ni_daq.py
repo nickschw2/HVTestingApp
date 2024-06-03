@@ -22,7 +22,7 @@ import time
 class NI_DAQ():
     def __init__(self, systemStatus_sample_rate, systemStatus_channels={},
                  charge_ao_channels={}, di_channels={}, diagnostics={}, counters={},
-                 n_pulses=None, autostart=True):
+                 enableHV_channels={}, n_pulses=None, autostart=True):
         
         self.output_name = output_name
         self.diagnostics_name = diagnostics_name
@@ -31,6 +31,7 @@ class NI_DAQ():
         self.di_channels = di_channels
         self.diagnostics = diagnostics
         self.counters = counters
+        self.enableHV_channels = enableHV_channels
         self.systemStatus_sample_rate = systemStatus_sample_rate
         self.n_pulses = n_pulses
 
@@ -46,10 +47,12 @@ class NI_DAQ():
         self.counters_task_names = ['task_ci_trigger']
         # Separate task for each counter input, as required by nidaqmx
         self.counters_task_names += [f'task_{counter}' for counter in self.counters]
+        # Add enable HV task when using direct drive power supply
+        if len(self.enableHV_channels) > 0:
+            self.trigger_task_names += ['task_enableHV']
 
         # Set default duration
         self.set_timing(userInputs['dumpDelay']['default'] / 1000,
-                        userInputs['ignitronDelay']['default'] / 1000,
                         userInputs['spectrometerDelay']['default'] / 1000,
                         userInputs['secondaryGasTime']['default'] / 1000)
         
@@ -61,15 +64,17 @@ class NI_DAQ():
 
         self.reset_discharge_trigger()
 
-    def set_timing(self, dumpDelay, ignitronDelay, spectrometerDelay, secondaryGasTime):
+    def set_timing(self, dumpDelay, spectrometerDelay, secondaryGasTime, ignitronDelay=0, hvStart=0):
         # Set variables for delays
+        # hvStart is used for the direct drive, and ignitron delay is used for capacitor discharges
         # Set the spectrometer delay in relation to the ignitron, not the gas puff
-        self.spectrometerDelay = spectrometerDelay + ignitronDelay
+        self.spectrometerDelay = spectrometerDelay + ignitronDelay + hvStart
         self.secondaryGasTime = secondaryGasTime
+        self.hvStart = hvStart
 
         # Dump delay in seconds
         self.dumpDelay = dumpDelay
-        self.duration = self.dumpDelay + post_dump_duration + ignitronDelay # s
+        self.duration = self.dumpDelay + post_dump_duration + ignitronDelay + hvStart # s
 
         print(f'Recording duration set to {self.duration:.3f} s')
 
@@ -81,6 +86,7 @@ class NI_DAQ():
         # Create time array for discharge
         self.posttrigger_samples = int(samp_freq * self.duration) + 1 # Add one to include t=0
         self.pretrigger_samples = int(samp_freq * pretrigger_duration) # Don't need to add one, otherwise would be double counting t=0
+        print(f'pre: {self.pretrigger_samples}, post: {self.posttrigger_samples}')
         self.discharge_samps_per_chan = self.pretrigger_samples + self.posttrigger_samples
         self.dischargeTime = np.linspace(-pretrigger_duration, self.duration, self.discharge_samps_per_chan)
         if (max(np.abs(self.dischargeTime)) < 1e-3):
@@ -132,11 +138,6 @@ class NI_DAQ():
 
         # * Register a callback funtion to be run every N samples and when the AO task is done
             self.task_systemStatus.register_every_n_samples_acquired_into_buffer_event(self._points_to_plot, self.read_callback)
-
-        '''
-        SET UP DISCHARGE TRIGGER
-        '''
-        # self.reset_discharge_trigger()
 
     def reset_discharge_trigger(self):
         # Remove and close prior versions of trigger tasks
@@ -211,7 +212,23 @@ class NI_DAQ():
 
         # # When the switch has been opened, setup the triggering for switching the load and dump
         # self.task_dump.register_done_event(self.set_switch_trigger)
+        
+        '''
+        ENABLE HV TASK
+        '''
+        # Create an array of True values that is the length of the discharge
+        # Only execute this code if using the direct drive power supply
+        if len(self.enableHV_channels) > 0:
+            low_ticks = int(self.hvStart * samp_freq)
+            high_ticks = int(self.dumpDelay * samp_freq)
+            digital_out = np.array([False]* low_ticks + [True] * high_ticks + [False])
+            for name, enableHV_chan in self.enableHV_channels.items():
+                self.task_enableHV.do_channels.add_do_chan(enableHV_chan)
 
+            self.task_enableHV.timing.cfg_samp_clk_timing(samp_freq, sample_mode=AcquisitionType.FINITE, samps_per_chan=len(digital_out))
+            self.task_enableHV.triggers.start_trigger.cfg_dig_edge_start_trig(f'/{self.diagnostics_name}/PFI0', trigger_edge=Edge.RISING)
+            self.task_enableHV.write(digital_out)
+                
         '''
         DIAGNOSTICS TASK
         '''        
@@ -327,7 +344,6 @@ class NI_DAQ():
 
     def read_discharge(self):
         if not self.dischargeTriggered:
-            print('DAQ has been triggered')
             # Read all discharge data and wait for acquisition to finish
             self.dischargeTriggered = True
             self.discharge_reader.read_many_sample(self.dischargeData)

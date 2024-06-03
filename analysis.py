@@ -4,7 +4,7 @@ import numpy as np
 from scipy import signal, integrate, optimize
 
 class Analysis():
-    def __init__(self, time, timeUnit, voltage, current, dumpDelay, ignitronDelay, polarity):
+    def __init__(self, time, timeUnit, voltage, current, dumpDelay, ignitronDelay, gasStart, polarity):
         self.time = time
         self.timeUnit = timeUnit
         self.dumpDelay = dumpDelay / 1000 # In ms by default, convert to s
@@ -12,6 +12,7 @@ class Analysis():
         self.set_time()
         self.voltage = voltage
         self.current = current
+        self.gasStart = gasStart / 1000 # In ms by default, convert to s
         self.polarity = polarity
 
         # Send voltage and current through filter
@@ -128,6 +129,14 @@ class Analysis():
 
         # Get velocity at the dump
         self.dumpVelocity = self.voltage_at_dump / ((plasma_radius_outer - plasma_radius_inner) * B0)
+
+    def get_deposited_enegry(self, current):
+        discharge_indices = (self.time_sec < self.dumpDelay + self.ignitronDelay) & (self.time_sec > self.ignitronDelay + self.gasStart)
+        self.discharge_time = self.time_sec[discharge_indices]
+        self.discharge_current = current[discharge_indices]
+        self.discharge_voltage = self.voltage_filtered[discharge_indices]
+
+        self.deposited_energy = np.abs(integrate.trapezoid(self.discharge_current * self.discharge_voltage, self.discharge_time))
 
     def get_diamagneticDensity(self, data):
         # Filter and integrate

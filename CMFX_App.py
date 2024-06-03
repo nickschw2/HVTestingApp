@@ -66,13 +66,11 @@ class CMFX_App(TestingApp):
         # Create text variables for status indicators, associate with labels, and place
         self.voltagePSText = ttk.StringVar()
         self.currentPSText = ttk.StringVar()
-        self.capacitorVoltageText = ttk.StringVar()
         self.chamberPressureText = ttk.StringVar()
         self.pumpPressureText = ttk.StringVar()
 
         self.voltagePSLabel = ttk.Label(self.HVStatusFrame, textvariable=self.voltagePSText)
         self.currentPSLabel = ttk.Label(self.HVStatusFrame, textvariable=self.currentPSText)
-        self.capacitorVoltageLabel = ttk.Label(self.HVStatusFrame, textvariable=self.capacitorVoltageText)
         self.chamberPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.chamberPressureText)
         self.pumpPressureLabel = ttk.Label(self.pressureStatusFrame, textvariable=self.pumpPressureText)
         self.bankCapacitanceLabel = ttk.Label(self.circuitValuesFrame, text=f'Bank Capacitance: {self.capacitance} uF')
@@ -83,7 +81,6 @@ class CMFX_App(TestingApp):
 
         self.voltagePSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.currentPSLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
-        self.capacitorVoltageLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.chamberPressureLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.pumpPressureLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.bankCapacitanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
@@ -91,6 +88,13 @@ class CMFX_App(TestingApp):
         self.dumpResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.chamberProtectionResistanceLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
         self.polarityLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+
+        # Add label for capacitor discharges
+        if POWER_SUPPLY != 'EB-100':
+            self.capacitorVoltageText = ttk.StringVar()
+            self.capacitorVoltageLabel = ttk.Label(self.HVStatusFrame, textvariable=self.capacitorVoltageText)
+            self.capacitorVoltageLabel.pack(side='top', pady=labelPadding, padx=labelPadding)
+
 
         # Add textboxes for adding notes about a given shot
         self.userNotesFrame = ttk.Frame(self.notebookFrames['System Status'])
@@ -164,6 +168,7 @@ class CMFX_App(TestingApp):
         self.secondaryGasComboBox.pack(side='top', padx=framePadding, pady=(0, framePadding))
 
         #### CHARGING SECTION ####
+        # Only need this section for capacitor discharges
         # Add charging input to notebook
         # New frame for plot and other indicators in one row
         self.chargingStatusFrame = ttk.Frame(self.notebookFrames['Charging'])
@@ -174,9 +179,15 @@ class CMFX_App(TestingApp):
         self.chargingIndicatorsFrame.pack(side='left', expand=True, padx=framePadding, pady=framePadding)
 
         # Add progress bar to notebook
-        self.progressBar = ttk.widgets.Meter(master=self.chargingIndicatorsFrame,
-                                             stripethickness=3, subtext='Charged', textright='%',
-                                             bootstyle='success')
+        if POWER_SUPPLY == 'EB-100':
+            self.progressBar = ttk.widgets.Meter(master=self.chargingIndicatorsFrame, amounttotal=countdownTime,
+                                                 stripethickness=36, subtext='Countdown', textright='s',
+                                                 bootstyle='success')
+        else:
+            self.progressBar = ttk.widgets.Meter(master=self.chargingIndicatorsFrame,
+                                                 stripethickness=3, subtext='Charged', textright='%',
+                                                 bootstyle='success')
+            
         self.progressBar.pack(side='top', expand=True)
 
         # Add status variables, associate with labels, and place them
@@ -222,7 +233,7 @@ class CMFX_App(TestingApp):
         # Add actors to blit manager
         # Blit manager speeds up plotting by redrawing only necessary items
         self.bm = BlitManager(self.chargePlot.canvas, [self.chargeVoltageLine, self.chargeCurrentLine, self.capacitorVoltageLine,
-                                                       self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis, self.chargeCurrentAxis.yaxis])
+                                                    self.chargePlot.ax.xaxis, self.chargePlot.ax.yaxis, self.chargeCurrentAxis.yaxis])
 
         # Create the legends before any plot is made
         self.chargePlot.ax.legend(handles=chargeHandles, loc='upper right')
@@ -241,22 +252,25 @@ class CMFX_App(TestingApp):
         # Button definitions and placement
         self.checklistButton = ttk.Button(self.buttons, text='Checklist Complete',
                                     command=self.checklist, bootstyle='success')
-        self.chargeButton = ttk.Button(self.buttons, text='Charge',
-                                    command=self.charge, bootstyle='warning')
-        self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
-                                    command=self.discharge, bootstyle='danger')
+        if POWER_SUPPLY == 'EB-100':
+            self.chargeButton = ttk.Button(self.buttons, text='Charge',
+                                        command=self.startDirectDrive, bootstyle='warning')
+            self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
+                                        command=self.stopDirectDrive, bootstyle='danger')
+        else:
+            self.chargeButton = ttk.Button(self.buttons, text='Charge',
+                                        command=self.charge, bootstyle='warning')
+            self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
+                                        command=self.discharge, bootstyle='danger')
 
         self.checklistButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
         self.chargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
-        self.dischargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
-
-        
+        self.dischargeButton.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)    
 
         #### RESULTS SECTION ####
         # Initialize the data structure to hold results plot
         self.resultsPlotData = {'Voltage': {'twinx': False, 'ylabel': 'Voltage (V)', 'lines': voltageLines},
                                 'Current': {'twinx': False, 'ylabel': 'Current (A)', 'lines': currentLines},
-                                'Diamagnetic': {'twinx': False, 'ylabel': 'Diamagnetic (V)', 'lines': diamagneticLines},
                                 'B-Radial': {'twinx': False, 'ylabel': 'B$_R$ (V)', 'lines': BRLines},
                                 'Accelerometer': {'twinx': False, 'ylabel': 'Accelerometer (V)', 'lines': ACCLines},
                                 'Diode': {'twinx': False, 'ylabel': 'Diode (V)', 'lines': DIODELines}}
@@ -303,7 +317,7 @@ class CMFX_App(TestingApp):
             self.analysisText_dict[variable] = text
             text.set(f'{analysisVariables[variable]["label"]}: N/A')
             label = ttk.Label(misc_analysis, textvariable=text)
-            label.pack(side='left', expand=True, padx=buttonPadding, pady=labelPadding)
+            label.pack(side='left', expand=True, padx=labelPadding, pady=labelPadding)
 
         #### STATIC SECTION ####
         self.staticFrame = ttk.Frame(self)
@@ -442,15 +456,27 @@ class CMFX_App(TestingApp):
                 #     self.scope.setScale(self.chargeVoltage)
 
                 # Settings on visa instruments
-                self.pulseGenerator.setDelay('dumpDelay', self.dumpDelay / 1000 + self.ignitronDelay / 1000)
-                self.pulseGenerator.setDelay('ignitronDelay', self.ignitronDelay / 1000)
                 self.pulseGenerator.setDelay('primaryGasStart', self.primaryGasStart / 1000)
                 self.pulseGenerator.setDelay('primaryGasTime', self.primaryGasTime / 1000, ref_chan=pulseGeneratorOutputs['primaryGasTime']['ref'])
                 self.pulseGenerator.setDelay('secondaryGasStart', self.secondaryGasStart / 1000)
                 self.pulseGenerator.setDelay('secondaryGasTime', self.secondaryGasTime / 1000, ref_chan=pulseGeneratorOutputs['secondaryGasTime']['ref'])
+                
+                if POWER_SUPPLY != 'EB-100':
+                    # These triggers only exists for capacitor discharges
+                    self.pulseGenerator.setDelay('ignitronDelay', self.ignitronDelay / 1000)
+                    self.pulseGenerator.setDelay('dumpDelay', (self.dumpDelay + self.ignitronDelay) / 1000)
+                    # We also need to set the hv enable timing to a dummy variable to pass it to the daq
+                    self.hvStart = 0
+                else:
+                    # These triggers only exists for direct drive
+                    self.pulseGenerator.setDelay('scopeTrigger', (self.dumpDelay + self.hvStart) / 1000)
+                    # Need to set the ignitron delay to a dummy variable to pass it to the daq
+                    self.ignitronDelay = 0
+
 
                 # Reset the timing on the daq
-                self.NI_DAQ.set_timing(self.dumpDelay / 1000, self.ignitronDelay / 1000, self.spectrometerDelay / 1000, self.secondaryGasTime / 1000)
+                self.NI_DAQ.set_timing(self.dumpDelay / 1000, self.spectrometerDelay / 1000, self.secondaryGasTime / 1000,
+                                       ignitronDelay=self.ignitronDelay / 1000, hvStart=self.hvStart / 1000)
 
             # Check if the save folder has been selected, and if so allow user to begin checklist
             if self.saveFolderSet:
@@ -487,27 +513,39 @@ class CMFX_App(TestingApp):
                 if self.charging:
                     self.chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply[POWER_SUPPLY] / maxAnalogInput	
                     self.chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply[POWER_SUPPLY] / maxAnalogInput # +10 because theres an offset for whatever reason	
-                    self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider	
                     
                     voltagePSPoint = self.chargeVoltagePS[-1]
                     currentPSPoint = self.chargeCurrentPS[-1]
-                    capacitorVoltagePoint = self.capacitorVoltage[-1]
+                    
+                    if POWER_SUPPLY != 'EB-100':
+                        self.capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider
+                        capacitorVoltagePoint = self.capacitorVoltage[-1]
                 
                 else:
                     chargeVoltagePS = (voltages['Power Supply Voltage']) * maxVoltagePowerSupply[POWER_SUPPLY] / maxAnalogInput	
                     chargeCurrentPS = (voltages['Power Supply Current'] + 10) * maxCurrentPowerSupply[POWER_SUPPLY] / maxAnalogInput # +10 because theres an offset for whatever reason	
-                    capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider
                     	
                     voltagePSPoint = chargeVoltagePS[-1]
                     currentPSPoint = chargeCurrentPS[-1]
-                    capacitorVoltagePoint = capacitorVoltage[-1]
+
+                    if POWER_SUPPLY != 'EB-100':
+                        capacitorVoltage = voltages['Capacitor Voltage'] * voltageDivider
+                        capacitorVoltagePoint = capacitorVoltage[-1]
 
             self.voltagePSText.set(f'Power Supply V: {voltagePSPoint / 1000:.2f} kV')	
             self.currentPSText.set(f'Power Supply I: {currentPSPoint * 1000:.2f} mA')
-            self.capacitorVoltageText.set(f'Capacitor V: {capacitorVoltagePoint / 1000:.2f} kV')	
-
-            if not self.idleMode:	
-                self.progressBar.configure(amountused = np.abs(int(100 * capacitorVoltagePoint / 1000 / self.chargeVoltage)))
+            
+            if POWER_SUPPLY == 'EB-100':
+                if not self.idleMode:
+                    countdownCurrent = time.time() - self.countdownStart
+                    if countdownCurrent >= countdownTime:
+                        self.progressBar.configure(amountused = 0)
+                    else:
+                        self.progressBar.configure(amountused = int(countdownTime - countdownCurrent))
+            else:
+                self.capacitorVoltageText.set(f'Capacitor V: {capacitorVoltagePoint / 1000:.2f} kV')
+                if not self.idleMode:
+                    self.progressBar.configure(amountused = np.abs(int(100 * capacitorVoltagePoint / 1000 / self.chargeVoltage)))
 
             # Logic heirarchy for charge state and countdown text
             if self.discharged:
@@ -549,7 +587,9 @@ class CMFX_App(TestingApp):
             else:
                 self.chargeStateText.set('Not Charged')
 
-            if self.charging and not self.discharged:
+            
+            # This is only executed for capacitor discharges
+            if self.charging and not self.discharged and POWER_SUPPLY != 'EB-100':
                 N = len(self.chargeVoltagePS)	
                 self.chargeTime = np.linspace(0, (N - 1) / systemStatus_sample_rate, N)	
                 self.timePoint = (N - 1) / systemStatus_sample_rate
@@ -583,15 +623,6 @@ class CMFX_App(TestingApp):
                     self.charged = True
                     thread = Thread(target=self.discharge)	
                     thread.start()
-
-                # Voltage reaches a certain value of chargeVoltage to discharge
-                if np.abs(capacitorVoltagePoint) >= cameraRecordVoltageLimit * self.chargeVoltage * 1000 and not self.cameraRecording:
-                    self.cameraRecording = True
-
-                    # Send a request to remote computer to begin recording
-                    # Run it on a separate thread because otherwise it will wait for response until it's done recording
-                    Thread(target=requests.get, args=(f'http://169.254.146.121/record_cameras?n={self.runNumber}&dsc=1',)).start()
-                    Thread(target=requests.get, args=(f'http://169.254.146.131/record_cameras?n={self.runNumber}&dsc=1',)).start()
 
         def updatePressureStatus():
             chamberPressure = 8e-4
@@ -650,13 +681,17 @@ class CMFX_App(TestingApp):
     def performAnalysis(self):
         print('Performing analysis...')
         analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent,
-                            self.dumpDelay, self.ignitronDelay, self.polarity)
+                            self.dumpDelay, self.ignitronDelay, self.primaryGasStart, self.polarity)
         self.dischargeVoltageFiltered = analysis.voltage_filtered / 1000
         self.dischargeCurrentFiltered = analysis.current_filtered
-        self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent)
-        self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent)
-        self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage) * 10
-        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent) / 10
+        self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent) / 100
+        self.chamberProtectionCurrentFiltered = analysis.lowPassFilter(self.chamberProtectionCurrent) / 100
+        self.feedthroughVoltageFiltered = analysis.lowPassFilter(self.feedthroughVoltage) / 10
+        self.feedthroughCurrentFiltered = analysis.lowPassFilter(self.feedthroughCurrent) / 100
+        if POWER_SUPPLY == 'EB-100':
+            self.PSVoltageFiltered = analysis.lowPassFilter(self.PSVoltage) / 1000
+            self.PSCurrentFiltered = analysis.lowPassFilter(self.PSCurrent)
+            self.deposited_energy = analysis.get_deposited_enegry(self.PSCurrentFiltered)
 
         # Update the misc analysis text variables
         if analysis.success:
@@ -664,12 +699,12 @@ class CMFX_App(TestingApp):
                 textVariable.set(f'{analysisVariables[variable]["label"]}: {getattr(analysis, variable) * analysisVariables[variable]["factor"]:.1f}')
 
         # Diamagnetic loops
-        for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
-            if hasattr(self, variable):
-                densityVariable = f'{variable}Density'
-                signal = line.data
-                density = analysis.get_diamagneticDensity(signal)
-                setattr(self, densityVariable, density)
+        # for variable, line in self.resultsPlotData['Diamagnetic']['lines'].items():
+        #     if hasattr(self, variable):
+        #         densityVariable = f'{variable}Density'
+        #         signal = line.data
+        #         density = analysis.get_diamagneticDensity(signal)
+        #         setattr(self, densityVariable, density)
 
         # Accelerometer Data
         for variable, line in self.resultsPlotData['Accelerometer']['lines'].items():
@@ -681,7 +716,7 @@ class CMFX_App(TestingApp):
 
         # Diode Data
         for variable, line in self.resultsPlotData['Diode']['lines'].items():
-            if hasattr(self, variable):
+            if hasattr(self, variable): 
                 filteredVariable = f'{variable}Filtered'
                 signal = line.data
                 filteredSignal = analysis.lowPassFilter(signal)
@@ -713,6 +748,9 @@ class CMFX_App(TestingApp):
             # self.dumpCurrent /= dumpResistance
             # self.chamberProtectionCurrent /= chamberProtectionResistance
             self.dischargeVoltage *= voltageDivider
+            if POWER_SUPPLY == 'EB-100':
+                self.PSVoltage *= - maxVoltagePowerSupply[POWER_SUPPLY] / maxAnalogInput
+                self.PSCurrent *= maxCurrentPowerSupply[POWER_SUPPLY] / maxAnalogInput
 
             self.setData(self.resultsPlotData)
 
@@ -757,7 +795,6 @@ class CMFX_App(TestingApp):
         self.idleMode = True
         self.resultsSaved = False
         self.scopeDataSaved = False
-        self.cameraRecording = False
 
         # Reset the charging time point
         self.timePoint = 0.0
@@ -806,7 +843,10 @@ class CMFX_App(TestingApp):
         self.disableButtons()
 
         # Reset progress bar
-        self.progressBar.configure(amountused=0)
+        if POWER_SUPPLY == 'EB-100':
+            self.progressBar.configure(amountused=countdownTime)
+        else:
+            self.progressBar.configure(amountused=0)
 
         # Set the run number
         self.setRunNumber()
