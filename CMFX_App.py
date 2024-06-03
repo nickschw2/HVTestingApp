@@ -256,7 +256,7 @@ class CMFX_App(TestingApp):
             self.chargeButton = ttk.Button(self.buttons, text='Charge',
                                         command=self.startDirectDrive, bootstyle='warning')
             self.dischargeButton = ttk.Button(self.buttons, text='Discharge',
-                                        command=self.stopDirectDrive, bootstyle='danger')
+                                        command=self.dischargeDirectDrive, bootstyle='danger')
         else:
             self.chargeButton = ttk.Button(self.buttons, text='Charge',
                                         command=self.charge, bootstyle='warning')
@@ -536,12 +536,16 @@ class CMFX_App(TestingApp):
             self.currentPSText.set(f'Power Supply I: {currentPSPoint * 1000:.2f} mA')
             
             if POWER_SUPPLY == 'EB-100':
-                if not self.idleMode:
-                    countdownCurrent = time.time() - self.countdownStart
-                    if countdownCurrent >= countdownTime:
+                if not self.idleMode and not self.discharged:
+                    countdownNow = time.time() - self.countdownStart
+                    # If the countdown is finished, "discharge" the power supply, i.e. enable high voltage
+                    if countdownNow >= countdownTime:
                         self.progressBar.configure(amountused = 0)
+                        thread = Thread(target=self.dischargeDirectDrive)
+                        thread.start()
+                        self.discharged = True
                     else:
-                        self.progressBar.configure(amountused = int(countdownTime - countdownCurrent))
+                        self.progressBar.configure(amountused = int(countdownTime - countdownNow))
             else:
                 self.capacitorVoltageText.set(f'Capacitor V: {capacitorVoltagePoint / 1000:.2f} kV')
                 if not self.idleMode:
@@ -691,11 +695,12 @@ class CMFX_App(TestingApp):
         if POWER_SUPPLY == 'EB-100':
             self.PSVoltageFiltered = analysis.lowPassFilter(self.PSVoltage) / 1000
             self.PSCurrentFiltered = analysis.lowPassFilter(self.PSCurrent)
-            self.deposited_energy = analysis.get_deposited_enegry(self.PSCurrentFiltered)
+            self.depositedEnergy = analysis.get_deposited_enegry(self.PSCurrentFiltered)
 
         # Update the misc analysis text variables
         if analysis.success:
             for variable, textVariable in self.analysisText_dict.items():
+                # value = getattr(analysis, f'get_{variable}')
                 textVariable.set(f'{analysisVariables[variable]["label"]}: {getattr(analysis, variable) * analysisVariables[variable]["factor"]:.1f}')
 
         # Diamagnetic loops

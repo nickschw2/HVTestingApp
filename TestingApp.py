@@ -544,39 +544,6 @@ class TestingApp(ttk.Window):
             self.arm_http()
             self.countdownStart = time.time()
             print(f'Starting countdown for {countdownTime} seconds')
-            time.sleep(10)
-
-            ### Operate charging ###
-            print('Charging')
-            if SHOT_MODE:
-                # Record base pressures when charging begins
-                self.recordPressure()
-            
-            # Close the load switch
-            self.operateSwitch('Load Switch', True)
-            time.sleep(switchWaitTime)
-
-            # Actually begin charging power supply
-            self.powerSupplyRamp(action='charge')
-
-            # Start the pulse generator
-            self.runDate, self.runTime = self.pulseGenerator.triggerStart()
-
-            # Read from DAQ
-            self.NI_DAQ.read_discharge()
-
-            # Actually begin discharging power supply before opening load switch
-            self.powerSupplyRamp(action='discharge')
-
-            # Wait a while before closing the mechanical dump switch
-            time.sleep(hardCloseWaitTime)
-            self.operateSwitch('Load Switch', False)
-
-            self.discharged = True
-
-            # Save discharge on a separate thread
-            self.saveDischarge_thread = Thread(target=self.saveDischarge)
-            self.saveDischarge_thread.start()
 
     def dischargeDirectDrive(self):
         def discharge_switch():
@@ -594,8 +561,8 @@ class TestingApp(ttk.Window):
             self.powerSupplyRamp(action='charge')
 
             # Start the pulse generator
-            self.charging = True
             self.runDate, self.runTime = self.pulseGenerator.triggerStart()
+            self.discharged = True
 
             # Read from DAQ
             self.NI_DAQ.read_discharge()
@@ -607,9 +574,6 @@ class TestingApp(ttk.Window):
             time.sleep(hardCloseWaitTime)
             self.operateSwitch('Load Switch', False)
 
-            self.charging = False
-            self.discharged = True
-
             # Save discharge on a separate thread
             self.saveDischarge_thread = Thread(target=self.saveDischarge)
             self.saveDischarge_thread.start()
@@ -629,79 +593,12 @@ class TestingApp(ttk.Window):
                 # Reset the trigger just before discharging
                 self.NI_DAQ.reset_discharge_trigger()
 
-                # Force power supply to discharge
-                self.powerSupplyRamp(action='discharge')
-
-                self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
-
-                # Operate switches
-                self.operateSwitch('Power Supply Switch', False)
-                time.sleep(switchWaitTime)
-
-                discharge_switch()
-
-        if not self.idleMode:
-            if not self.charged:
-                popup()
-            else:
-                discharge_switch()
-        else:
-            popup()
-
-        # Disable all buttons except for reset, if logged in
-        self.disableButtons()
-        if self.loggedIn:
-            self.resetButton.configure(state='normal')
-    
-    def stopDirectDrive(self):
-        def discharge_switch():
-            # Start the pulse generator
-            self.runDate, self.runTime = self.pulseGenerator.triggerStart()
-
-            # Read from DAQ
-            self.NI_DAQ.read_discharge()
-
-            # Actually begin discharging power supply before opening load switch
-            self.powerSupplyRamp(action='discharge')
-
-            # Wait a while before closing the mechanical dump switch
-            time.sleep(hardCloseWaitTime)	
-            self.operateSwitch('Load Switch', False)
-
-            self.charging = False
-            self.discharged = True
-
-            # Save discharge on a separate thread
-            self.saveDischarge_thread = Thread(target=self.saveDischarge)
-            self.saveDischarge_thread.start()
-
-        def popup():
-            # Popup window to confirm discharge
-            dischargeConfirmName = 'Discharge'
-            dischargeConfirmText = 'Are you sure you want to discharge?'
-            dischargeConfirmWindow = MessageWindow(self, dischargeConfirmName, dischargeConfirmText)
-
-            cancelButton = ttk.Button(dischargeConfirmWindow.bottomFrame, text='Cancel', command=dischargeConfirmWindow.destroy, bootstyle='danger')
-            cancelButton.pack(side='left')
-
-            dischargeConfirmWindow.wait_window()
-
-            if dischargeConfirmWindow.OKPress:
-                # Reset the trigger just before discharging
-                self.NI_DAQ.reset_discharge_trigger()
-
-                # Force power supply to discharge
-                self.powerSupplyRamp(action='discharge')
-
                 self.NI_DAQ.remove_tasks(self.NI_DAQ.dump_task_names + self.NI_DAQ.switch_task_names)
 
                 discharge_switch()
 
         if not self.idleMode:
-            if not self.charged:
-                popup()
-            else:
-                discharge_switch()
+            discharge_switch()
         else:
             popup()
 

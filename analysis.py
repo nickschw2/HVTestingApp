@@ -20,11 +20,11 @@ class Analysis():
         self.current_filtered = self.lowPassFilter(current)
 
         try:
-            self.get_decay_time()
-            self.get_stored_energy()
+            self.get_decayTime()
+            self.get_storedEnergy()
             self.get_capacitance()
-            self.get_mom_conf_time()
-            self.get_velocity()
+            self.get_tauM()
+            self.get_dumpVelocity()
             self.success = True
         except Exception as e:
             print(e)
@@ -46,7 +46,7 @@ class Analysis():
         sos = signal.butter(order, cutoff_freq, btype='lowpass', output='sos', fs=samp_freq)
         return signal.sosfilt(sos, data)
     
-    def get_decay_time(self):
+    def get_decayTime(self):
         # Find the point just before the dump. Used to calculate resistance of the plasma at the moment of dump
         self.voltage_drop_index = np.where(self.time_sec > self.dumpDelay + self.ignitronDelay)[0][0]
 
@@ -87,26 +87,26 @@ class Analysis():
     def exp_decay(self, x, m, tau, b):
         return m * np.exp(-x / tau) + b
     
-    def get_stored_energy(self):
+    def get_storedEnergy(self):
         if not hasattr(self, 'tau'):
-            self.get_decay_time()
+            self.get_decayTime()
 
-        self.stored_energy = np.abs(integrate.trapezoid(self.exp_current * self.exp_voltage, self.exp_time))
+        self.storedEnergy = np.abs(integrate.trapezoid(self.exp_current * self.exp_voltage, self.exp_time))
 
     def get_capacitance(self):
-        if not hasattr(self, 'stored_energy'):
-            self.get_stored_energy()
+        if not hasattr(self, 'storedEnergy'):
+            self.get_storedEnergy()
 
         # self.capacitance = self.tau / 1000 / (self.resistance_at_dump * 1000) # [F]
 
         # 1/2 CV^2 = int(I * V)
-        self.capacitance = 2 * self.stored_energy / self.voltage_at_dump**2 # [F]
+        self.capacitance = 2 * self.storedEnergy / self.voltage_at_dump**2 # [F]
 
-    def get_mom_conf_time(self):
+    def get_tauM(self):
         if not hasattr(self, 'capacitance'):
             self.get_capacitance()
 
-        self.tau_M = self.capacitance * self.resistance_at_dump
+        self.tauM = self.capacitance * self.resistance_at_dump
 
     # def get_density(self, length, inner_radius, outer_radius, B_0, species):
     #     if not hasattr(self, 'capacitance'):
@@ -120,7 +120,7 @@ class Analysis():
     #     # 1/2 CV^2 = 1/2 n m_i v^2 V_p
     #     self.RC_density = self.capacitance * B_0**2 * (outer_radius - inner_radius) / (np.pi * m_i * (outer_radius + inner_radius) * length)
     
-    def get_velocity(self):
+    def get_dumpVelocity(self):
         # Electric field (V / m)
         self.E = self.voltage / plasma_radius_outer
         
@@ -136,7 +136,7 @@ class Analysis():
         self.discharge_current = current[discharge_indices]
         self.discharge_voltage = self.voltage_filtered[discharge_indices]
 
-        self.deposited_energy = np.abs(integrate.trapezoid(self.discharge_current * self.discharge_voltage, self.discharge_time))
+        self.depositedEnergy = np.abs(integrate.trapezoid(self.discharge_current * self.discharge_voltage, self.discharge_time))
 
     def get_diamagneticDensity(self, data):
         # Filter and integrate

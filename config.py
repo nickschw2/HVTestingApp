@@ -216,11 +216,11 @@ samp_freq = 100000 # Frequency for acquiring data [Hz]
 switch_samp_freq = 1000 # Frequency for triggering switches [Hz]
 
 analysisVariables = {'decayTime': {'label': 'Decay Time (ms)', 'factor': 1e3},
-                     'stored_energy': {'label': 'Plasma Energy (J)', 'factor': 1},
+                     'storedEnergy': {'label': 'Plasma Energy (J)', 'factor': 1},
                      'capacitance': {'label': 'Plasma Cap. (uF)', 'factor': 1e6},
-                     'tau_M': {'label': 'RC Time (ms)', 'factor': 1e3},
+                     'tauM': {'label': 'RC Time (ms)', 'factor': 1e3},
                      'dumpVelocity': {'label': 'Avg. Vel. (km/s)', 'factor': 1e-3},
-                     'deposited_energy': {'label': 'Depos. Energy (kJ)', 'factor': 1e-3}}
+                     'depositedEnergy': {'label': 'Depos. Energy (kJ)', 'factor': 1e-3}}
 
 # Results plot
 # Create a small class to store line label and data so that the data is mutable (unlike namedtuple, for example)
