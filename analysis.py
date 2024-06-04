@@ -4,7 +4,7 @@ import numpy as np
 from scipy import signal, integrate, optimize
 
 class Analysis():
-    def __init__(self, time, timeUnit, voltage, current, dumpDelay, ignitronDelay, gasStart, polarity):
+    def __init__(self, time, timeUnit, voltage, current, dumpDelay, ignitronDelay, gasStart, hvStart, polarity):
         self.time = time
         self.timeUnit = timeUnit
         self.dumpDelay = dumpDelay / 1000 # In ms by default, convert to s
@@ -13,6 +13,7 @@ class Analysis():
         self.voltage = voltage
         self.current = current
         self.gasStart = gasStart / 1000 # In ms by default, convert to s
+        self.hvStart = hvStart / 1000 # In ms by default, convert to s
         self.polarity = polarity
 
         # Send voltage and current through filter
@@ -25,10 +26,8 @@ class Analysis():
             self.get_capacitance()
             self.get_tauM()
             self.get_dumpVelocity()
-            self.success = True
         except Exception as e:
             print(e)
-            self.success = False
 
     def set_time(self):
         # Get time in seconds
@@ -48,11 +47,11 @@ class Analysis():
     
     def get_decayTime(self):
         # Find the point just before the dump. Used to calculate resistance of the plasma at the moment of dump
-        self.voltage_drop_index = np.where(self.time_sec > self.dumpDelay + self.ignitronDelay)[0][0]
+        self.voltage_drop_index = np.where(self.time_sec > self.dumpDelay + self.ignitronDelay + self.hvStart)[0][0]
 
         # Separate out the dump trace
         dump_window = 0.2 # [s]
-        dump_indices = (self.time_sec >= self.dumpDelay + self.ignitronDelay) & (self.time_sec <= self.dumpDelay + self.ignitronDelay + dump_window)
+        dump_indices = (self.time_sec >= self.dumpDelay + self.ignitronDelay + self.hvStart) & (self.time_sec <= self.dumpDelay + self.ignitronDelay + self.hvStart + dump_window)
         self.dump_time = self.time_sec[dump_indices]
         self.dump_current = self.current_filtered[dump_indices]
         self.dump_voltage = self.voltage_filtered[dump_indices]
@@ -97,8 +96,6 @@ class Analysis():
         if not hasattr(self, 'storedEnergy'):
             self.get_storedEnergy()
 
-        # self.capacitance = self.tau / 1000 / (self.resistance_at_dump * 1000) # [F]
-
         # 1/2 CV^2 = int(I * V)
         self.capacitance = 2 * self.storedEnergy / self.voltage_at_dump**2 # [F]
 
@@ -131,7 +128,7 @@ class Analysis():
         self.dumpVelocity = self.voltage_at_dump / ((plasma_radius_outer - plasma_radius_inner) * B0)
 
     def get_deposited_enegry(self, current):
-        discharge_indices = (self.time_sec < self.dumpDelay + self.ignitronDelay) & (self.time_sec > self.ignitronDelay + self.gasStart)
+        discharge_indices = (self.time_sec < self.dumpDelay + self.ignitronDelay + self.hvStart) & (self.time_sec > self.ignitronDelay + self.gasStart + self.hvStart)
         self.discharge_time = self.time_sec[discharge_indices]
         self.discharge_current = current[discharge_indices]
         self.discharge_voltage = self.voltage_filtered[discharge_indices]

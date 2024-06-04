@@ -685,7 +685,7 @@ class CMFX_App(TestingApp):
     def performAnalysis(self):
         print('Performing analysis...')
         analysis = Analysis(self.dischargeTime, self.dischargeTimeUnit, self.dischargeVoltage, self.dischargeCurrent,
-                            self.dumpDelay, self.ignitronDelay, self.primaryGasStart, self.polarity)
+                            self.dumpDelay, self.ignitronDelay, self.primaryGasStart, self.hvStart, self.polarity)
         self.dischargeVoltageFiltered = analysis.voltage_filtered / 1000
         self.dischargeCurrentFiltered = analysis.current_filtered
         self.dumpCurrentFiltered = analysis.lowPassFilter(self.dumpCurrent) / 100
@@ -696,11 +696,12 @@ class CMFX_App(TestingApp):
             self.PSVoltageFiltered = analysis.lowPassFilter(self.PSVoltage) / 1000
             self.PSCurrentFiltered = analysis.lowPassFilter(self.PSCurrent)
             self.depositedEnergy = analysis.get_deposited_enegry(self.PSCurrentFiltered)
+        else:
+            self.depositedEnergy = analysis.get_deposited_enegry(self.dischargeCurrentFiltered)
 
         # Update the misc analysis text variables
-        if analysis.success:
-            for variable, textVariable in self.analysisText_dict.items():
-                # value = getattr(analysis, f'get_{variable}')
+        for variable, textVariable in self.analysisText_dict.items():
+            if hasattr(analysis, variable):
                 textVariable.set(f'{analysisVariables[variable]["label"]}: {getattr(analysis, variable) * analysisVariables[variable]["factor"]:.1f}')
 
         # Diamagnetic loops
